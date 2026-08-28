@@ -1,4 +1,4 @@
-import { renderGantt } from './gantt.js?v=1.4.3';
+import { renderGantt } from './gantt.js?v=1.4.4';
 import { saveLocal, loadActive, loadProject, listProjects, deleteProject, setActiveProject } from './storage.js';
 
 const $ = (id) => document.getElementById(id);
