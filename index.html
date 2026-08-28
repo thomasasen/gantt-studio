@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <meta name="theme-color" content="#16324f">
+  <meta name="description" content="Gantt Studio – browserbasierte Projektplanung mit Aufgaben, Abhängigkeiten, Phasen, Gates, Baselines, Risiken und JSON-Import/-Export.">
+  <title>Gantt Studio</title>
+  <link rel="stylesheet" href="./assets/css/app.css?v=1.0.0">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand" aria-label="Gantt Studio">
+      <div class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></div>
+      <div>
+        <strong>Gantt Studio</strong>
+        <small>Project planning in the browser</small>
+      </div>
+    </div>
+
+    <nav class="toolbar" aria-label="Projektaktionen">
+      <button class="btn" id="newProjectBtn" type="button">Neu</button>
+      <button class="btn" id="openProjectBtn" type="button">Öffnen</button>
+      <button class="btn" id="saveProjectBtn" type="button">Speichern</button>
+      <button class="btn primary" id="addTaskBtn" type="button">+ Aufgabe</button>
+      <input id="fileInput" type="file" accept="application/json,.json,.gantt" hidden>
+    </nav>
+  </header>
+
+  <main class="app-shell">
+    <section class="project-head panel">
+      <div class="project-title-wrap">
+        <label class="eyebrow" for="projectName">PROJEKT</label>
+        <input id="projectName" class="project-name" value="Neues Projekt" aria-label="Projektname">
+        <div class="project-meta" id="projectMeta">Lokaler Entwurf</div>
+      </div>
+
+      <div class="head-controls">
+        <label>
+          <span>Ansicht</span>
+          <select id="zoomSelect">
+            <option value="day">Tag</option>
+            <option value="week" selected>Woche</option>
+            <option value="month">Monat</option>
+          </select>
+        </label>
+        <button class="btn ghost" id="demoBtn" type="button">Demo laden</button>
+        <button class="btn ghost" id="settingsBtn" type="button">Anzeige</button>
+      </div>
+    </section>
+
+    <section class="metrics" id="metrics" aria-label="Projektkennzahlen"></section>
+
+    <section class="workspace panel">
+      <div class="workspace-head">
+        <div>
+          <h1>Projektplan</h1>
+          <p>Aufgaben links bearbeiten, Zeitplan rechts analysieren.</p>
+        </div>
+        <div class="legend" id="legend"></div>
+      </div>
+
+      <div class="gantt-scroller" id="ganttScroller">
+        <div class="gantt-stage" id="ganttStage" role="region" aria-label="Gantt-Diagramm">
+          <div class="empty-state" id="emptyState">
+            <strong>Noch keine Aufgaben</strong>
+            <span>Erstelle eine Aufgabe oder lade die Demo.</span>
+            <button class="btn primary" id="emptyAddBtn" type="button">Erste Aufgabe erstellen</button>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <dialog id="taskDialog" class="dialog">
+    <form method="dialog" id="taskForm">
+      <div class="dialog-head">
+        <div>
+          <div class="eyebrow">AUFGABE</div>
+          <h2 id="taskDialogTitle">Aufgabe bearbeiten</h2>
+        </div>
+        <button class="icon-btn" value="cancel" aria-label="Schließen" type="submit">×</button>
+      </div>
+
+      <input type="hidden" id="taskId">
+      <div class="form-grid">
+        <label class="span-2">Name<input id="taskName" required maxlength="120"></label>
+        <label>Start<input id="taskStart" type="date" required></label>
+        <label>Ende<input id="taskEnd" type="date" required></label>
+        <label>Typ<select id="taskType">
+          <option value="workstream">Workstream</option>
+          <option value="critical">Kritisch</option>
+          <option value="milestone">Meilenstein</option>
+          <option value="gate">Gate</option>
+        </select></label>
+        <label>Fortschritt<input id="taskProgress" type="number" min="0" max="100" step="5" value="0"></label>
+        <label>Owner<input id="taskOwner" maxlength="80"></label>
+        <label>Status<select id="taskStatus">
+          <option value="neutral">Neutral</option>
+          <option value="green">Grün</option>
+          <option value="amber">Gelb</option>
+          <option value="red">Rot</option>
+        </select></label>
+        <label>Risiko<select id="taskRisk">
+          <option value="none">Kein</option>
+          <option value="low">Niedrig</option>
+          <option value="medium">Mittel</option>
+          <option value="high">Hoch</option>
+          <option value="critical">Kritisch</option>
+        </select></label>
+        <label>Phase<select id="taskPhase"></select></label>
+        <label class="span-2">Abhängigkeiten<select id="taskDependencies" multiple size="4"></select></label>
+        <label>Baseline Start<input id="taskBaselineStart" type="date"></label>
+        <label>Baseline Ende<input id="taskBaselineEnd" type="date"></label>
+        <label>Puffer (Tage)<input id="taskBuffer" type="number" min="0" max="365" value="0"></label>
+        <label>Kosten (€)<input id="taskCost" type="number" min="0" step="100"></label>
+        <label class="span-2">Link<input id="taskUrl" type="url" placeholder="https://…"></label>
+        <label class="span-2">Notizen<textarea id="taskNotes" rows="3" maxlength="1000"></textarea></label>
+      </div>
+
+      <div class="dialog-actions">
+        <button class="btn danger" id="deleteTaskBtn" type="button">Löschen</button>
+        <div class="spacer"></div>
+        <button class="btn" value="cancel" type="submit">Abbrechen</button>
+        <button class="btn primary" id="saveTaskBtn" type="button">Übernehmen</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="settingsDialog" class="dialog compact">
+    <form method="dialog">
+      <div class="dialog-head">
+        <div><div class="eyebrow">ANZEIGE</div><h2>Gantt-Elemente</h2></div>
+        <button class="icon-btn" value="cancel" aria-label="Schließen" type="submit">×</button>
+      </div>
+      <div class="toggle-list" id="settingsList"></div>
+      <div class="dialog-actions"><div class="spacer"></div><button class="btn primary" value="cancel" type="submit">Fertig</button></div>
+    </form>
+  </dialog>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script type="module" src="./assets/js/app.js?v=1.0.0"></script>
+</body>
+</html>
