@@ -1,4 +1,4 @@
-import { renderGantt } from './gantt.js';
+import { renderGantt } from './gantt.js?v=1.4.3';
 import { saveLocal, loadActive, loadProject, listProjects, deleteProject, setActiveProject } from './storage.js';
 
 const $ = (id) => document.getElementById(id);
@@ -92,7 +92,8 @@ function bindEvents() {
   $('projectName').addEventListener('change', async e => { envelope.project.name = e.target.value.trim() || 'Unbenanntes Projekt'; touch(); await persist(); await renderPortfolio(); });
   $('saveTaskBtn').addEventListener('click', saveTask);
   $('deleteTaskBtn').addEventListener('click', deleteTask);
-  $('ganttStage').addEventListener('click', e => { if (Date.now() < (window.__ganttDragUntil || 0)) return; const node = e.target.closest('[data-task-id]'); const id=node?.dataset.taskId; if (id && !id.startsWith('phase-summary-')) openTaskDialog(id); });
+  $('ganttStage').addEventListener('click', e => { if (Date.now() < (window.__ganttDragUntil || 0)) return; const phaseRow=e.target.closest('[data-phase-id]'); const phaseId=phaseRow?.dataset.phaseId; if(phaseId){ collapsedPhases.has(phaseId)?collapsedPhases.delete(phaseId):collapsedPhases.add(phaseId); saveViewState(); renderPhaseToolbar(); renderGanttOnly(); return; } const node=e.target.closest('[data-task-id]'); const id=node?.dataset.taskId; if(id) openTaskDialog(id); });
+  $('ganttStage').addEventListener('keydown', e => { if(!['Enter',' '].includes(e.key)) return; const phaseRow=e.target.closest('[data-phase-id]'); const phaseId=phaseRow?.dataset.phaseId; if(!phaseId)return; e.preventDefault(); collapsedPhases.has(phaseId)?collapsedPhases.delete(phaseId):collapsedPhases.add(phaseId); saveViewState(); renderPhaseToolbar(); renderGanttOnly(); });
   $('phaseCollapseToolbar').addEventListener('click', handlePhaseCollapseClick);
   $('addPhaseBtn').addEventListener('click', () => openEntity('phase'));
   $('addMarkerBtn').addEventListener('click', () => openEntity('marker'));

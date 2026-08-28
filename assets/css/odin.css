@@ -54,3 +54,7 @@
   .planning-toggle-grid .toggle-row{font-size:12px}
   .relative-editor-grid>label{font-size:11px}
 }
+
+
+/* Clickable phase rows v1.4.3 */
+.phase-summary-row[data-phase-id]{cursor:pointer}
