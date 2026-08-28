@@ -28,8 +28,7 @@ export async function saveLocal(project) {
   });
 }
 
-export async function loadActive() {
-  const id = localStorage.getItem(ACTIVE_KEY);
+export async function loadProject(id) {
   if (!id) return null;
   const db = await openDb();
   return new Promise((resolve, reject) => {
@@ -37,6 +36,37 @@ export async function loadActive() {
     request.onsuccess = () => resolve(request.result || null);
     request.onerror = () => reject(request.error);
   });
+}
+
+export async function loadActive() {
+  return loadProject(localStorage.getItem(ACTIVE_KEY));
+}
+
+export async function listProjects() {
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const request = db.transaction(STORE, 'readonly').objectStore(STORE).getAll();
+    request.onsuccess = () => resolve((request.result || []).sort((a, b) => String(b.updatedAt || '').localeCompare(String(a.updatedAt || ''))));
+    request.onerror = () => reject(request.error);
+  });
+}
+
+export async function deleteProject(id) {
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE, 'readwrite');
+    tx.objectStore(STORE).delete(id);
+    tx.oncomplete = () => {
+      if (localStorage.getItem(ACTIVE_KEY) === id) localStorage.removeItem(ACTIVE_KEY);
+      resolve();
+    };
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+export function setActiveProject(id) {
+  if (id) localStorage.setItem(ACTIVE_KEY, id);
+  else localStorage.removeItem(ACTIVE_KEY);
 }
 
 export async function clearActive() {
