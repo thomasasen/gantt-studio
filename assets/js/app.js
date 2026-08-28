@@ -27,6 +27,7 @@ let collapsedPhases = new Set();
 let saveTimer = null;
 let toastTimer = null;
 let activeTab = 'project';
+let taskDetailsExpanded = false;
 
 function createEnvelope() {
   const now = new Date().toISOString();
@@ -75,6 +76,10 @@ function bindEvents() {
   $('openProjectBtn').addEventListener('click', () => $('fileInput').click());
   $('fileInput').addEventListener('change', importFile);
   $('addTaskBtn').addEventListener('click', () => openTaskDialog());
+  $('taskTableAddBtn').addEventListener('click', () => openTaskDialog());
+  $('taskDetailsToggle').addEventListener('click', toggleTaskDetails);
+  $('taskTableBody').addEventListener('click', handleTaskTableClick);
+  $('taskTableBody').addEventListener('keydown', handleTaskTableKeydown);
   $('guideBtn').addEventListener('click', () => $('guideDialog').showModal());
   $('designBtn').addEventListener('click', openDesignDialog);
   $('saveDesignBtn').addEventListener('click', saveDesign);
@@ -116,7 +121,7 @@ async function renderAll() {
   applyDesign();
   $('projectName').value = envelope.project.name;
   await renderPortfolio();
-  renderMeta(); renderMetrics(); renderPlanningLists(); syncSettings(); renderQuickSettings(); renderPhaseToolbar(); renderGanttOnly(); populateTaskPhases(); syncControlStates();
+  renderMeta(); renderMetrics(); renderPlanningLists(); syncSettings(); renderQuickSettings(); renderPhaseToolbar(); renderGanttOnly(); renderTaskTable(); populateTaskPhases(); syncControlStates();
 }
 
 async function renderPortfolio() {
@@ -309,6 +314,148 @@ function syncRelativeEditor(){const settings=envelope.project.planning.settings;
 async function handleRelativeSettingChange(e){const settings=envelope.project.planning.settings;if(e.target.id==='relativeEnabled')settings.showRelativeToday=e.target.checked;if(e.target.id==='relativeOffset')settings.relativeOffsetDays=Number(e.target.value);if(e.target.id==='relativeMode')settings.relativeDayMode=e.target.value;if(e.target.id==='relativeLabel')settings.relativeLabel=e.target.value;if(e.target.id==='relativeColor')settings.relativeColor=e.target.value;if(e.target.id==='relativeStyle')settings.relativeStyle=e.target.value;if(e.target.id==='relativeSkipHolidays')settings.relativeSkipHolidays=e.target.checked;normalizeRelativeSettings(settings);touch();await persist();syncRelativeEditor();renderGanttOnly();}
 async function handleRelativeTargetDateChange(){const target=$('relativeTargetDate').value;if(!target)return;const settings=envelope.project.planning.settings;normalizeRelativeSettings(settings);if(settings.relativeDayMode==='workdays'&&!isWorkdayIso(target,settings.relativeSkipHolidays!==false)){toast('Das gewählte Datum ist kein Arbeitstag. Bitte einen Arbeitstag wählen oder auf Kalendertage umstellen.',true);syncRelativeEditor();return;}settings.relativeOffsetDays=offsetFromTarget(target);touch();await persist();syncRelativeEditor();renderGanttOnly();}
 function jumpToRelativeLine(){if(!envelope.project.planning.settings.showRelativeToday)return;switchTab('project');renderGanttOnly();requestAnimationFrame(()=>{const line=document.querySelector('.relative-today-line'),scroller=$('ganttScroller');if(!line||!scroller){toast(`Das Zieldatum ${formatDate(calculateRelativeTarget())} liegt außerhalb des aktuell dargestellten Projektzeitraums.`,true);return;}const leftWidth=parseInt(getComputedStyle(document.documentElement).getPropertyValue('--left-width'))||430;scroller.scrollTo({left:Math.max(0,leftWidth+line.offsetLeft-scroller.clientWidth/2),behavior:'smooth'});});}
+
+function toggleTaskDetails(){
+  taskDetailsExpanded=!taskDetailsExpanded;
+  renderTaskTable();
+}
+
+function renderTaskTable(){
+  const table=$('taskOverviewTable'), body=$('taskTableBody'), toggle=$('taskDetailsToggle');
+  if(!table||!body||!toggle)return;
+  table.classList.toggle('task-details-collapsed',!taskDetailsExpanded);
+  toggle.setAttribute('aria-expanded',String(taskDetailsExpanded));
+  toggle.innerHTML=`<span aria-hidden="true">${taskDetailsExpanded?'▾':'▸'}</span> ${taskDetailsExpanded?'Details ausblenden':'Details anzeigen'}`;
+
+  const tasks=envelope.project.tasks;
+  if(!tasks.length){
+    body.innerHTML='<tr><td colspan="11" class="task-table-empty">Noch keine Aufgaben vorhanden.</td></tr>';
+    return;
+  }
+  const phaseMap=new Map((envelope.project.planning?.phases||[]).map(p=>[String(p.id),p.name]));
+  const taskMap=new Map(tasks.map(t=>[String(t.id),t.name]));
+  body.innerHTML=tasks.map(task=>{
+    const dependencies=(task.dependencies||[]).map(id=>taskMap.get(String(id))||id).join(', ');
+    const phase=phaseMap.get(String(task.phaseId||''))||'–';
+    const note=task.notes?`<small class="task-table-note">${esc(task.notes)}</small>`:'';
+    const link=task.url?`<a class="task-table-document" href="${esc(task.url)}" target="_blank" rel="noopener noreferrer">↗ Dokument</a>`:'';
+    const baseline=task.baselineStart&&task.baselineEnd?`<small class="task-table-baseline">Soll: ${formatDate(task.baselineStart)} – ${formatDate(task.baselineEnd)}</small>`:'';
+    return `<tr data-task-row-id="${esc(task.id)}">
+      <td class="task-inline-cell" data-task-field="name" tabindex="0"><strong>${esc(task.name)}</strong>${note}${link}</td>
+      <td class="task-detail-column task-inline-cell" data-task-field="phaseId" tabindex="0">${esc(phase)}</td>
+      <td class="task-detail-column task-inline-cell" data-task-field="type" tabindex="0"><span class="task-type-badge task-type-${esc(task.type)}">${esc(taskTypeLabel(task.type))}</span></td>
+      <td class="task-inline-cell task-period-cell" data-task-field="period" tabindex="0">${formatDate(task.start)} – ${formatDate(task.end)}${baseline}</td>
+      <td class="task-inline-cell" data-task-field="progress" tabindex="0"><div class="task-progress-cell"><span class="task-progress-track"><i style="width:${clamp(Number(task.progress)||0,0,100)}%"></i></span><b>${clamp(Number(task.progress)||0,0,100)} %</b></div></td>
+      <td class="task-inline-cell" data-task-field="owner" tabindex="0">${task.owner?esc(task.owner):'<span class="muted">–</span>'}</td>
+      <td class="task-inline-cell" data-task-field="status" tabindex="0"><span class="task-status"><i class="task-status-dot ${esc(task.status||'neutral')}"></i>${esc(taskStatusLabel(task.status))}</span></td>
+      <td class="task-detail-column task-inline-cell" data-task-field="risk" tabindex="0"><span class="task-risk task-risk-${esc(task.risk||'none')}">${esc(taskRiskLabel(task.risk))}</span></td>
+      <td class="task-detail-column task-inline-cell" data-task-field="costEur" tabindex="0">${formatMoney(task.costEur||0)}</td>
+      <td class="task-detail-column task-inline-cell" data-task-field="dependencies" tabindex="0">${dependencies?esc(dependencies):'<span class="muted">Keine</span>'}</td>
+      <td class="task-table-actions"><button type="button" class="task-link-button" data-task-action="edit">Bearbeiten</button><button type="button" class="task-link-button delete" data-task-action="delete">Löschen</button></td>
+    </tr>`;
+  }).join('');
+}
+
+function handleTaskTableClick(e){
+  const action=e.target.closest('[data-task-action]');
+  if(action){
+    const row=action.closest('[data-task-row-id]'); if(!row)return;
+    if(action.dataset.taskAction==='edit')openTaskDialog(row.dataset.taskRowId);
+    else if(action.dataset.taskAction==='delete')deleteTaskFromTable(row.dataset.taskRowId);
+    return;
+  }
+  if(e.target.closest('a,button,input,select,textarea,label'))return;
+  const cell=e.target.closest('td[data-task-field]');
+  if(cell)openTaskInlineEditor(cell);
+}
+
+function handleTaskTableKeydown(e){
+  if(e.target.closest('.task-inline-editor')){
+    if(e.key==='Escape'){e.preventDefault();renderTaskTable();}
+    return;
+  }
+  const cell=e.target.closest('td[data-task-field]');
+  if(cell&&(e.key==='Enter'||e.key==='F2')){e.preventDefault();openTaskInlineEditor(cell);}
+}
+
+function openTaskInlineEditor(cell){
+  if(cell.classList.contains('editing'))return;
+  const row=cell.closest('[data-task-row-id]'), task=envelope.project.tasks.find(t=>String(t.id)===String(row?.dataset.taskRowId));
+  if(!task)return;
+  renderTaskTable();
+  const fresh=$('taskTableBody').querySelector(`[data-task-row-id="${cssEscape(task.id)}"] td[data-task-field="${cell.dataset.taskField}"]`);
+  if(!fresh)return;
+  const field=fresh.dataset.taskField;
+  fresh.classList.add('editing');
+  fresh.removeAttribute('tabindex');
+  fresh.innerHTML=`<div class="task-inline-editor" data-inline-task-id="${esc(task.id)}" data-inline-field="${esc(field)}">${taskInlineControl(field,task)}<span class="task-inline-actions"><button type="button" class="task-inline-save">✓</button><button type="button" class="task-inline-cancel">×</button></span></div>`;
+  const editor=fresh.querySelector('.task-inline-editor');
+  editor.querySelector('.task-inline-save').addEventListener('click',()=>saveTaskInlineEditor(editor));
+  editor.querySelector('.task-inline-cancel').addEventListener('click',renderTaskTable);
+  editor.addEventListener('keydown',e=>{if(e.key==='Escape'){e.preventDefault();renderTaskTable();}else if(e.key==='Enter'&&!e.shiftKey&&!e.target.matches('select[multiple]')){e.preventDefault();saveTaskInlineEditor(editor);}});
+  const focus=editor.querySelector('input,select'); if(focus)focus.focus();
+}
+
+function taskInlineControl(field,task){
+  const phases=envelope.project.planning?.phases||[];
+  const option=(value,label,selected)=>`<option value="${esc(value)}" ${selected?'selected':''}>${esc(label)}</option>`;
+  if(field==='name')return `<input data-inline-value type="text" maxlength="120" value="${esc(task.name)}">`;
+  if(field==='phaseId')return `<select data-inline-value><option value="">Keine Phase</option>${phases.map(p=>option(p.id,p.name,String(p.id)===String(task.phaseId||''))).join('')}</select>`;
+  if(field==='type')return `<select data-inline-value>${[['workstream','Arbeitspaket'],['critical','Kritisch markiert'],['milestone','Meilenstein'],['gate','Gate']].map(([v,l])=>option(v,l,task.type===v)).join('')}</select>`;
+  if(field==='period')return `<div class="task-inline-period"><input data-inline-start type="date" value="${esc(task.start)}"><span>–</span><input data-inline-end type="date" value="${esc(task.end)}"></div>`;
+  if(field==='progress')return `<input data-inline-value type="number" min="0" max="100" step="1" value="${clamp(Number(task.progress)||0,0,100)}">`;
+  if(field==='owner')return `<input data-inline-value type="text" maxlength="80" value="${esc(task.owner||'')}">`;
+  if(field==='status')return `<select data-inline-value>${[['neutral','Neutral'],['green','Grün'],['amber','Gelb'],['red','Rot']].map(([v,l])=>option(v,l,(task.status||'neutral')===v)).join('')}</select>`;
+  if(field==='risk')return `<select data-inline-value>${[['none','Kein'],['low','Niedrig'],['medium','Mittel'],['high','Hoch'],['critical','Kritisch']].map(([v,l])=>option(v,l,(task.risk||'none')===v)).join('')}</select>`;
+  if(field==='costEur')return `<input data-inline-value type="number" min="0" step="100" value="${Number(task.costEur)||0}">`;
+  if(field==='dependencies')return `<select data-inline-value multiple size="4">${envelope.project.tasks.filter(t=>t.id!==task.id).map(t=>option(t.id,t.name,(task.dependencies||[]).includes(t.id))).join('')}</select>`;
+  return '';
+}
+
+async function saveTaskInlineEditor(editor){
+  const id=editor.dataset.inlineTaskId, field=editor.dataset.inlineField;
+  const patch={};
+  if(field==='period'){
+    patch.start=editor.querySelector('[data-inline-start]').value;
+    patch.end=editor.querySelector('[data-inline-end]').value;
+  }else if(field==='dependencies')patch.dependencies=[...editor.querySelector('[data-inline-value]').selectedOptions].map(o=>o.value);
+  else{
+    const input=editor.querySelector('[data-inline-value]');
+    let value=input.value;
+    if(field==='progress')value=clamp(Number(value)||0,0,100);
+    if(field==='costEur')value=Math.max(0,Number(value)||0);
+    if(field==='name')value=value.trim().slice(0,120);
+    if(field==='owner')value=value.trim().slice(0,80);
+    patch[field]=value;
+  }
+  await updateTaskFromTable(id,patch);
+}
+
+async function updateTaskFromTable(id,patch){
+  const idx=envelope.project.tasks.findIndex(t=>String(t.id)===String(id));
+  if(idx<0)return;
+  const next={...envelope.project.tasks[idx],...patch};
+  if(!next.name?.trim())return toast('Der Aufgabenname darf nicht leer sein.',true);
+  if(!next.start||!next.end||next.end<next.start)return toast('Der Zeitraum ist ungültig.',true);
+  if((next.dependencies||[]).includes(next.id))return toast('Eine Aufgabe kann nicht von sich selbst abhängen.',true);
+  const copy=envelope.project.tasks.map((t,i)=>i===idx?next:t);
+  try{validateGraph(copy);}catch(e){return toast(e.message,true);}
+  envelope.project.tasks=copy;
+  sortTasks(); touch(); await persist(); await renderAll(); toast('Aufgabe aktualisiert.');
+}
+
+async function deleteTaskFromTable(id){
+  const task=envelope.project.tasks.find(t=>String(t.id)===String(id)); if(!task)return;
+  if(!confirm(`Aufgabe „${task.name}“ wirklich löschen?`))return;
+  envelope.project.tasks=envelope.project.tasks.filter(t=>String(t.id)!==String(id)).map(t=>({...t,dependencies:(t.dependencies||[]).filter(dep=>String(dep)!==String(id))}));
+  touch(); await persist(); await renderAll(); toast('Aufgabe gelöscht.');
+}
+
+function taskTypeLabel(type){return({workstream:'Arbeitspaket',critical:'Kritisch',milestone:'Meilenstein',gate:'Gate'})[type]||type||'–';}
+function taskStatusLabel(status){return({neutral:'Neutral',green:'Grün',amber:'Gelb',red:'Rot'})[status]||'Neutral';}
+function taskRiskLabel(risk){return({none:'Kein',low:'Niedrig',medium:'Mittel',high:'Hoch',critical:'Kritisch'})[risk]||'Kein';}
+function cssEscape(value){return String(value).replace(/(["\\])/g,'\\$1');}
+
 function renderPlanningLists(){const planning=envelope.project.planning,cost=envelope.project.tasks.reduce((sum,t)=>sum+(Number(t.costEur)||0),0);if($('planningCost'))$('planningCost').textContent=formatMoney(cost);if($('phaseCountBadge'))$('phaseCountBadge').textContent=`${planning.phases.length} ${planning.phases.length===1?'Phase':'Phasen'}`;const gates=envelope.project.tasks.filter(t=>t.type==='gate').length,markerTotal=planning.markers.length;if($('markerCountBadge'))$('markerCountBadge').textContent=`${markerTotal} ${markerTotal===1?'Stichtag':'Stichtage'}${gates?` · ${gates} ${gates===1?'Gate':'Gates'}`:''}`;if($('holidayCountBadge'))$('holidayCountBadge').textContent=`${planning.holidays.length} ${planning.holidays.length===1?'Sondertag':'Sondertage'}`;$('phaseList').innerHTML=entityRows('phase',planning.phases,p=>`${formatDate(p.start)} – ${formatDate(p.end)}`);$('markerList').innerHTML=entityRows('marker',planning.markers,p=>`${formatDate(p.date)} · ${p.style==='dashed'?'gestrichelt':p.style==='dotted'?'gepunktet':'durchgezogen'}`);$('holidayList').innerHTML=entityRows('holiday',planning.holidays,p=>`${formatDate(p.date)}${p.source?` · ${esc(p.source)}`:''}`);syncRelativeEditor();syncSettings();}
 
 function entityRows(kind,items,detail){return items.length?items.slice().sort((a,b)=>(a.start||a.date||'').localeCompare(b.start||b.date||'')).map(x=>`<button type="button" class="entity-row" data-entity-kind="${kind}" data-entity-id="${esc(x.id)}"><span><strong>${esc(x.name)}</strong><small>${detail(x)}</small></span><i style="background:${esc(x.color||'#DCE8EB')}"></i></button>`).join(''):'<div class="muted-empty">Noch keine Einträge.</div>';}
