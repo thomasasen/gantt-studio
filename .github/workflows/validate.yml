@@ -29,13 +29,16 @@ jobs:
           test -s assets/css/odin.css
           test -s examples/demo.gantt.json
           python -m json.tool examples/demo.gantt.json >/dev/null
-          grep -q 'assets/js/app.js?v=1.4.3' index.html
-          grep -q 'assets/css/app.css?v=1.4.3' index.html
-          grep -q 'assets/css/privacy.css?v=1.4.3' index.html
-          grep -q 'assets/css/odin.css?v=1.4.3' index.html
+          grep -q 'assets/js/app.js?v=1.4.4' index.html
+          grep -q 'assets/css/app.css?v=1.4.4' index.html
+          grep -q 'assets/css/privacy.css?v=1.4.4' index.html
+          grep -q 'assets/css/odin.css?v=1.4.4' index.html
           grep -q 'Readability scale v1.4.2' assets/css/odin.css
           grep -q 'Clickable phase rows v1.4.3' assets/css/odin.css
-          grep -q "gantt.js?v=1.4.3" assets/js/app.js
+          grep -q "gantt.js?v=1.4.4" assets/js/app.js
+          grep -q 'function periodWidth' assets/js/gantt.js
+          grep -q 'const labelLanes=\[\]' assets/js/gantt.js
+          grep -q 'text-overflow: ellipsis' assets/css/app.css
           grep -q 'dataset.phaseId' assets/js/gantt.js
           grep -q 'Deine Projekt- und Planungsdaten bleiben in diesem Browser' index.html
           grep -q 'phaseCollapseToolbar' index.html
