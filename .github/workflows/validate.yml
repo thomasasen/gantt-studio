@@ -29,10 +29,11 @@ jobs:
           test -s assets/css/odin.css
           test -s examples/demo.gantt.json
           python -m json.tool examples/demo.gantt.json >/dev/null
-          grep -q 'assets/js/app.js?v=1.4.0' index.html
-          grep -q 'assets/css/app.css?v=1.4.0' index.html
-          grep -q 'assets/css/privacy.css?v=1.4.0' index.html
-          grep -q 'assets/css/odin.css?v=1.4.0' index.html
+          grep -q 'assets/js/app.js?v=1.4.2' index.html
+          grep -q 'assets/css/app.css?v=1.4.2' index.html
+          grep -q 'assets/css/privacy.css?v=1.4.2' index.html
+          grep -q 'assets/css/odin.css?v=1.4.2' index.html
+          grep -q 'Readability scale v1.4.2' assets/css/odin.css
           grep -q 'Deine Projekt- und Planungsdaten bleiben in diesem Browser' index.html
           grep -q 'phaseCollapseToolbar' index.html
           grep -q 'centralExportBtn' index.html
