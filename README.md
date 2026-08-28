@@ -10,7 +10,7 @@ Die Anwendung ist unter
 
 erreichbar.
 
-## Stand v1.3.0
+## Stand v1.4.0
 
 ### Projektportfolio und lokale Speicherung
 
@@ -53,6 +53,12 @@ Die Odin-Phasenlogik wurde auf GitHub Pages übertragen:
 - Phasen anlegen, bearbeiten und löschen
 
 ### Planung & Darstellung
+
+- Odin-nahe Akkordeonseite mit Zählern für Darstellung, Phasen, Stichtage/Gates und Sondertage
+- Dynamische Zieldatumslinie mit Arbeits- oder Kalendertagen, direkter Datumsauswahl, eigener Bezeichnung, Farbe und Linienart
+- Arbeitstage können Wochenenden und importierte Feiertage überspringen
+- Fortschrittslinie und Abhängigkeiten sind getrennt schaltbar
+- Gesamtkosten werden in der Planungsansicht separat ausgewiesen
 
 - separater Arbeitsbereich `Planung & Darstellung`
 - zentrale Anzeigeoptionen

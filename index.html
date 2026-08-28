@@ -7,9 +7,9 @@
   <meta name="theme-color" content="#16324f">
   <meta name="description" content="Gantt Studio – browserbasierte Projektplanung mit Portfolio, Aufgaben, Abhängigkeiten, Phasen, Gates, Baselines, Risiken und Import/Export.">
   <title>Gantt Studio</title>
-  <link rel="stylesheet" href="./assets/css/app.css?v=1.3.0">
-  <link rel="stylesheet" href="./assets/css/privacy.css?v=1.3.0">
-  <link rel="stylesheet" href="./assets/css/odin.css?v=1.3.0">
+  <link rel="stylesheet" href="./assets/css/app.css?v=1.4.0">
+  <link rel="stylesheet" href="./assets/css/privacy.css?v=1.4.0">
+  <link rel="stylesheet" href="./assets/css/odin.css?v=1.4.0">
 </head>
 <body>
   <header class="topbar">
@@ -28,18 +28,6 @@
   </header>
 
   <main class="app-shell">
-    <section class="studio-nav panel" aria-label="Arbeitsbereich">
-      <div class="studio-tabs" role="tablist" aria-label="Gantt-Studio-Bereiche">
-        <button id="projectTabBtn" class="studio-tab active" type="button" role="tab" aria-selected="true" aria-controls="projectView">Projektplan</button>
-        <button id="planningTabBtn" class="studio-tab" type="button" role="tab" aria-selected="false" aria-controls="planningView">Planung &amp; Darstellung</button>
-      </div>
-      <div class="studio-nav-actions">
-        <div id="saveStatus" class="save-status saved" role="status" aria-live="polite"><span class="save-status-icon">✓</span><strong id="saveStatusText">Gespeichert</strong><span id="saveStatusDetail">Lokal im Browser</span></div>
-        <button class="text-action" id="guideBtn" type="button">Verstanden / Hilfe</button>
-        <button class="btn design-btn" id="designBtn" type="button">Design bearbeiten</button>
-      </div>
-    </section>
-
     <section class="project-head panel">
       <div class="project-title-wrap">
         <label class="eyebrow" for="projectName">EXECUTIVE PROJECT ROADMAP</label>
@@ -56,6 +44,19 @@
     </aside>
 
     <section class="metrics" id="metrics" aria-label="Projektkennzahlen"></section>
+
+    <section class="studio-nav panel" aria-label="Arbeitsbereich">
+      <div class="studio-tabs" role="tablist" aria-label="Gantt-Studio-Bereiche">
+        <button id="projectTabBtn" class="studio-tab active" type="button" role="tab" aria-selected="true" aria-controls="projectView">Projektplan</button>
+        <button id="planningTabBtn" class="studio-tab" type="button" role="tab" aria-selected="false" aria-controls="planningView">Planung &amp; Darstellung</button>
+      </div>
+      <div class="studio-nav-actions">
+        <div id="saveStatus" class="save-status saved" role="status" aria-live="polite"><span class="save-status-icon">✓</span><strong id="saveStatusText">Gespeichert</strong><span id="saveStatusDetail">Lokal im Browser</span></div>
+        <button class="text-action" id="guideBtn" type="button">Verstanden / Hilfe</button>
+        <button class="btn design-btn" id="designBtn" type="button">Design bearbeiten</button>
+      </div>
+    </section>
+
 
     <section id="projectView" class="studio-view" role="tabpanel" aria-labelledby="projectTabBtn">
       <section class="workspace panel">
@@ -82,12 +83,49 @@
 
     <section id="planningView" class="studio-view" role="tabpanel" aria-labelledby="planningTabBtn" hidden>
       <section class="planning-page panel">
-        <div class="planning-page-head"><div><span class="eyebrow">PLANUNG &amp; DARSTELLUNG</span><h1>Projektplan konfigurieren</h1><p>Darstellung, Phasen, Stichtage und Kalender zentral pflegen.</p></div></div>
-        <div class="settings-columns inline-settings">
-          <section class="settings-section"><h3>Darstellung</h3><div class="toggle-list" id="settingsList"></div><div class="mini-form"><label>Relative Linie<input id="relativeLabel" maxlength="80" placeholder="Vorbereitungstermin"></label><label>Versatz (Tage)<input id="relativeOffset" type="number" min="-3650" max="3650"></label></div></section>
-          <section class="settings-section"><div class="section-title-row"><h3>Phasen</h3><button class="btn small" id="addPhaseBtn" type="button">+ Phase</button></div><div id="phaseList" class="entity-list"></div></section>
-          <section class="settings-section"><div class="section-title-row"><h3>Stichtage / Marker</h3><button class="btn small" id="addMarkerBtn" type="button">+ Stichtag</button></div><div id="markerList" class="entity-list"></div></section>
-          <section class="settings-section"><div class="section-title-row"><h3>Feiertage &amp; Sondertage</h3><div><button class="btn small" id="importHolidayBtn" type="button">DE importieren</button><button class="btn small" id="addHolidayBtn" type="button">+ Sondertag</button></div></div><div id="holidayList" class="entity-list"></div></section>
+        <div class="planning-page-head">
+          <div>
+            <h1>Planung &amp; Darstellung</h1>
+            <p>Darstellung, Phasen, Stichtage und Sondertage übersichtlich verwalten.</p>
+          </div>
+          <div class="planning-cost-card"><span>Gesamtkosten</span><strong id="planningCost">0,00 €</strong></div>
+        </div>
+
+        <div class="planning-accordion-stack">
+          <details id="displaySection" class="planning-accordion" open>
+            <summary><span><strong>Darstellung</strong><small>Linien, Hervorhebungen und Balkeninformationen</small></span><span class="planning-summary-right"><span id="displayActiveCount" class="planning-count-badge">0 von 12 aktiv</span><span class="planning-chevron">⌃</span></span></summary>
+            <div class="planning-accordion-body">
+              <div class="toggle-list planning-toggle-grid" id="settingsList"></div>
+              <section id="relative-today-editor" class="relative-editor">
+                <div class="relative-editor-head"><div><h3>Dynamische Zieldatumslinie</h3><p>Zeigt automatisch „Heute plus oder minus X“ und wird bei jedem Öffnen neu berechnet.</p></div><label class="switch-label"><input id="relativeEnabled" type="checkbox"> Linie aktivieren</label></div>
+                <div class="relative-editor-grid">
+                  <label>Versatz<div class="input-suffix"><input id="relativeOffset" type="number" min="-3650" max="3650" step="1"><span>Tage</span></div></label>
+                  <label>Berechnung<select id="relativeMode"><option value="workdays">Arbeitstage</option><option value="calendar">Kalendertage</option></select></label>
+                  <label>Zieldatum direkt wählen<input id="relativeTargetDate" type="date"></label>
+                  <label>Eigene Bezeichnung<input id="relativeLabel" maxlength="80" placeholder="z. B. Tag 90"></label>
+                  <label>Linienfarbe<input id="relativeColor" class="color-wide" type="color"></label>
+                  <label>Linienart<select id="relativeStyle"><option value="solid">Durchgezogen</option><option value="dashed">Gestrichelt</option><option value="dotted">Gepunktet</option></select></label>
+                </div>
+                <label class="relative-skip-row"><input id="relativeSkipHolidays" type="checkbox"> Wochenenden und importierte Feiertage bei Arbeitstagen überspringen</label>
+                <div class="relative-result-row"><div><span>Berechnetes Datum</span><strong id="relativeResultText">–</strong></div><button id="relativeJumpBtn" class="btn" type="button">Zur Linie springen</button></div>
+              </section>
+            </div>
+          </details>
+
+          <details id="phaseSection" class="planning-accordion">
+            <summary><span><strong>Phasen</strong><small>Beispiel: Analyse, Build, Test oder Go-live</small></span><span class="planning-summary-right"><span id="phaseCountBadge" class="planning-count-badge">0 Phasen</span><span class="planning-chevron">⌄</span></span></summary>
+            <div class="planning-accordion-body"><div class="section-title-row"><h3>Phasen verwalten</h3><button class="btn small" id="addPhaseBtn" type="button">+ Phase</button></div><div id="phaseList" class="entity-list"></div></div>
+          </details>
+
+          <details id="markerSection" class="planning-accordion">
+            <summary><span><strong>Stichtage und Gates</strong><small>Go-live, Freigaben, Termine oder Deadlines</small></span><span class="planning-summary-right"><span id="markerCountBadge" class="planning-count-badge">0 Stichtage</span><span class="planning-chevron">⌄</span></span></summary>
+            <div class="planning-accordion-body"><div class="section-title-row"><h3>Stichtage verwalten</h3><button class="btn small" id="addMarkerBtn" type="button">+ Stichtag</button></div><p class="planning-note">Gates bleiben eigenständige Aufgaben vom Typ „Gate“. Diese Liste verwaltet zusätzliche vertikale Stichtagslinien.</p><div id="markerList" class="entity-list"></div></div>
+          </details>
+
+          <details id="holidaySection" class="planning-accordion">
+            <summary><span><strong>Feiertage und Sondertage</strong><small>Importieren oder einzelne Kalendertage markieren</small></span><span class="planning-summary-right"><span id="holidayCountBadge" class="planning-count-badge">0 Sondertage</span><span class="planning-chevron">⌄</span></span></summary>
+            <div class="planning-accordion-body"><div class="section-title-row"><h3>Kalenderausnahmen verwalten</h3><div><button class="btn small" id="importHolidayBtn" type="button">DE importieren</button><button class="btn small" id="addHolidayBtn" type="button">+ Sondertag</button></div></div><div id="holidayList" class="entity-list"></div></div>
+          </details>
         </div>
       </section>
     </section>
@@ -104,6 +142,6 @@
   <dialog id="guideDialog" class="dialog wide-dialog"><form method="dialog"><div class="dialog-head"><div><div class="eyebrow">GANTT STUDIO VERSTEHEN</div><h2>Projektplan, Symbole &amp; Datenspeicherung</h2></div><button class="icon-btn" value="cancel" type="submit">×</button></div><div class="guide-grid"><article><i class="guide-bar work"></i><h3>Arbeitspaket</h3><p>Ein Balken zeigt Zeitraum und Dauer einer Aufgabe.</p></article><article><i class="guide-bar critical"></i><h3>Kritisch markiertes Arbeitspaket</h3><p>Diese Kennzeichnung wird aktuell manuell gesetzt. Sie ist kein automatisch berechneter Critical Path.</p></article><article><i class="guide-diamond milestone"></i><h3>Meilenstein</h3><p>Eine Raute markiert ein wesentliches Ergebnis oder Ereignis.</p></article><article><i class="guide-diamond gate"></i><h3>Gate</h3><p>Ein Gate steht für eine Freigabe oder Managemententscheidung.</p></article><article><div class="guide-baseline-symbol" aria-hidden="true"><span class="guide-baseline-bar"></span><span class="guide-baseline-line"></span></div><h3>Baseline</h3><p>Die dünne Linie unter einem Balken zeigt den ursprünglich hinterlegten Plan.</p></article><article><div class="guide-buffer-symbol" aria-hidden="true"><span class="guide-buffer-bar"></span><span class="guide-buffer-extension"></span></div><h3>Puffer</h3><p>Der gestrichelte Bereich nach einer Aufgabe visualisiert hinterlegten Zeitpuffer.</p></article><article><div class="guide-status-symbol" aria-hidden="true"><span class="guide-status-dot green"></span><span class="guide-status-dot amber"></span><span class="guide-status-dot red"></span><span class="guide-risk-symbol">!</span></div><h3>Status &amp; Risiko</h3><p>Ampelstatus und Risikostufe ergänzen die reine Terminperspektive.</p></article><article><div class="guide-dependency-symbol" aria-hidden="true"><span class="guide-dependency-from"></span><span class="guide-dependency-path"></span><span class="guide-dependency-to"></span></div><h3>Abhängigkeiten</h3><p>Pfeile zeigen Vorgänger. Gantt Studio verhindert zyklische Abhängigkeiten.</p></article><article class="guide-storage"><span class="guide-local-mark">LOKAL</span><h3>Keine Projektdatenbank</h3><p>Projekt- und Planungsdaten werden in IndexedDB dieses Browsers gespeichert. Es gibt auf GitHub Pages keine serverseitige Gantt-Studio-Projektspeicherung oder automatische Cloud-Synchronisierung.</p></article><article class="guide-warning"><span class="guide-backup-mark">BACKUP</span><h3>Export regelmäßig sichern</h3><p>Browser- oder Website-Daten können gelöscht werden und sind geräte- bzw. profilgebunden. Die JSON-Datei aus dem Export ist deine portable Sicherung.</p></article></div><div class="dialog-actions"><div class="spacer"></div><button class="btn primary" value="cancel" type="submit">Verstanden</button></div></form></dialog>
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
-  <script type="module" src="./assets/js/app.js?v=1.3.0"></script>
+  <script type="module" src="./assets/js/app.js?v=1.4.0"></script>
 </body>
 </html>
