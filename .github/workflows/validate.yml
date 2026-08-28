@@ -25,7 +25,10 @@ jobs:
         run: |
           test -s index.html
           test -s assets/css/app.css
+          test -s assets/css/privacy.css
           test -s examples/demo.gantt.json
           python -m json.tool examples/demo.gantt.json >/dev/null
-          grep -q 'assets/js/app.js?v=1.2.0' index.html
-          grep -q 'assets/css/app.css?v=1.2.0' index.html
+          grep -q 'assets/js/app.js?v=1.2.1' index.html
+          grep -q 'assets/css/app.css?v=1.2.1' index.html
+          grep -q 'assets/css/privacy.css?v=1.2.1' index.html
+          grep -q 'Deine Projekt- und Planungsdaten bleiben in diesem Browser' index.html
