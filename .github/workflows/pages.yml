@@ -29,20 +29,21 @@ jobs:
         run: |
           python - <<'PY'
           from pathlib import Path
-          import textwrap
           source = Path('.github/workflows/apply-task-table-v150.yml').read_text()
           py_start = "          python - <<'PY'\n"
           py_end = "\n          PY\n"
           if py_start not in source:
               raise SystemExit('migration python block not found')
-          code = source.split(py_start, 1)[1].split(py_end, 1)[0]
-          exec(compile(textwrap.dedent(code), 'task-table-migration', 'exec'))
+          raw = source.split(py_start, 1)[1].split(py_end, 1)[0]
+          code = '\n'.join(line[10:] if line.startswith('          ') else line for line in raw.splitlines())
+          exec(compile(code, 'task-table-migration', 'exec'))
           css_start = "          cat > assets/css/task-table.css <<'EOF'\n"
           css_end = "\n          EOF\n"
           if css_start not in source:
               raise SystemExit('migration css block not found')
-          css = source.split(css_start, 1)[1].split(css_end, 1)[0]
-          Path('assets/css/task-table.css').write_text(textwrap.dedent(css))
+          raw_css = source.split(css_start, 1)[1].split(css_end, 1)[0]
+          css = '\n'.join(line[10:] if line.startswith('          ') else line for line in raw_css.splitlines())
+          Path('assets/css/task-table.css').write_text(css + '\n')
           PY
           node --check assets/js/app.js
           node --check assets/js/gantt.js
