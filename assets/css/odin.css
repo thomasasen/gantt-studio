@@ -5,3 +5,52 @@
 
 /* Readability scale v1.4.1: larger type without changing the core layout geometry */
 .brand small{font-size:12px}.btn{font-size:13px}.btn.small{font-size:11px}.eyebrow{font-size:10px}.project-meta{font-size:12px}.project-head-side{font-size:11px}.project-local-chip{font-size:9px}.metric span{font-size:10px}.metric strong{font-size:20px}.studio-tab{font-size:13px}.save-status{font-size:10px}.text-action{font-size:10px}.timeline-title h1{font-size:20px}.timeline-title p{font-size:12px}.control-caption{font-size:9px}.seg-btn,.task-count,.dropdown-control>summary{font-size:10px}.filter-panel strong{font-size:11px}.filter-panel label,.quick-settings label{font-size:11px}.phase-collapse-heading strong{font-size:12px}.phase-collapse-heading span{font-size:10px}.link-button,.phase-collapse-button{font-size:10px}.phase-collapse-count,.phase-summary-count{font-size:9px}.planning-page-head h1{font-size:22px}.planning-page-head p{font-size:12px}.planning-cost-card span{font-size:9px}.planning-cost-card strong{font-size:18px}.planning-accordion>summary>span:first-child strong{font-size:13px}.planning-accordion>summary>span:first-child small{font-size:10px;line-height:1.35}.planning-count-badge{font-size:9px}.planning-toggle-grid .toggle-row{font-size:11px;line-height:1.3}.relative-editor-head h3{font-size:13px}.relative-editor-head p{font-size:10px;line-height:1.4}.switch-label{font-size:11px}.relative-editor-grid>label{font-size:10px}.relative-editor-grid input,.relative-editor-grid select{font-size:11px}.input-suffix span{font-size:10px}.relative-skip-row{font-size:10px!important;line-height:1.35}.relative-result-row span{font-size:9px}.relative-result-row strong{font-size:12px}.planning-note{font-size:10px}.entity-row strong{font-size:12px}.entity-row small{font-size:10px}.muted-empty{font-size:11px}.gantt-head-left{font-size:10px}.time-major{font-size:11px}.time-minor{font-size:10px}.task-title strong{font-size:12px}.task-title small,.owner{font-size:10px}.status-pill{font-size:9px}.bar-label{font-size:10px}.marker-label,.today-label{font-size:9px}.form-grid label,.mini-form label{font-size:11px}.dialog-intro{font-size:11px}.design-grid label{font-size:10px}.design-preview-card strong{font-size:10px}.export-option strong{font-size:12px}.export-option span{font-size:10px}
+
+/* Readability scale v1.4.2 */
+/* Clearly larger desktop typography while preserving the compact Odin layout. */
+.planning-page-head h1{font-size:24px}
+.planning-page-head p{font-size:13px;line-height:1.45}
+.planning-cost-card span{font-size:10px}
+.planning-cost-card strong{font-size:19px}
+.planning-accordion>summary>span:first-child strong{font-size:14px;line-height:1.25}
+.planning-accordion>summary>span:first-child small{font-size:11px;line-height:1.4;margin-top:4px}
+.planning-count-badge{font-size:10px;padding:5px 9px}
+.planning-toggle-grid .toggle-row{font-size:12px;line-height:1.3;padding:10px 11px}
+.planning-toggle-grid .toggle-row input{width:16px;height:16px}
+.relative-editor-head h3{font-size:14px}
+.relative-editor-head p{font-size:11px;line-height:1.45}
+.switch-label{font-size:12px}
+.relative-editor-grid>label{font-size:11px;line-height:1.3}
+.relative-editor-grid input,.relative-editor-grid select{font-size:12px;min-height:38px}
+.input-suffix span{font-size:11px}
+.relative-skip-row{font-size:11px!important;line-height:1.4}
+.relative-result-row span{font-size:9px}
+.relative-result-row strong{font-size:12px}
+.planning-note{font-size:11px}
+.entity-row strong{font-size:12px}
+.entity-row small{font-size:10px}
+.muted-empty{font-size:11px}
+.btn.small{font-size:12px}
+.studio-tab{font-size:13px}
+.save-status{font-size:11px}
+.text-action{font-size:11px}
+.project-head-side{font-size:12px}
+.control-caption{font-size:10px}
+.seg-btn,.task-count,.dropdown-control>summary{font-size:11px}
+.filter-panel strong{font-size:12px}
+.filter-panel label,.quick-settings label{font-size:12px}
+.phase-collapse-heading strong{font-size:12px}
+.phase-collapse-heading span{font-size:10px}
+.phase-collapse-button{font-size:11px}
+.phase-collapse-count{font-size:10px}
+.task-title strong{font-size:12px}
+.task-title small,.owner{font-size:10px}
+.status-pill{font-size:9px}
+.time-major{font-size:11px}
+.time-minor{font-size:10px}
+.bar-label{font-size:10px}
+.marker-label,.today-label{font-size:9px}
+@media(max-width:1250px){
+  .planning-toggle-grid .toggle-row{font-size:12px}
+  .relative-editor-grid>label{font-size:11px}
+}
