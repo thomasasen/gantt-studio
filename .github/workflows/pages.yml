@@ -25,37 +25,30 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: main
-      - name: Apply pending Odin task table migration
+      - name: Finalize task table integration
         run: |
           python - <<'PY'
           from pathlib import Path
-          source = Path('.github/workflows/apply-task-table-v150.yml').read_text()
-          py_start = "          python - <<'PY'\n"
-          py_end = "\n          PY\n"
-          if py_start not in source:
-              raise SystemExit('migration python block not found')
-          raw = source.split(py_start, 1)[1].split(py_end, 1)[0]
-          code = '\n'.join(line[10:] if line.startswith('          ') else line for line in raw.splitlines())
-          exec(compile(code, 'task-table-migration', 'exec'))
-          css_start = "          cat > assets/css/task-table.css <<'EOF'\n"
-          css_end = "\n          EOF\n"
-          if css_start not in source:
-              raise SystemExit('migration css block not found')
-          raw_css = source.split(css_start, 1)[1].split(css_end, 1)[0]
-          css = '\n'.join(line[10:] if line.startswith('          ') else line for line in raw_css.splitlines())
-          Path('assets/css/task-table.css').write_text(css + '\n')
+          p=Path('assets/js/app.js')
+          s=p.read_text()
+          old="  sortTasks(); touch(); await persist(); renderMetrics(); renderPhaseToolbar(); renderGanttOnly();\n}"
+          new="  sortTasks(); touch(); await persist(); renderMetrics(); renderPhaseToolbar(); renderGanttOnly(); renderTaskTable();\n}"
+          if old in s:
+              s=s.replace(old,new,1)
+          old_link="    const link=task.url?`<a class=\"task-table-document\" href=\"${esc(task.url)}\" target=\"_blank\" rel=\"noopener noreferrer\">↗ Dokument</a>`:'';"
+          new_link="    const documentUrl=safeUrl(task.url);\n    const link=documentUrl?`<a class=\"task-table-document\" href=\"${esc(documentUrl)}\" target=\"_blank\" rel=\"noopener noreferrer\">↗ Dokument</a>`:'';"
+          if old_link in s:
+              s=s.replace(old_link,new_link,1)
+          p.write_text(s)
           PY
           node --check assets/js/app.js
-          node --check assets/js/gantt.js
-          test -s assets/css/task-table.css
-          grep -q 'id="taskOverviewPanel"' index.html
-          grep -q 'assets/js/app.js?v=1.5.0' index.html
-          grep -q 'function renderTaskTable' assets/js/app.js
+          grep -q 'renderGanttOnly(); renderTaskTable();' assets/js/app.js
+          grep -q 'const documentUrl=safeUrl(task.url)' assets/js/app.js
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add index.html assets/js/app.js assets/css/task-table.css
+          git add assets/js/app.js
           if ! git diff --cached --quiet; then
-            git commit -m 'Port Odin task and dependency table'
+            git commit -m 'Finalize task table synchronization'
             git push origin HEAD:main
           fi
       - name: Configure Pages
