@@ -29,16 +29,26 @@ jobs:
           test -s assets/css/odin.css
           test -s examples/demo.gantt.json
           python -m json.tool examples/demo.gantt.json >/dev/null
-          grep -q 'assets/js/app.js?v=1.3.0' index.html
-          grep -q 'assets/css/app.css?v=1.3.0' index.html
-          grep -q 'assets/css/privacy.css?v=1.3.0' index.html
-          grep -q 'assets/css/odin.css?v=1.3.0' index.html
+          grep -q 'assets/js/app.js?v=1.4.0' index.html
+          grep -q 'assets/css/app.css?v=1.4.0' index.html
+          grep -q 'assets/css/privacy.css?v=1.4.0' index.html
+          grep -q 'assets/css/odin.css?v=1.4.0' index.html
           grep -q 'Deine Projekt- und Planungsdaten bleiben in diesem Browser' index.html
           grep -q 'phaseCollapseToolbar' index.html
           grep -q 'centralExportBtn' index.html
           grep -q 'designBtn' index.html
           grep -q 'data-management-mode="management"' index.html
           grep -q 'data-zoom="week"' index.html
+          grep -q 'Dynamische Zieldatumslinie' index.html
+          grep -q 'relativeTargetDate' index.html
+          grep -q 'relativeSkipHolidays' index.html
+          grep -q 'displayActiveCount' index.html
+          grep -q 'phaseCountBadge' index.html
+          grep -q 'markerCountBadge' index.html
+          grep -q 'holidayCountBadge' index.html
+          grep -q 'showDependencies' assets/js/app.js
+          grep -q 'makeStatusLine' assets/js/gantt.js
+          grep -q 'const DAY = 86400000' assets/js/app.js
           grep -q 'guide-baseline-symbol' index.html
           grep -q 'guide-buffer-symbol' index.html
           grep -q 'guide-status-symbol' index.html
