@@ -1,0 +1,59 @@
+name: Apply Gantt Studio v1.4.0 final parity patch
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/apply-v140-final.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Apply verified v1.4.0 patch
+        run: python tools/run_v140_fixed.py
+      - name: Finalize runtime details
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('assets/js/app.js')
+          text = p.read_text(encoding='utf-8')
+          anchor = "const todayIso = () => new Date().toISOString().slice(0, 10);"
+          if 'const DAY = 86400000;' not in text:
+              if anchor not in text:
+                  raise SystemExit('todayIso anchor missing')
+              text = text.replace(anchor, anchor + "\nconst DAY = 86400000;", 1)
+          text = text.replace("const milestones = tasks.filter(t => ['milestone','gate'].includes(t.type)).length;", "const milestones = tasks.filter(t => t.type === 'milestone').length;", 1)
+          p.write_text(text, encoding='utf-8')
+          PY
+      - name: Validate application
+        run: |
+          node --check assets/js/app.js
+          node --check assets/js/gantt.js
+          node --check assets/js/storage.js
+          grep -q 'Dynamische Zieldatumslinie' index.html
+          grep -q 'showDependencies' assets/js/app.js
+          grep -q 'makeStatusLine' assets/js/gantt.js
+          grep -q 'const DAY = 86400000' assets/js/app.js
+          grep -q 'v=1.4.0' index.html
+      - name: Commit application v1.4.0
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add index.html assets/js/app.js assets/js/gantt.js assets/css/odin.css README.md
+          if git diff --cached --quiet; then
+            echo 'No application changes needed.'
+            exit 0
+          fi
+          git commit -m 'Port Odin planning controls to v1.4.0'
+          git push
