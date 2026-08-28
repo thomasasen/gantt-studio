@@ -1,0 +1,48 @@
+/* Gantt scroll containment v1.4.5
+   Sticky date headers must remain inside the Gantt viewport and
+   never paint over the timeline controls, phase toolbar or left headings. */
+
+.workspace {
+  position: relative;
+  isolation: isolate;
+}
+
+.timeline-panel-head {
+  position: relative;
+  z-index: 50;
+  background: var(--panel);
+}
+
+.phase-collapse-toolbar {
+  position: relative;
+  z-index: 45;
+  background: #f8fafb;
+}
+
+.gantt-scroller {
+  position: relative;
+  z-index: 1;
+  isolation: isolate;
+}
+
+/* The frozen left side must always cover timeline content when
+   horizontal scrolling brings the timeline underneath it. */
+.gantt-left {
+  z-index: 30;
+}
+
+.gantt-head-left {
+  z-index: 40;
+  background: #f8fafb;
+}
+
+.gantt-head-right {
+  z-index: 20;
+  background: #f8fafb;
+}
+
+/* A small separator makes the sticky header boundary explicit. */
+.gantt-head-left,
+.gantt-head-right {
+  box-shadow: 0 1px 0 var(--border);
+}
