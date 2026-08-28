@@ -7,8 +7,9 @@
   <meta name="theme-color" content="#16324f">
   <meta name="description" content="Gantt Studio – browserbasierte Projektplanung mit Portfolio, Aufgaben, Abhängigkeiten, Phasen, Gates, Baselines, Risiken und Import/Export.">
   <title>Gantt Studio</title>
-  <link rel="stylesheet" href="./assets/css/app.css?v=1.2.2">
-  <link rel="stylesheet" href="./assets/css/privacy.css?v=1.2.2">
+  <link rel="stylesheet" href="./assets/css/app.css?v=1.3.0">
+  <link rel="stylesheet" href="./assets/css/privacy.css?v=1.3.0">
+  <link rel="stylesheet" href="./assets/css/odin.css?v=1.3.0">
 </head>
 <body>
   <header class="topbar">
@@ -20,7 +21,6 @@
       <select id="projectSelect" class="project-select" aria-label="Projekt auswählen"></select>
       <button class="btn" id="newProjectBtn" type="button">+ Neues Projekt</button>
       <button class="btn" id="openProjectBtn" type="button">Import</button>
-      <button class="btn" id="saveProjectBtn" type="button">Backup / Export</button>
       <button class="btn danger-top" id="deleteProjectBtn" type="button">Löschen</button>
       <button class="btn primary" id="addTaskBtn" type="button">+ Aufgabe</button>
       <input id="fileInput" type="file" accept="application/json,.json,.gantt" hidden>
@@ -28,123 +28,82 @@
   </header>
 
   <main class="app-shell">
+    <section class="studio-nav panel" aria-label="Arbeitsbereich">
+      <div class="studio-tabs" role="tablist" aria-label="Gantt-Studio-Bereiche">
+        <button id="projectTabBtn" class="studio-tab active" type="button" role="tab" aria-selected="true" aria-controls="projectView">Projektplan</button>
+        <button id="planningTabBtn" class="studio-tab" type="button" role="tab" aria-selected="false" aria-controls="planningView">Planung &amp; Darstellung</button>
+      </div>
+      <div class="studio-nav-actions">
+        <div id="saveStatus" class="save-status saved" role="status" aria-live="polite"><span class="save-status-icon">✓</span><strong id="saveStatusText">Gespeichert</strong><span id="saveStatusDetail">Lokal im Browser</span></div>
+        <button class="text-action" id="guideBtn" type="button">Verstanden / Hilfe</button>
+        <button class="btn design-btn" id="designBtn" type="button">Design bearbeiten</button>
+      </div>
+    </section>
+
     <section class="project-head panel">
       <div class="project-title-wrap">
         <label class="eyebrow" for="projectName">EXECUTIVE PROJECT ROADMAP</label>
         <input id="projectName" class="project-name" value="Neues Projekt" aria-label="Projektname">
         <div class="project-meta" id="projectMeta">Lokaler Entwurf</div>
       </div>
-      <div class="head-controls">
-        <label><span>Inhalt</span><select id="managementSelect"><option value="operational">Operativ</option><option value="management">Management</option><option value="milestones">Meilensteine</option></select></label>
-        <label><span>Ansicht</span><select id="zoomSelect"><option value="day">Tag</option><option value="week" selected>Woche</option><option value="month">Monat</option></select></label>
-        <button class="btn ghost" id="demoBtn" type="button">Demo laden</button>
-        <button class="btn ghost" id="settingsBtn" type="button">Planung & Darstellung</button>
-        <button class="btn ghost" id="guideBtn" type="button">Hilfe & Hinweise</button>
-      </div>
+      <div class="project-head-side"><span class="project-local-chip">LOKAL</span><span>Keine Cloud-Synchronisierung</span></div>
     </section>
 
     <aside class="storage-notice" aria-label="Hinweis zur Datenspeicherung">
       <span class="storage-notice__mark">LOKAL</span>
-      <div class="storage-notice__copy">
-        <strong>Deine Projekt- und Planungsdaten bleiben in diesem Browser.</strong>
-        <p> Gantt Studio besitzt auf GitHub Pages keine Projektdatenbank und keine Cloud-Synchronisierung. Für ein dauerhaftes Backup bitte regelmäßig „Backup / Export“ verwenden.</p>
-      </div>
-      <details>
-        <summary>Was bedeutet das genau?</summary>
-        <div class="storage-notice__details">
-          <strong>Speicherung:</strong> Projekte liegen in IndexedDB dieses Browserprofils; nur die aktive Projekt-ID wird in localStorage gemerkt.
-          <ul>
-            <li>Es werden keine Projektinhalte an GitHub oder einen eigenen Gantt-Studio-Server übertragen oder dort gespeichert.</li>
-            <li>Die GitHub-Pages-Server liefern lediglich HTML, CSS und JavaScript der Anwendung aus.</li>
-            <li>Browserdaten löschen, ein anderes Gerät/Browserprofil verwenden oder privates Surfen kann dazu führen, dass lokale Projekte dort nicht verfügbar sind.</li>
-            <li>Beim optionalen Feiertagsimport wird Nager.Date direkt aus dem Browser abgefragt. Dabei werden Land und Jahr angefragt, nicht deine Projektinhalte.</li>
-          </ul>
-        </div>
-      </details>
+      <div class="storage-notice__copy"><strong>Deine Projekt- und Planungsdaten bleiben in diesem Browser.</strong><p> Gantt Studio besitzt auf GitHub Pages keine Projektdatenbank und keine Cloud-Synchronisierung. Für ein dauerhaftes Backup bitte regelmäßig exportieren.</p></div>
+      <details><summary>Was bedeutet das genau?</summary><div class="storage-notice__details"><strong>Speicherung:</strong> Projekte liegen in IndexedDB dieses Browserprofils; nur die aktive Projekt-ID wird in localStorage gemerkt.<ul><li>Es werden keine Projektinhalte an GitHub oder einen eigenen Gantt-Studio-Server übertragen oder dort gespeichert.</li><li>Die GitHub-Pages-Server liefern lediglich HTML, CSS und JavaScript der Anwendung aus.</li><li>Browserdaten löschen, ein anderes Gerät/Browserprofil verwenden oder privates Surfen kann dazu führen, dass lokale Projekte dort nicht verfügbar sind.</li><li>Beim optionalen Feiertagsimport wird Nager.Date direkt aus dem Browser abgefragt. Dabei werden Land und Jahr angefragt, nicht deine Projektinhalte.</li></ul></div></details>
     </aside>
 
     <section class="metrics" id="metrics" aria-label="Projektkennzahlen"></section>
 
-    <section class="workspace panel">
-      <div class="workspace-head">
-        <div><h1>Projektplan</h1><p>Aufgaben bearbeiten, Abhängigkeiten prüfen und Managementsicht filtern.</p></div>
-        <div class="legend" id="legend"></div>
-      </div>
-      <div class="gantt-scroller" id="ganttScroller"><div class="gantt-stage" id="ganttStage" role="region" aria-label="Gantt-Diagramm"></div></div>
+    <section id="projectView" class="studio-view" role="tabpanel" aria-labelledby="projectTabBtn">
+      <section class="workspace panel">
+        <div class="timeline-panel-head">
+          <div class="timeline-title"><h1>Zeitplan</h1><p>Balken verschieben, verlängern und Fortschritt anpassen.</p></div>
+          <div class="timeline-actions">
+            <div class="control-cluster content-cluster" aria-label="Inhaltsansicht">
+              <span class="control-caption">Inhalt</span>
+              <button type="button" class="seg-btn active" data-management-mode="operational">Operativ</button>
+              <button type="button" class="seg-btn" data-management-mode="management">Management</button>
+              <button type="button" class="seg-btn" data-management-mode="milestones">Meilensteine</button>
+              <details id="filterDetails" class="dropdown-control"><summary>Filter <span aria-hidden="true">▾</span></summary><div class="dropdown-panel filter-panel"><strong>Managementansicht zeigt</strong><label><input type="checkbox" data-management-criterion="critical"> Kritisch markierte Aufgaben</label><label><input type="checkbox" data-management-criterion="milestones"> Meilensteine</label><label><input type="checkbox" data-management-criterion="gates"> Entscheidungs-Gates</label><label><input type="checkbox" data-management-criterion="risks"> Hohe und kritische Risiken</label><label><input type="checkbox" data-management-criterion="redStatus"> Aufgaben mit rotem Status</label><label><input type="checkbox" data-management-criterion="overdue"> Überfällige offene Aufgaben</label></div></details>
+              <output id="visibleTaskCount" class="task-count">0 Aufgaben</output>
+            </div>
+            <div class="control-cluster zoom-cluster" aria-label="Zeitskala"><button type="button" class="seg-btn" data-zoom="day">Tag</button><button type="button" class="seg-btn active" data-zoom="week">Woche</button><button type="button" class="seg-btn" data-zoom="month">Monat</button></div>
+            <details id="moreSettingsDetails" class="dropdown-control more-settings"><summary>Weitere Einstellungen <span aria-hidden="true">▾</span></summary><div id="quickSettingsList" class="dropdown-panel quick-settings"></div></details>
+            <button id="centralExportBtn" class="btn primary central-export" type="button"><span aria-hidden="true">⇩</span> Exportieren</button>
+          </div>
+        </div>
+        <section id="phaseCollapseToolbar" class="phase-collapse-toolbar" aria-label="Phasen ein- oder ausblenden"></section>
+        <div class="gantt-scroller" id="ganttScroller"><div class="gantt-stage" id="ganttStage" role="region" aria-label="Gantt-Diagramm"></div></div>
+      </section>
+    </section>
+
+    <section id="planningView" class="studio-view" role="tabpanel" aria-labelledby="planningTabBtn" hidden>
+      <section class="planning-page panel">
+        <div class="planning-page-head"><div><span class="eyebrow">PLANUNG &amp; DARSTELLUNG</span><h1>Projektplan konfigurieren</h1><p>Darstellung, Phasen, Stichtage und Kalender zentral pflegen.</p></div></div>
+        <div class="settings-columns inline-settings">
+          <section class="settings-section"><h3>Darstellung</h3><div class="toggle-list" id="settingsList"></div><div class="mini-form"><label>Relative Linie<input id="relativeLabel" maxlength="80" placeholder="Vorbereitungstermin"></label><label>Versatz (Tage)<input id="relativeOffset" type="number" min="-3650" max="3650"></label></div></section>
+          <section class="settings-section"><div class="section-title-row"><h3>Phasen</h3><button class="btn small" id="addPhaseBtn" type="button">+ Phase</button></div><div id="phaseList" class="entity-list"></div></section>
+          <section class="settings-section"><div class="section-title-row"><h3>Stichtage / Marker</h3><button class="btn small" id="addMarkerBtn" type="button">+ Stichtag</button></div><div id="markerList" class="entity-list"></div></section>
+          <section class="settings-section"><div class="section-title-row"><h3>Feiertage &amp; Sondertage</h3><div><button class="btn small" id="importHolidayBtn" type="button">DE importieren</button><button class="btn small" id="addHolidayBtn" type="button">+ Sondertag</button></div></div><div id="holidayList" class="entity-list"></div></section>
+        </div>
+      </section>
     </section>
   </main>
 
-  <dialog id="taskDialog" class="dialog">
-    <form method="dialog" id="taskForm">
-      <div class="dialog-head"><div><div class="eyebrow">AUFGABE</div><h2 id="taskDialogTitle">Aufgabe bearbeiten</h2></div><button class="icon-btn" value="cancel" aria-label="Schließen" type="submit">×</button></div>
-      <input type="hidden" id="taskId">
-      <div class="form-grid">
-        <label class="span-2">Name<input id="taskName" required maxlength="120"></label>
-        <label>Start<input id="taskStart" type="date" required></label><label>Ende<input id="taskEnd" type="date" required></label>
-        <label>Typ<select id="taskType"><option value="workstream">Workstream</option><option value="critical">Kritisch markiert</option><option value="milestone">Meilenstein</option><option value="gate">Gate</option></select></label>
-        <label>Fortschritt<input id="taskProgress" type="number" min="0" max="100" step="5" value="0"></label>
-        <label>Owner<input id="taskOwner" maxlength="80"></label>
-        <label>Status<select id="taskStatus"><option value="neutral">Neutral</option><option value="green">Grün</option><option value="amber">Gelb</option><option value="red">Rot</option></select></label>
-        <label>Risiko<select id="taskRisk"><option value="none">Kein</option><option value="low">Niedrig</option><option value="medium">Mittel</option><option value="high">Hoch</option><option value="critical">Kritisch</option></select></label>
-        <label>Phase<select id="taskPhase"></select></label>
-        <label class="span-2">Abhängigkeiten<select id="taskDependencies" multiple size="5"></select></label>
-        <label>Baseline Start<input id="taskBaselineStart" type="date"></label><label>Baseline Ende<input id="taskBaselineEnd" type="date"></label>
-        <label>Puffer (Tage)<input id="taskBuffer" type="number" min="0" max="365" value="0"></label><label>Kosten (€)<input id="taskCost" type="number" min="0" step="100"></label>
-        <label class="span-2">Link<input id="taskUrl" type="url" placeholder="https://…"></label><label class="span-2">Notizen<textarea id="taskNotes" rows="3" maxlength="2000"></textarea></label>
-      </div>
-      <div class="dialog-actions"><button class="btn danger" id="deleteTaskBtn" type="button">Löschen</button><div class="spacer"></div><button class="btn" value="cancel" type="submit">Abbrechen</button><button class="btn primary" id="saveTaskBtn" type="button">Übernehmen</button></div>
-    </form>
-  </dialog>
-
-  <dialog id="settingsDialog" class="dialog wide-dialog">
-    <form method="dialog">
-      <div class="dialog-head"><div><div class="eyebrow">PLANUNG & DARSTELLUNG</div><h2>Projektplan konfigurieren</h2></div><button class="icon-btn" value="cancel" aria-label="Schließen" type="submit">×</button></div>
-      <div class="settings-columns">
-        <section class="settings-section"><h3>Darstellung</h3><div class="toggle-list" id="settingsList"></div>
-          <div class="mini-form"><label>Relative Linie<input id="relativeLabel" maxlength="80" placeholder="Vorbereitungstermin"></label><label>Versatz (Tage)<input id="relativeOffset" type="number" min="-3650" max="3650"></label></div>
-        </section>
-        <section class="settings-section"><div class="section-title-row"><h3>Phasen</h3><button class="btn small" id="addPhaseBtn" type="button">+ Phase</button></div><div id="phaseList" class="entity-list"></div></section>
-        <section class="settings-section"><div class="section-title-row"><h3>Stichtage / Marker</h3><button class="btn small" id="addMarkerBtn" type="button">+ Stichtag</button></div><div id="markerList" class="entity-list"></div></section>
-        <section class="settings-section"><div class="section-title-row"><h3>Feiertage & Sondertage</h3><div><button class="btn small" id="importHolidayBtn" type="button">DE importieren</button><button class="btn small" id="addHolidayBtn" type="button">+ Sondertag</button></div></div><div id="holidayList" class="entity-list"></div></section>
-      </div>
-      <div class="dialog-actions"><div class="spacer"></div><button class="btn primary" value="cancel" type="submit">Fertig</button></div>
-    </form>
-  </dialog>
+  <dialog id="taskDialog" class="dialog"><form method="dialog" id="taskForm"><div class="dialog-head"><div><div class="eyebrow">AUFGABE</div><h2 id="taskDialogTitle">Aufgabe bearbeiten</h2></div><button class="icon-btn" value="cancel" aria-label="Schließen" type="submit">×</button></div><input type="hidden" id="taskId"><div class="form-grid"><label class="span-2">Name<input id="taskName" required maxlength="120"></label><label>Start<input id="taskStart" type="date" required></label><label>Ende<input id="taskEnd" type="date" required></label><label>Typ<select id="taskType"><option value="workstream">Workstream</option><option value="critical">Kritisch markiert</option><option value="milestone">Meilenstein</option><option value="gate">Gate</option></select></label><label>Fortschritt<input id="taskProgress" type="number" min="0" max="100" step="5" value="0"></label><label>Owner<input id="taskOwner" maxlength="80"></label><label>Status<select id="taskStatus"><option value="neutral">Neutral</option><option value="green">Grün</option><option value="amber">Gelb</option><option value="red">Rot</option></select></label><label>Risiko<select id="taskRisk"><option value="none">Kein</option><option value="low">Niedrig</option><option value="medium">Mittel</option><option value="high">Hoch</option><option value="critical">Kritisch</option></select></label><label>Phase<select id="taskPhase"></select></label><label class="span-2">Abhängigkeiten<select id="taskDependencies" multiple size="5"></select></label><label>Baseline Start<input id="taskBaselineStart" type="date"></label><label>Baseline Ende<input id="taskBaselineEnd" type="date"></label><label>Puffer (Tage)<input id="taskBuffer" type="number" min="0" max="365" value="0"></label><label>Kosten (€)<input id="taskCost" type="number" min="0" step="100"></label><label class="span-2">Link<input id="taskUrl" type="url" placeholder="https://…"></label><label class="span-2">Notizen<textarea id="taskNotes" rows="3" maxlength="2000"></textarea></label></div><div class="dialog-actions"><button class="btn danger" id="deleteTaskBtn" type="button">Löschen</button><div class="spacer"></div><button class="btn" value="cancel" type="submit">Abbrechen</button><button class="btn primary" id="saveTaskBtn" type="button">Übernehmen</button></div></form></dialog>
 
   <dialog id="entityDialog" class="dialog compact"><form method="dialog"><div class="dialog-head"><div><div class="eyebrow" id="entityEyebrow">PLANUNG</div><h2 id="entityTitle">Element bearbeiten</h2></div><button class="icon-btn" value="cancel" type="submit">×</button></div><input type="hidden" id="entityKind"><input type="hidden" id="entityId"><div id="entityFields" class="form-grid"></div><div class="dialog-actions"><button id="deleteEntityBtn" class="btn danger" type="button">Löschen</button><div class="spacer"></div><button class="btn" value="cancel" type="submit">Abbrechen</button><button id="saveEntityBtn" class="btn primary" type="button">Speichern</button></div></form></dialog>
 
-  <dialog id="guideDialog" class="dialog wide-dialog">
-    <form method="dialog">
-      <div class="dialog-head"><div><div class="eyebrow">GANTT STUDIO VERSTEHEN</div><h2>Projektplan, Symbole & Datenspeicherung</h2></div><button class="icon-btn" value="cancel" type="submit">×</button></div>
-      <div class="guide-grid">
-        <article><i class="guide-bar work"></i><h3>Arbeitspaket</h3><p>Ein Balken zeigt Zeitraum und Dauer einer Aufgabe.</p></article>
-        <article><i class="guide-bar critical"></i><h3>Kritisch markiertes Arbeitspaket</h3><p>Diese Kennzeichnung wird aktuell manuell gesetzt. Sie ist kein automatisch berechneter Critical Path.</p></article>
-        <article><i class="guide-diamond milestone"></i><h3>Meilenstein</h3><p>Eine Raute markiert ein wesentliches Ergebnis oder Ereignis.</p></article>
-        <article><i class="guide-diamond gate"></i><h3>Gate</h3><p>Ein Gate steht für eine Freigabe oder Managemententscheidung.</p></article>
-        <article>
-          <div class="guide-baseline-symbol" aria-hidden="true"><span class="guide-baseline-bar"></span><span class="guide-baseline-line"></span></div>
-          <h3>Baseline</h3><p>Die dünne Linie unter einem Balken zeigt den ursprünglich hinterlegten Plan.</p>
-        </article>
-        <article>
-          <div class="guide-buffer-symbol" aria-hidden="true"><span class="guide-buffer-bar"></span><span class="guide-buffer-extension"></span></div>
-          <h3>Puffer</h3><p>Der gestrichelte Bereich nach einer Aufgabe visualisiert hinterlegten Zeitpuffer.</p>
-        </article>
-        <article>
-          <div class="guide-status-symbol" aria-hidden="true"><span class="guide-status-dot green"></span><span class="guide-status-dot amber"></span><span class="guide-status-dot red"></span><span class="guide-risk-symbol">!</span></div>
-          <h3>Status & Risiko</h3><p>Ampelstatus und Risikostufe ergänzen die reine Terminperspektive.</p>
-        </article>
-        <article>
-          <div class="guide-dependency-symbol" aria-hidden="true"><span class="guide-dependency-from"></span><span class="guide-dependency-path"></span><span class="guide-dependency-to"></span></div>
-          <h3>Abhängigkeiten</h3><p>Pfeile zeigen Vorgänger. Gantt Studio verhindert zyklische Abhängigkeiten.</p>
-        </article>
-        <article class="guide-storage"><span class="guide-local-mark">LOKAL</span><h3>Keine Projektdatenbank</h3><p>Projekt- und Planungsdaten werden in IndexedDB dieses Browsers gespeichert. Es gibt auf GitHub Pages keine serverseitige Gantt-Studio-Projektspeicherung oder automatische Cloud-Synchronisierung.</p></article>
-        <article class="guide-warning"><span class="guide-backup-mark">BACKUP</span><h3>Export regelmäßig sichern</h3><p>Browser- oder Website-Daten können gelöscht werden und sind geräte- bzw. profilgebunden. Die JSON-Datei aus „Backup / Export“ ist deine portable Sicherung.</p></article>
-      </div>
-      <div class="dialog-actions"><div class="spacer"></div><button class="btn primary" value="cancel" type="submit">Verstanden</button></div>
-    </form>
-  </dialog>
+  <dialog id="designDialog" class="dialog wide-dialog"><form method="dialog"><div class="dialog-head"><div><div class="eyebrow">DESIGN</div><h2>Projekt-Design bearbeiten</h2><p class="dialog-intro">Farben werden im Projekt gespeichert und wirken direkt auf den Zeitplan.</p></div><button class="icon-btn" value="cancel" aria-label="Schließen" type="submit">×</button></div><div class="preset-row"><button class="btn small" id="designPresetOdin" type="button">Gantt Studio</button><button class="btn small" id="designPresetNeutral" type="button">Neutral</button></div><div class="design-grid"><label>Header / Primär<input id="designPrimary" type="color"></label><label>Akzent<input id="designAccent" type="color"></label><label>Workstream<input id="designWorkstream" type="color"></label><label>Kritisch<input id="designCritical" type="color"></label><label>Meilenstein<input id="designMilestone" type="color"></label><label>Gate<input id="designGate" type="color"></label><label>Seitenhintergrund<input id="designPageBg" type="color"></label><label>Panel<input id="designPanelBg" type="color"></label></div><div class="design-preview-card"><span class="preview-work"></span><span class="preview-critical"></span><span class="preview-milestone"></span><span class="preview-gate"></span><strong>Live-Vorschau</strong></div><div class="dialog-actions"><div class="spacer"></div><button class="btn" value="cancel" type="submit">Abbrechen</button><button id="saveDesignBtn" class="btn primary" type="button">Design speichern</button></div></form></dialog>
+
+  <dialog id="exportDialog" class="dialog compact"><form method="dialog"><div class="dialog-head"><div><div class="eyebrow">PROJEKT EXPORTIEREN</div><h2>Export auswählen</h2><p class="dialog-intro">Projekt sichern oder den sichtbaren Plan weitergeben.</p></div><button class="icon-btn" value="cancel" aria-label="Schließen" type="submit">×</button></div><div class="export-options"><button id="exportJsonBtn" class="export-option" type="button"><strong>Projektdatei</strong><span>Vollständiges .gantt.json als portable Sicherung.</span></button><button id="exportCsvBtn" class="export-option" type="button"><strong>Aufgabenübersicht CSV</strong><span>Aufgaben, Termine, Owner, Status und Risiken tabellarisch exportieren.</span></button><button id="printPdfBtn" class="export-option" type="button"><strong>Drucken / PDF</strong><span>Sichtbaren Projektplan über den Browser drucken oder als PDF sichern.</span></button></div><div class="dialog-actions"><div class="spacer"></div><button class="btn" value="cancel" type="submit">Schließen</button></div></form></dialog>
+
+  <dialog id="guideDialog" class="dialog wide-dialog"><form method="dialog"><div class="dialog-head"><div><div class="eyebrow">GANTT STUDIO VERSTEHEN</div><h2>Projektplan, Symbole &amp; Datenspeicherung</h2></div><button class="icon-btn" value="cancel" type="submit">×</button></div><div class="guide-grid"><article><i class="guide-bar work"></i><h3>Arbeitspaket</h3><p>Ein Balken zeigt Zeitraum und Dauer einer Aufgabe.</p></article><article><i class="guide-bar critical"></i><h3>Kritisch markiertes Arbeitspaket</h3><p>Diese Kennzeichnung wird aktuell manuell gesetzt. Sie ist kein automatisch berechneter Critical Path.</p></article><article><i class="guide-diamond milestone"></i><h3>Meilenstein</h3><p>Eine Raute markiert ein wesentliches Ergebnis oder Ereignis.</p></article><article><i class="guide-diamond gate"></i><h3>Gate</h3><p>Ein Gate steht für eine Freigabe oder Managemententscheidung.</p></article><article><div class="guide-baseline-symbol" aria-hidden="true"><span class="guide-baseline-bar"></span><span class="guide-baseline-line"></span></div><h3>Baseline</h3><p>Die dünne Linie unter einem Balken zeigt den ursprünglich hinterlegten Plan.</p></article><article><div class="guide-buffer-symbol" aria-hidden="true"><span class="guide-buffer-bar"></span><span class="guide-buffer-extension"></span></div><h3>Puffer</h3><p>Der gestrichelte Bereich nach einer Aufgabe visualisiert hinterlegten Zeitpuffer.</p></article><article><div class="guide-status-symbol" aria-hidden="true"><span class="guide-status-dot green"></span><span class="guide-status-dot amber"></span><span class="guide-status-dot red"></span><span class="guide-risk-symbol">!</span></div><h3>Status &amp; Risiko</h3><p>Ampelstatus und Risikostufe ergänzen die reine Terminperspektive.</p></article><article><div class="guide-dependency-symbol" aria-hidden="true"><span class="guide-dependency-from"></span><span class="guide-dependency-path"></span><span class="guide-dependency-to"></span></div><h3>Abhängigkeiten</h3><p>Pfeile zeigen Vorgänger. Gantt Studio verhindert zyklische Abhängigkeiten.</p></article><article class="guide-storage"><span class="guide-local-mark">LOKAL</span><h3>Keine Projektdatenbank</h3><p>Projekt- und Planungsdaten werden in IndexedDB dieses Browsers gespeichert. Es gibt auf GitHub Pages keine serverseitige Gantt-Studio-Projektspeicherung oder automatische Cloud-Synchronisierung.</p></article><article class="guide-warning"><span class="guide-backup-mark">BACKUP</span><h3>Export regelmäßig sichern</h3><p>Browser- oder Website-Daten können gelöscht werden und sind geräte- bzw. profilgebunden. Die JSON-Datei aus dem Export ist deine portable Sicherung.</p></article></div><div class="dialog-actions"><div class="spacer"></div><button class="btn primary" value="cancel" type="submit">Verstanden</button></div></form></dialog>
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
-  <script type="module" src="./assets/js/app.js?v=1.2.2"></script>
+  <script type="module" src="./assets/js/app.js?v=1.3.0"></script>
 </body>
 </html>
