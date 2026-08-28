@@ -26,12 +26,19 @@ jobs:
           test -s index.html
           test -s assets/css/app.css
           test -s assets/css/privacy.css
+          test -s assets/css/odin.css
           test -s examples/demo.gantt.json
           python -m json.tool examples/demo.gantt.json >/dev/null
-          grep -q 'assets/js/app.js?v=1.2.2' index.html
-          grep -q 'assets/css/app.css?v=1.2.2' index.html
-          grep -q 'assets/css/privacy.css?v=1.2.2' index.html
+          grep -q 'assets/js/app.js?v=1.3.0' index.html
+          grep -q 'assets/css/app.css?v=1.3.0' index.html
+          grep -q 'assets/css/privacy.css?v=1.3.0' index.html
+          grep -q 'assets/css/odin.css?v=1.3.0' index.html
           grep -q 'Deine Projekt- und Planungsdaten bleiben in diesem Browser' index.html
+          grep -q 'phaseCollapseToolbar' index.html
+          grep -q 'centralExportBtn' index.html
+          grep -q 'designBtn' index.html
+          grep -q 'data-management-mode="management"' index.html
+          grep -q 'data-zoom="week"' index.html
           grep -q 'guide-baseline-symbol' index.html
           grep -q 'guide-buffer-symbol' index.html
           grep -q 'guide-status-symbol' index.html
