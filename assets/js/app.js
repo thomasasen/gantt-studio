@@ -10,18 +10,22 @@ const defaults = {
   schema: 'gantt-studio.project', schemaVersion: 1, generator: 'Gantt Studio Pages',
   project: {
     id: '', name: 'Neues Projekt', createdAt: '', updatedAt: '', tasks: [],
-    design: { colors: { pageBg:'#EEF2F3',panelBg:'#FFFFFF',headerBg:'#16324F',primary:'#16324F',accent:'#607A00',critical:'#16324F',workstream:'#3B7280',milestone:'#607A00',arrow:'#657983',grid:'#DCE4E7',text:'#243746',mutedText:'#687D87',border:'#D8E1E4',saturday:'#F1E2E2',sunday:'#F1E2E2',holiday:'#F3CACA' } },
+    design: { colors: { pageBg:'#EEF2F3',panelBg:'#FFFFFF',headerBg:'#16324F',primary:'#16324F',accent:'#607A00',critical:'#16324F',workstream:'#3B7280',milestone:'#607A00',gate:'#8B5A2B',arrow:'#657983',grid:'#DCE4E7',text:'#243746',mutedText:'#687D87',border:'#D8E1E4',saturday:'#F1E2E2',sunday:'#F1E2E2',holiday:'#F3CACA' } },
     planning: { settings: { showToday:true,showStatusLine:true,showWeekends:true,showHolidays:true,showPhaseBands:true,showBaseline:true,showBuffer:true,showRisk:true,showOwners:true,showProgressLabels:true,showDateLabels:true,showRelativeToday:false,relativeOffsetDays:14,relativeDayMode:'workdays',relativeSkipHolidays:true,relativeLabel:'Vorbereitungstermin',relativeColor:'#C2007B',relativeStyle:'solid' }, phases:[],markers:[],holidays:[] },
     labelConfig: { enabled:true,tracks:4,leaderLines:true,ellipsis:true,twoLine:true,maxWidth:240,placement:'auto',groups:{name:true,progress:true,owner:false,dates:false,phase:false,status:false,risk:false} },
     revision: 1
   }
 };
 
+const managementDefaults = { critical:true,milestones:true,gates:true,risks:true,redStatus:true,overdue:true };
 let envelope = createEnvelope();
 let zoom = 'week';
 let managementMode = 'operational';
+let managementCriteria = { ...managementDefaults };
+let collapsedPhases = new Set();
 let saveTimer = null;
 let toastTimer = null;
+let activeTab = 'project';
 
 function createEnvelope() {
   const now = new Date().toISOString();
@@ -59,6 +63,7 @@ async function boot() {
   }
   if (local) envelope = normalizeEnvelope({ schema:'gantt-studio.project', schemaVersion:1, generator:'Gantt Studio', project:local });
   else await saveLocal(envelope.project);
+  loadViewState();
   await renderAll();
 }
 
@@ -68,17 +73,26 @@ function bindEvents() {
   $('projectSelect').addEventListener('change', changeProject);
   $('openProjectBtn').addEventListener('click', () => $('fileInput').click());
   $('fileInput').addEventListener('change', importFile);
-  $('saveProjectBtn').addEventListener('click', exportProject);
   $('addTaskBtn').addEventListener('click', () => openTaskDialog());
-  $('demoBtn').addEventListener('click', loadDemo);
-  $('settingsBtn').addEventListener('click', openSettings);
   $('guideBtn').addEventListener('click', () => $('guideDialog').showModal());
-  $('zoomSelect').addEventListener('change', e => { zoom = e.target.value; renderGanttOnly(); });
-  $('managementSelect').addEventListener('change', e => { managementMode = e.target.value; renderGanttOnly(); });
+  $('designBtn').addEventListener('click', openDesignDialog);
+  $('saveDesignBtn').addEventListener('click', saveDesign);
+  $('designPresetOdin').addEventListener('click', () => setDesignPreset('odin'));
+  $('designPresetNeutral').addEventListener('click', () => setDesignPreset('neutral'));
+  $('centralExportBtn').addEventListener('click', () => $('exportDialog').showModal());
+  $('exportJsonBtn').addEventListener('click', exportProject);
+  $('exportCsvBtn').addEventListener('click', exportCsv);
+  $('printPdfBtn').addEventListener('click', () => { $('exportDialog').close(); window.print(); });
+  $('projectTabBtn').addEventListener('click', () => switchTab('project'));
+  $('planningTabBtn').addEventListener('click', () => switchTab('planning'));
+  document.querySelectorAll('[data-zoom]').forEach(btn => btn.addEventListener('click', () => setZoom(btn.dataset.zoom)));
+  document.querySelectorAll('[data-management-mode]').forEach(btn => btn.addEventListener('click', () => setManagementMode(btn.dataset.managementMode)));
+  document.querySelectorAll('[data-management-criterion]').forEach(cb => cb.addEventListener('change', () => { managementCriteria[cb.dataset.managementCriterion] = cb.checked; saveViewState(); renderGanttOnly(); syncControlStates(); }));
   $('projectName').addEventListener('change', async e => { envelope.project.name = e.target.value.trim() || 'Unbenanntes Projekt'; touch(); await persist(); await renderPortfolio(); });
   $('saveTaskBtn').addEventListener('click', saveTask);
   $('deleteTaskBtn').addEventListener('click', deleteTask);
-  $('ganttStage').addEventListener('click', e => { const node = e.target.closest('[data-task-id]'); if (node) openTaskDialog(node.dataset.taskId); });
+  $('ganttStage').addEventListener('click', e => { if (Date.now() < (window.__ganttDragUntil || 0)) return; const node = e.target.closest('[data-task-id]'); const id=node?.dataset.taskId; if (id && !id.startsWith('phase-summary-')) openTaskDialog(id); });
+  $('phaseCollapseToolbar').addEventListener('click', handlePhaseCollapseClick);
   $('addPhaseBtn').addEventListener('click', () => openEntity('phase'));
   $('addMarkerBtn').addEventListener('click', () => openEntity('marker'));
   $('addHolidayBtn').addEventListener('click', () => openEntity('holiday'));
@@ -88,14 +102,16 @@ function bindEvents() {
   $('relativeLabel').addEventListener('change', updateRelativeSettings);
   $('relativeOffset').addEventListener('change', updateRelativeSettings);
   for (const id of ['phaseList','markerList','holidayList']) $(id).addEventListener('click', e => { const row=e.target.closest('[data-entity-id]'); if(row) openEntity(row.dataset.entityKind,row.dataset.entityId); });
+  document.addEventListener('change', async e => { const key=e.target?.dataset?.setting; if(!key)return; envelope.project.planning.settings[key]=e.target.checked; touch(); await persist(); syncSettings(); renderGanttOnly(); });
   window.addEventListener('keydown', e => { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase()==='s') { e.preventDefault(); exportProject(); } });
+  document.addEventListener('input', e => { if (['designPrimary','designAccent','designWorkstream','designCritical','designMilestone','designGate','designPageBg','designPanelBg'].includes(e.target.id)) updateDesignPreview(); });
 }
 
 async function renderAll() {
+  applyDesign();
   $('projectName').value = envelope.project.name;
-  $('managementSelect').value = managementMode;
   await renderPortfolio();
-  renderMeta(); renderMetrics(); renderLegend(); renderGanttOnly(); populateTaskPhases();
+  renderMeta(); renderMetrics(); renderPlanningLists(); syncSettings(); renderQuickSettings(); renderPhaseToolbar(); renderGanttOnly(); populateTaskPhases(); syncControlStates();
 }
 
 async function renderPortfolio() {
@@ -110,6 +126,14 @@ function renderMeta() {
   $('projectMeta').textContent = `Revision ${p.revision || 1} · zuletzt geändert ${updated} · lokal im Browser gespeichert`;
 }
 
+function setSaveStatus(state, detail='Lokal im Browser') {
+  const box=$('saveStatus'); if(!box)return;
+  box.className=`save-status ${state}`;
+  $('saveStatusText').textContent=state==='saving'?'Speichert…':state==='error'?'Nicht gespeichert':'Gespeichert';
+  $('saveStatusDetail').textContent=detail;
+  box.querySelector('.save-status-icon').textContent=state==='saving'?'…':state==='error'?'!':'✓';
+}
+
 function renderMetrics() {
   const tasks = envelope.project.tasks;
   const milestones = tasks.filter(t => ['milestone','gate'].includes(t.type)).length;
@@ -121,27 +145,107 @@ function renderMetrics() {
   $('metrics').innerHTML = metrics.map(([l,v],i)=>`<div class="metric ${i===4&&criticalRisk?'warn':''}"><span>${l}</span><strong>${v}</strong></div>`).join('');
 }
 
-function renderLegend() {
-  $('legend').innerHTML = [['Workstream','var(--workstream)'],['Kritisch','var(--critical)'],['Meilenstein','var(--milestone)'],['Gate','var(--gate)']].map(([l,c])=>`<span class="legend-item"><i class="legend-swatch" style="background:${c}"></i>${l}</span>`).join('');
-}
-
-function visibleTasks() {
-  const tasks = envelope.project.tasks;
+function filteredBaseTasks() {
+  const tasks = envelope.project.tasks.filter(t=>t.showInGantt!==false);
   if (managementMode === 'operational') return tasks;
   if (managementMode === 'milestones') return tasks.filter(t => ['milestone','gate'].includes(t.type));
   const today = todayIso();
-  return tasks.filter(t => t.type==='critical' || ['milestone','gate'].includes(t.type) || ['high','critical'].includes(t.risk) || t.status==='red' || (t.end < today && Number(t.progress||0)<100));
+  return tasks.filter(t =>
+    (managementCriteria.critical && t.type==='critical') ||
+    (managementCriteria.milestones && t.type==='milestone') ||
+    (managementCriteria.gates && t.type==='gate') ||
+    (managementCriteria.risks && ['high','critical'].includes(t.risk)) ||
+    (managementCriteria.redStatus && t.status==='red') ||
+    (managementCriteria.overdue && t.end < today && Number(t.progress||0)<100)
+  );
+}
+
+function visibleTasks() {
+  const base=filteredBaseTasks();
+  const phases=(envelope.project.planning?.phases||[]).slice().sort((a,b)=>(a.start||'').localeCompare(b.start||''));
+  if(!phases.length) return base;
+  const byPhase=new Map(phases.map(p=>[p.id,[]]));
+  const unphased=[];
+  for(const task of base){ if(task.phaseId && byPhase.has(task.phaseId)) byPhase.get(task.phaseId).push(task); else unphased.push(task); }
+  const out=[];
+  for(const phase of phases){
+    const tasks=byPhase.get(phase.id)||[];
+    if(!tasks.length) continue;
+    out.push(makePhaseSummary(phase,tasks));
+    if(!collapsedPhases.has(String(phase.id))) out.push(...tasks);
+  }
+  out.push(...unphased);
+  return out;
+}
+
+function makePhaseSummary(phase,tasks){
+  const starts=tasks.map(t=>t.start).filter(Boolean).sort(), ends=tasks.map(t=>t.end).filter(Boolean).sort();
+  const start=phase.start||starts[0]||todayIso(), end=phase.end||ends.at(-1)||start;
+  const progress=tasks.length?Math.round(tasks.reduce((s,t)=>s+Number(t.progress||0),0)/tasks.length):0;
+  return {id:`phase-summary-${phase.id}`,name:phase.name||'Phase',start,end,progress,type:'phase-summary',dependencies:[],phaseId:phase.id,owner:`${tasks.length} Aufgaben`,status:'neutral',risk:'none',showInGantt:true,syntheticPhase:true,phaseColor:phase.color||'#DCE8EB',collapsed:collapsedPhases.has(String(phase.id)),taskCount:tasks.length};
 }
 
 function renderGanttOnly() {
   const project = clone(envelope.project);
-  project.tasks = visibleTasks();
+  const tasks = visibleTasks();
+  project.tasks = tasks;
   const stage = $('ganttStage');
-  const result = renderGantt(stage, project, { zoom });
+  const result = renderGantt(stage, project, { zoom, onTaskChange:applyTimelineChange });
+  const actualCount=tasks.filter(t=>!t.syntheticPhase).length;
+  $('visibleTaskCount').textContent = actualCount===1?'1 Aufgabe':`${actualCount} Aufgaben`;
   if (result.empty) {
-    stage.innerHTML = `<div class="empty-state"><strong>${envelope.project.tasks.length?'Keine Aufgaben in dieser Ansicht':'Noch keine Aufgaben'}</strong><span>${envelope.project.tasks.length?'Wechsle die Inhaltsansicht oder ergänze relevante Merkmale.':'Erstelle eine Aufgabe oder lade die Demo.'}</span><button class="btn primary" id="emptyAddBtn2" type="button">${envelope.project.tasks.length?'Aufgabe erstellen':'Erste Aufgabe erstellen'}</button></div>`;
+    stage.innerHTML = `<div class="empty-state"><strong>${envelope.project.tasks.length?'Keine Aufgaben in dieser Ansicht':'Noch keine Aufgaben'}</strong><span>${envelope.project.tasks.length?'Passe Filter oder Phasen an.':'Erstelle eine Aufgabe oder importiere ein Projekt.'}</span><button class="btn primary" id="emptyAddBtn2" type="button">Aufgabe erstellen</button></div>`;
     $('emptyAddBtn2').addEventListener('click',()=>openTaskDialog());
   }
+}
+
+async function applyTimelineChange(change){
+  const task=envelope.project.tasks.find(t=>t.id===change.id); if(!task)return;
+  if(change.start)task.start=change.start; if(change.end)task.end=change.end; if(Number.isFinite(change.progress))task.progress=clamp(Math.round(change.progress),0,100);
+  if(task.end<task.start){const x=task.start;task.start=task.end;task.end=x;}
+  sortTasks(); touch(); await persist(); renderMetrics(); renderPhaseToolbar(); renderGanttOnly();
+}
+
+function renderPhaseToolbar(){
+  const phases=(envelope.project.planning?.phases||[]).slice().sort((a,b)=>(a.start||'').localeCompare(b.start||''));
+  const box=$('phaseCollapseToolbar');
+  if(!phases.length){box.hidden=true;box.innerHTML='';return;} box.hidden=false;
+  const counts=new Map(phases.map(p=>[p.id,envelope.project.tasks.filter(t=>t.phaseId===p.id).length]));
+  box.innerHTML=`<div class="phase-collapse-heading"><div><strong>Phasen</strong><span>Aufgaben im Zeitplan ein- oder ausblenden</span></div><div class="phase-collapse-actions"><button class="link-button" type="button" data-phase-action="expand-all">Alle ausklappen</button><button class="link-button" type="button" data-phase-action="collapse-all">Alle einklappen</button></div></div><div class="phase-collapse-list">${phases.map(p=>{const collapsed=collapsedPhases.has(String(p.id));return `<button type="button" class="phase-collapse-button ${collapsed?'collapsed':'expanded'}" data-phase-id="${esc(p.id)}" aria-expanded="${!collapsed}" style="--phase-control-color:${esc(p.color||'#DCE8EB')}"><span class="phase-collapse-icon">${collapsed?'▶':'▼'}</span><span class="phase-collapse-label">${esc(p.name||'Phase')}</span><span class="phase-collapse-count">${counts.get(p.id)||0}</span></button>`}).join('')}</div>`;
+}
+
+function handlePhaseCollapseClick(e){
+  const action=e.target.closest('[data-phase-action]')?.dataset.phaseAction;
+  if(action==='expand-all')collapsedPhases.clear();
+  else if(action==='collapse-all')collapsedPhases=new Set((envelope.project.planning?.phases||[]).map(p=>String(p.id)));
+  else {const id=e.target.closest('[data-phase-id]')?.dataset.phaseId;if(!id)return;collapsedPhases.has(id)?collapsedPhases.delete(id):collapsedPhases.add(id);}
+  saveViewState();renderPhaseToolbar();renderGanttOnly();
+}
+
+function switchTab(tab){
+  activeTab=tab==='planning'?'planning':'project';
+  $('projectView').hidden=activeTab!=='project';$('planningView').hidden=activeTab!=='planning';
+  $('projectTabBtn').classList.toggle('active',activeTab==='project');$('planningTabBtn').classList.toggle('active',activeTab==='planning');
+  $('projectTabBtn').setAttribute('aria-selected',String(activeTab==='project'));$('planningTabBtn').setAttribute('aria-selected',String(activeTab==='planning'));
+  if(activeTab==='planning'){syncSettings();renderPlanningLists();}
+}
+
+function setZoom(value){zoom=['day','week','month'].includes(value)?value:'week';saveViewState();syncControlStates();renderGanttOnly();}
+function setManagementMode(value){managementMode=['operational','management','milestones'].includes(value)?value:'operational';saveViewState();syncControlStates();renderGanttOnly();}
+function syncControlStates(){
+  document.querySelectorAll('[data-zoom]').forEach(b=>b.classList.toggle('active',b.dataset.zoom===zoom));
+  document.querySelectorAll('[data-management-mode]').forEach(b=>b.classList.toggle('active',b.dataset.managementMode===managementMode));
+  document.querySelectorAll('[data-management-criterion]').forEach(cb=>cb.checked=managementCriteria[cb.dataset.managementCriterion]!==false);
+}
+
+function viewKey(){return `gantt-studio.view-v2:${envelope.project.id}`;}
+function loadViewState(){try{const v=JSON.parse(localStorage.getItem(viewKey())||'{}');zoom=['day','week','month'].includes(v.zoom)?v.zoom:'week';managementMode=['operational','management','milestones'].includes(v.managementMode)?v.managementMode:'operational';managementCriteria={...managementDefaults,...(v.managementCriteria||{})};collapsedPhases=new Set(Array.isArray(v.collapsedPhases)?v.collapsedPhases.map(String):[]);}catch{zoom='week';managementMode='operational';managementCriteria={...managementDefaults};collapsedPhases=new Set();}}
+function saveViewState(){localStorage.setItem(viewKey(),JSON.stringify({zoom,managementMode,managementCriteria,collapsedPhases:[...collapsedPhases]}));}
+
+function renderQuickSettings(){
+  const labels={showToday:'Heute-Linie',showWeekends:'Wochenenden',showHolidays:'Feiertage',showPhaseBands:'Phasenbänder',showBaseline:'Baseline',showBuffer:'Puffer',showOwners:'Owner',showProgressLabels:'Fortschritt',showStatusLine:'Abhängigkeiten'};
+  $('quickSettingsList').innerHTML=Object.entries(labels).map(([key,label])=>`<label><input type="checkbox" data-setting="${key}"> <span>${label}</span></label>`).join('');
+  syncSettings();
 }
 
 function openTaskDialog(id=null) {
@@ -159,9 +263,7 @@ function populateTaskPhases(selected='') {
   $('taskPhase').innerHTML=['<option value="">Keine Phase</option>',...(envelope.project.planning?.phases||[]).map(p=>`<option value="${esc(p.id)}">${esc(p.name)}</option>`)].join('');
   $('taskPhase').value=selected;
 }
-function populateDependencies(task) {
-  $('taskDependencies').innerHTML=envelope.project.tasks.filter(t=>t.id!==task?.id).map(t=>`<option value="${esc(t.id)}" ${(task?.dependencies||[]).includes(t.id)?'selected':''}>${esc(t.name)}</option>`).join('');
-}
+function populateDependencies(task) {$('taskDependencies').innerHTML=envelope.project.tasks.filter(t=>t.id!==task?.id).map(t=>`<option value="${esc(t.id)}" ${(task?.dependencies||[]).includes(t.id)?'selected':''}>${esc(t.name)}</option>`).join('');}
 
 async function saveTask() {
   const name=$('taskName').value.trim(), start=$('taskStart').value, end=$('taskEnd').value;
@@ -177,110 +279,46 @@ async function saveTask() {
   sortTasks(); touch(); await persist(); $('taskDialog').close(); await renderAll(); toast(idx>=0?'Aufgabe aktualisiert.':'Aufgabe erstellt.');
 }
 
-async function deleteTask() {
-  const id=$('taskId').value; if(!id)return;
-  envelope.project.tasks=envelope.project.tasks.filter(t=>t.id!==id).map(t=>({...t,dependencies:(t.dependencies||[]).filter(dep=>dep!==id)}));
-  touch(); await persist(); $('taskDialog').close(); await renderAll(); toast('Aufgabe gelöscht.');
-}
+async function deleteTask() {const id=$('taskId').value;if(!id)return;envelope.project.tasks=envelope.project.tasks.filter(t=>t.id!==id).map(t=>({...t,dependencies:(t.dependencies||[]).filter(dep=>dep!==id)}));touch();await persist();$('taskDialog').close();await renderAll();toast('Aufgabe gelöscht.');}
 
-async function createProject() {
-  const name=(prompt('Name des neuen Projekts:','Neues Projekt')||'').trim(); if(!name)return;
-  envelope=createEnvelope(); envelope.project.name=uniqueName(name,await listProjects()); await saveLocal(envelope.project); setActiveProject(envelope.project.id); managementMode='operational'; await renderAll(); toast('Projekt wurde angelegt.');
-}
+async function createProject() {const name=(prompt('Name des neuen Projekts:','Neues Projekt')||'').trim();if(!name)return;envelope=createEnvelope();envelope.project.name=uniqueName(name,await listProjects());await saveLocal(envelope.project);setActiveProject(envelope.project.id);loadViewState();await renderAll();toast('Projekt wurde angelegt.');}
+async function changeProject(e) {const p=await loadProject(e.target.value);if(!p)return;envelope=normalizeEnvelope({schema:'gantt-studio.project',schemaVersion:1,generator:'Gantt Studio',project:p});setActiveProject(p.id);loadViewState();await renderAll();}
+async function removeProject() {const projects=await listProjects();if(!envelope.project?.id)return;if(!confirm(`Projekt „${envelope.project.name}“ vollständig löschen?`))return;await deleteProject(envelope.project.id);const remaining=projects.filter(p=>p.id!==envelope.project.id);if(remaining.length){const p=await loadProject(remaining[0].id);envelope=normalizeEnvelope({schema:'gantt-studio.project',schemaVersion:1,generator:'Gantt Studio',project:p});setActiveProject(p.id);}else{envelope=createEnvelope();await saveLocal(envelope.project);}loadViewState();await renderAll();toast('Projekt wurde gelöscht.');}
 
-async function changeProject(e) {
-  const p=await loadProject(e.target.value); if(!p)return;
-  envelope=normalizeEnvelope({schema:'gantt-studio.project',schemaVersion:1,generator:'Gantt Studio',project:p}); setActiveProject(p.id); managementMode='operational'; await renderAll();
-}
+async function importFile(event) {const file=event.target.files?.[0];if(!file)return;try{envelope=cloneForImport(normalizeEnvelope(JSON.parse(await file.text())));envelope.project.name=uniqueName(envelope.project.name,await listProjects());await saveLocal(envelope.project);loadViewState();await renderAll();toast('Projekt importiert.');}catch(e){toast(e.message||'Datei konnte nicht importiert werden.',true);}finally{event.target.value='';}}
+function cloneForImport(source) {const e=clone(source),map=new Map();e.project.tasks.forEach(t=>map.set(t.id,uuid()));e.project.tasks=e.project.tasks.map(t=>({...t,id:map.get(t.id),dependencies:(t.dependencies||[]).map(d=>map.get(d)).filter(Boolean)}));const now=new Date().toISOString();e.project.id=uuid();e.project.createdAt=now;e.project.updatedAt=now;e.project.revision=1;e.exportedAt=now;return e;}
 
-async function removeProject() {
-  const projects=await listProjects(); if(!envelope.project?.id)return;
-  if(!confirm(`Projekt „${envelope.project.name}“ vollständig löschen?`))return;
-  await deleteProject(envelope.project.id);
-  const remaining=projects.filter(p=>p.id!==envelope.project.id);
-  if(remaining.length){const p=await loadProject(remaining[0].id); envelope=normalizeEnvelope({schema:'gantt-studio.project',schemaVersion:1,generator:'Gantt Studio',project:p}); setActiveProject(p.id);} else {envelope=createEnvelope();await saveLocal(envelope.project);}
-  await renderAll(); toast('Projekt wurde gelöscht.');
-}
+function exportProject() {const payload=clone(envelope);payload.exportedAt=new Date().toISOString();download(JSON.stringify(payload,null,2),`${slug(payload.project.name)}-${todayIso()}.gantt.json`,'application/json');$('exportDialog').close();toast('Projektdatei exportiert.');}
+function exportCsv(){const q=v=>`"${String(v??'').replaceAll('"','""')}"`;const rows=[['Name','Start','Ende','Fortschritt','Typ','Owner','Status','Risiko','Phase','Kosten','Vorgänger'].join(';'),...envelope.project.tasks.map(t=>[t.name,t.start,t.end,t.progress,t.type,t.owner,t.status,t.risk,(envelope.project.planning.phases.find(p=>p.id===t.phaseId)?.name||''),t.costEur,(t.dependencies||[]).join(',')].map(q).join(';'))];download('\ufeff'+rows.join('\n'),`${slug(envelope.project.name)}-${todayIso()}.csv`,'text/csv;charset=utf-8');$('exportDialog').close();toast('Aufgabenübersicht exportiert.');}
 
-async function loadDemo() {
-  try { const res=await fetch('./examples/demo.gantt.json',{cache:'no-store'}); if(!res.ok)throw new Error(); const raw=await res.json(); envelope=cloneForImport(normalizeEnvelope(raw)); await saveLocal(envelope.project); await renderAll(); toast('Demo als neues Projekt geladen.'); }
-  catch { toast('Demo konnte nicht geladen werden.',true); }
-}
-
-async function importFile(event) {
-  const file=event.target.files?.[0]; if(!file)return;
-  try { envelope=cloneForImport(normalizeEnvelope(JSON.parse(await file.text()))); envelope.project.name=uniqueName(envelope.project.name,await listProjects()); await saveLocal(envelope.project); await renderAll(); toast('Projekt importiert.'); }
-  catch(e){toast(e.message||'Datei konnte nicht importiert werden.',true);} finally{event.target.value='';}
-}
-
-function cloneForImport(source) {
-  const e=clone(source), map=new Map();
-  e.project.tasks.forEach(t=>map.set(t.id,uuid()));
-  e.project.tasks=e.project.tasks.map(t=>({...t,id:map.get(t.id),dependencies:(t.dependencies||[]).map(d=>map.get(d)).filter(Boolean)}));
-  const now=new Date().toISOString(); e.project.id=uuid(); e.project.createdAt=now; e.project.updatedAt=now; e.project.revision=1; e.exportedAt=now; return e;
-}
-
-function exportProject() {
-  const payload=clone(envelope); payload.exportedAt=new Date().toISOString();
-  download(JSON.stringify(payload,null,2),`${slug(payload.project.name)}-${todayIso()}.gantt.json`,'application/json'); toast('Projektdatei exportiert.');
-}
-
-function openSettings() { syncSettings(); renderPlanningLists(); $('relativeLabel').value=envelope.project.planning.settings.relativeLabel||''; $('relativeOffset').value=envelope.project.planning.settings.relativeOffsetDays??14; $('settingsDialog').showModal(); }
-
-function buildSettings() {
-  const labels={showToday:'Heute markieren',showWeekends:'Wochenenden markieren',showHolidays:'Feiertage markieren',showPhaseBands:'Phasen einfärben',showBaseline:'Baseline anzeigen',showBuffer:'Puffer anzeigen',showRisk:'Risiken anzeigen',showOwners:'Owner anzeigen',showProgressLabels:'Fortschritt anzeigen',showDateLabels:'Datumslabels anzeigen',showStatusLine:'Abhängigkeiten anzeigen',showRelativeToday:'Relative Zieldatumslinie anzeigen'};
-  $('settingsList').innerHTML=Object.entries(labels).map(([key,label])=>`<label class="toggle-row"><span>${label}</span><input type="checkbox" data-setting="${key}"></label>`).join('');
-  $('settingsList').addEventListener('change',async e=>{const key=e.target.dataset.setting;if(!key)return;envelope.project.planning.settings[key]=e.target.checked;touch();await persist();renderGanttOnly();});
-}
+function buildSettings() {const labels={showToday:'Heute markieren',showWeekends:'Wochenenden markieren',showHolidays:'Feiertage markieren',showPhaseBands:'Phasen einfärben',showBaseline:'Baseline anzeigen',showBuffer:'Puffer anzeigen',showRisk:'Risiken anzeigen',showOwners:'Owner anzeigen',showProgressLabels:'Fortschritt anzeigen',showDateLabels:'Datumslabels anzeigen',showStatusLine:'Abhängigkeiten anzeigen',showRelativeToday:'Relative Zieldatumslinie anzeigen'};$('settingsList').innerHTML=Object.entries(labels).map(([key,label])=>`<label class="toggle-row"><span>${label}</span><input type="checkbox" data-setting="${key}"></label>`).join('');}
 function syncSettings(){document.querySelectorAll('[data-setting]').forEach(cb=>cb.checked=envelope.project.planning.settings[cb.dataset.setting]!==false);}
 async function updateRelativeSettings(){envelope.project.planning.settings.relativeLabel=$('relativeLabel').value.trim().slice(0,80);envelope.project.planning.settings.relativeOffsetDays=clamp(Number($('relativeOffset').value)||0,-3650,3650);touch();await persist();renderGanttOnly();}
 
-function renderPlanningLists(){
-  $('phaseList').innerHTML=entityRows('phase',envelope.project.planning.phases,p=>`${formatDate(p.start)} – ${formatDate(p.end)}`);
-  $('markerList').innerHTML=entityRows('marker',envelope.project.planning.markers,p=>`${formatDate(p.date)} · ${p.style==='dashed'?'gestrichelt':'durchgezogen'}`);
-  $('holidayList').innerHTML=entityRows('holiday',envelope.project.planning.holidays,p=>`${formatDate(p.date)}${p.source?` · ${esc(p.source)}`:''}`);
-}
+function renderPlanningLists(){$('relativeLabel').value=envelope.project.planning.settings.relativeLabel||'';$('relativeOffset').value=envelope.project.planning.settings.relativeOffsetDays??14;$('phaseList').innerHTML=entityRows('phase',envelope.project.planning.phases,p=>`${formatDate(p.start)} – ${formatDate(p.end)}`);$('markerList').innerHTML=entityRows('marker',envelope.project.planning.markers,p=>`${formatDate(p.date)} · ${p.style==='dashed'?'gestrichelt':'durchgezogen'}`);$('holidayList').innerHTML=entityRows('holiday',envelope.project.planning.holidays,p=>`${formatDate(p.date)}${p.source?` · ${esc(p.source)}`:''}`);}
 function entityRows(kind,items,detail){return items.length?items.slice().sort((a,b)=>(a.start||a.date||'').localeCompare(b.start||b.date||'')).map(x=>`<button type="button" class="entity-row" data-entity-kind="${kind}" data-entity-id="${esc(x.id)}"><span><strong>${esc(x.name)}</strong><small>${detail(x)}</small></span><i style="background:${esc(x.color||'#DCE8EB')}"></i></button>`).join(''):'<div class="muted-empty">Noch keine Einträge.</div>';}
 
-function openEntity(kind,id=''){
-  const list=kind==='phase'?envelope.project.planning.phases:kind==='marker'?envelope.project.planning.markers:envelope.project.planning.holidays;
-  const item=list.find(x=>x.id===id)||{}; $('entityKind').value=kind; $('entityId').value=id; $('deleteEntityBtn').style.visibility=id?'visible':'hidden';
-  const cfg={phase:['PHASE','Phase bearbeiten'],marker:['STICHTAG','Stichtag bearbeiten'],holiday:['SONDERTAG','Sondertag bearbeiten']}[kind]; $('entityEyebrow').textContent=cfg[0];$('entityTitle').textContent=id?cfg[1]:cfg[1].replace('bearbeiten','anlegen');
-  if(kind==='phase') $('entityFields').innerHTML=`<label class="span-2">Name<input id="entityName" maxlength="120" required value="${esc(item.name||'')}"></label><label>Start<input id="entityStart" type="date" required value="${esc(item.start||todayIso())}"></label><label>Ende<input id="entityEnd" type="date" required value="${esc(item.end||todayIso())}"></label><label>Farbe<input id="entityColor" type="color" value="${esc(item.color||'#DCE8EB')}"></label>`;
-  if(kind==='marker') $('entityFields').innerHTML=`<label class="span-2">Name<input id="entityName" maxlength="120" required value="${esc(item.name||'')}"></label><label>Datum<input id="entityDate" type="date" required value="${esc(item.date||todayIso())}"></label><label>Farbe<input id="entityColor" type="color" value="${esc(item.color||'#607A00')}"></label><label>Linie<select id="entityStyle"><option value="solid">Durchgezogen</option><option value="dashed">Gestrichelt</option></select></label>`;
-  if(kind==='holiday') $('entityFields').innerHTML=`<label class="span-2">Name<input id="entityName" maxlength="120" required value="${esc(item.name||'')}"></label><label>Datum<input id="entityDate" type="date" required value="${esc(item.date||todayIso())}"></label>`;
-  if(kind==='marker') $('entityStyle').value=item.style||'solid'; $('entityDialog').showModal();
-}
+function openEntity(kind,id=''){const list=kind==='phase'?envelope.project.planning.phases:kind==='marker'?envelope.project.planning.markers:envelope.project.planning.holidays;const item=list.find(x=>x.id===id)||{};$('entityKind').value=kind;$('entityId').value=id;$('deleteEntityBtn').style.visibility=id?'visible':'hidden';const cfg={phase:['PHASE','Phase bearbeiten'],marker:['STICHTAG','Stichtag bearbeiten'],holiday:['SONDERTAG','Sondertag bearbeiten']}[kind];$('entityEyebrow').textContent=cfg[0];$('entityTitle').textContent=id?cfg[1]:cfg[1].replace('bearbeiten','anlegen');if(kind==='phase')$('entityFields').innerHTML=`<label class="span-2">Name<input id="entityName" maxlength="120" required value="${esc(item.name||'')}"></label><label>Start<input id="entityStart" type="date" required value="${esc(item.start||todayIso())}"></label><label>Ende<input id="entityEnd" type="date" required value="${esc(item.end||todayIso())}"></label><label>Farbe<input id="entityColor" type="color" value="${esc(item.color||'#DCE8EB')}"></label>`;if(kind==='marker')$('entityFields').innerHTML=`<label class="span-2">Name<input id="entityName" maxlength="120" required value="${esc(item.name||'')}"></label><label>Datum<input id="entityDate" type="date" required value="${esc(item.date||todayIso())}"></label><label>Farbe<input id="entityColor" type="color" value="${esc(item.color||'#607A00')}"></label><label>Linie<select id="entityStyle"><option value="solid">Durchgezogen</option><option value="dashed">Gestrichelt</option></select></label>`;if(kind==='holiday')$('entityFields').innerHTML=`<label class="span-2">Name<input id="entityName" maxlength="120" required value="${esc(item.name||'')}"></label><label>Datum<input id="entityDate" type="date" required value="${esc(item.date||todayIso())}"></label>`;if(kind==='marker')$('entityStyle').value=item.style||'solid';$('entityDialog').showModal();}
+async function saveEntity(){const kind=$('entityKind').value,id=$('entityId').value||uuid(),name=$('entityName').value.trim();if(!name)return toast('Name darf nicht leer sein.',true);const p=envelope.project.planning;const list=kind==='phase'?p.phases:kind==='marker'?p.markers:p.holidays;let item;if(kind==='phase'){const start=$('entityStart').value,end=$('entityEnd').value;if(!start||!end||end<start)return toast('Bitte einen gültigen Phasenzeitraum angeben.',true);item={id,name,start,end,color:$('entityColor').value};}else if(kind==='marker'){item={id,name,date:$('entityDate').value,color:$('entityColor').value,style:$('entityStyle').value};}else{item={id,name,date:$('entityDate').value,source:'manual',country:'',subdivision:'',imported:false,importedAt:''};}const idx=list.findIndex(x=>x.id===id);if(idx>=0)list[idx]=item;else list.push(item);touch();await persist();$('entityDialog').close();renderPlanningLists();populateTaskPhases();renderPhaseToolbar();renderGanttOnly();toast('Planungselement gespeichert.');}
+async function deleteEntity(){const kind=$('entityKind').value,id=$('entityId').value;if(!id)return;const p=envelope.project.planning;if(kind==='phase'){p.phases=p.phases.filter(x=>x.id!==id);envelope.project.tasks=envelope.project.tasks.map(t=>t.phaseId===id?{...t,phaseId:''}:t);collapsedPhases.delete(String(id));}else if(kind==='marker')p.markers=p.markers.filter(x=>x.id!==id);else p.holidays=p.holidays.filter(x=>x.id!==id);touch();await persist();$('entityDialog').close();renderPlanningLists();populateTaskPhases();renderPhaseToolbar();renderGanttOnly();toast('Planungselement gelöscht.');}
 
-async function saveEntity(){
-  const kind=$('entityKind').value,id=$('entityId').value||uuid(),name=$('entityName').value.trim();if(!name)return toast('Name darf nicht leer sein.',true);
-  const p=envelope.project.planning; const list=kind==='phase'?p.phases:kind==='marker'?p.markers:p.holidays; let item;
-  if(kind==='phase'){const start=$('entityStart').value,end=$('entityEnd').value;if(!start||!end||end<start)return toast('Bitte einen gültigen Phasenzeitraum angeben.',true);item={id,name,start,end,color:$('entityColor').value};}
-  else if(kind==='marker'){item={id,name,date:$('entityDate').value,color:$('entityColor').value,style:$('entityStyle').value};}
-  else{item={id,name,date:$('entityDate').value,source:'manual',country:'',subdivision:'',imported:false,importedAt:''};}
-  const idx=list.findIndex(x=>x.id===id);if(idx>=0)list[idx]=item;else list.push(item);touch();await persist();$('entityDialog').close();renderPlanningLists();populateTaskPhases();renderGanttOnly();toast('Planungselement gespeichert.');
-}
-async function deleteEntity(){const kind=$('entityKind').value,id=$('entityId').value;if(!id)return;const p=envelope.project.planning;if(kind==='phase'){p.phases=p.phases.filter(x=>x.id!==id);envelope.project.tasks=envelope.project.tasks.map(t=>t.phaseId===id?{...t,phaseId:''}:t);}else if(kind==='marker')p.markers=p.markers.filter(x=>x.id!==id);else p.holidays=p.holidays.filter(x=>x.id!==id);touch();await persist();$('entityDialog').close();renderPlanningLists();populateTaskPhases();renderGanttOnly();toast('Planungselement gelöscht.');}
+async function importGermanHolidays(){const year=Number(prompt('Jahr für den Feiertagsimport:',String(new Date().getFullYear())));if(!Number.isInteger(year)||year<1975||year>2100)return;const subdivision=(prompt('Bundesland-Code (z. B. DE-BY). Leer = nur bundesweite Feiertage:','DE-BY')||'').trim().toUpperCase();try{const res=await fetch(`https://date.nager.at/api/v3/PublicHolidays/${year}/DE`);if(!res.ok)throw new Error(`HTTP ${res.status}`);const raw=await res.json();const existing=new Set(envelope.project.planning.holidays.map(h=>`${h.date}|${h.name.toLowerCase()}`));let added=0;for(const h of raw){const counties=Array.isArray(h.counties)?h.counties.map(String):[];const national=h.global===true||!counties.length;if(!national&&(!subdivision||!counties.includes(subdivision)))continue;const name=String(h.localName||h.name||'').trim();const key=`${h.date}|${name.toLowerCase()}`;if(existing.has(key))continue;envelope.project.planning.holidays.push({id:uuid(),name,date:h.date,source:'Nager.Date',country:'DE',subdivision,imported:true,importedAt:new Date().toISOString()});existing.add(key);added++;}touch();await persist();renderPlanningLists();renderGanttOnly();toast(`${added} Feiertage importiert.`);}catch(e){toast(`Feiertagsimport fehlgeschlagen: ${e.message}`,true);}}
 
-async function importGermanHolidays(){
-  const year=Number(prompt('Jahr für den Feiertagsimport:',String(new Date().getFullYear())));if(!Number.isInteger(year)||year<1975||year>2100)return;
-  const subdivision=(prompt('Bundesland-Code (z. B. DE-BY). Leer = nur bundesweite Feiertage:','DE-BY')||'').trim().toUpperCase();
-  try{const res=await fetch(`https://date.nager.at/api/v3/PublicHolidays/${year}/DE`);if(!res.ok)throw new Error(`HTTP ${res.status}`);const raw=await res.json();const existing=new Set(envelope.project.planning.holidays.map(h=>`${h.date}|${h.name.toLowerCase()}`));let added=0;
-    for(const h of raw){const counties=Array.isArray(h.counties)?h.counties.map(String):[];const national=h.global===true||!counties.length;if(!national&&(!subdivision||!counties.includes(subdivision)))continue;const name=String(h.localName||h.name||'').trim();const key=`${h.date}|${name.toLowerCase()}`;if(existing.has(key))continue;envelope.project.planning.holidays.push({id:uuid(),name,date:h.date,source:'Nager.Date',country:'DE',subdivision,imported:true,importedAt:new Date().toISOString()});existing.add(key);added++;}
-    touch();await persist();renderPlanningLists();renderGanttOnly();toast(`${added} Feiertage importiert.`);
-  }catch(e){toast(`Feiertagsimport fehlgeschlagen: ${e.message}`,true);}
-}
+function openDesignDialog(){const c=envelope.project.design?.colors||{};$('designPrimary').value=c.primary||c.headerBg||'#16324F';$('designAccent').value=c.accent||'#607A00';$('designWorkstream').value=c.workstream||'#3B7280';$('designCritical').value=c.critical||'#16324F';$('designMilestone').value=c.milestone||'#607A00';$('designGate').value=c.gate||'#8B5A2B';$('designPageBg').value=c.pageBg||'#EEF2F3';$('designPanelBg').value=c.panelBg||'#FFFFFF';updateDesignPreview();$('designDialog').showModal();}
+function setDesignPreset(name){const p=name==='neutral'?{primary:'#334155',accent:'#64748B',workstream:'#64748B',critical:'#1E293B',milestone:'#475569',gate:'#78716C',pageBg:'#F1F5F9',panelBg:'#FFFFFF'}:{primary:'#16324F',accent:'#607A00',workstream:'#3B7280',critical:'#16324F',milestone:'#607A00',gate:'#8B5A2B',pageBg:'#EEF2F3',panelBg:'#FFFFFF'};for(const [k,v] of Object.entries(p))$(`design${k[0].toUpperCase()+k.slice(1)}`).value=v;updateDesignPreview();}
+function updateDesignPreview(){const d=$('designDialog');if(!d)return;d.style.setProperty('--preview-primary',$('designPrimary').value);d.style.setProperty('--preview-accent',$('designAccent').value);d.style.setProperty('--preview-work',$('designWorkstream').value);d.style.setProperty('--preview-critical',$('designCritical').value);d.style.setProperty('--preview-milestone',$('designMilestone').value);d.style.setProperty('--preview-gate',$('designGate').value);}
+async function saveDesign(){const c=envelope.project.design.colors;c.primary=$('designPrimary').value;c.headerBg=c.primary;c.accent=$('designAccent').value;c.workstream=$('designWorkstream').value;c.critical=$('designCritical').value;c.milestone=$('designMilestone').value;c.gate=$('designGate').value;c.pageBg=$('designPageBg').value;c.panelBg=$('designPanelBg').value;touch();await persist();applyDesign();renderGanttOnly();$('designDialog').close();toast('Design gespeichert.');}
+function applyDesign(){const c=envelope.project.design?.colors||{};const r=document.documentElement;const map={'--bg':c.pageBg,'--panel':c.panelBg,'--primary':c.primary||c.headerBg,'--accent':c.accent,'--workstream':c.workstream,'--critical':c.critical,'--milestone':c.milestone,'--gate':c.gate,'--ink':c.text,'--muted':c.mutedText,'--border':c.border,'--grid':c.grid};for(const [k,v] of Object.entries(map))if(v)r.style.setProperty(k,v);}
 
 function validateGraph(tasks){const ids=new Set(tasks.map(t=>t.id)),byId=new Map(tasks.map(t=>[t.id,t]));for(const t of tasks)for(const dep of t.dependencies||[]){if(!ids.has(dep))throw new Error(`Aufgabe „${t.name}“ verweist auf einen unbekannten Vorgänger.`);if(dep===t.id)throw new Error(`Aufgabe „${t.name}“ darf nicht von sich selbst abhängen.`);}const visiting=new Set(),visited=new Set();const visit=id=>{if(visited.has(id))return;if(visiting.has(id))throw new Error('Die Aufgabenabhängigkeiten enthalten einen Zyklus.');visiting.add(id);for(const dep of byId.get(id)?.dependencies||[])visit(dep);visiting.delete(id);visited.add(id);};ids.forEach(visit);}
 function sortTasks(){envelope.project.tasks.sort((a,b)=>(a.start||'').localeCompare(b.start||'')||(a.end||'').localeCompare(b.end||''));}
-function touch(){envelope.project.updatedAt=new Date().toISOString();envelope.project.revision=Math.max(1,Number(envelope.project.revision)||1)+1;}
-async function persist(){clearTimeout(saveTimer);await saveLocal(envelope.project);renderMeta();}
-function schedulePersist(){clearTimeout(saveTimer);saveTimer=setTimeout(()=>persist().catch(console.warn),200);}
+function touch(){envelope.project.updatedAt=new Date().toISOString();envelope.project.revision=Math.max(1,Number(envelope.project.revision)||1)+1;setSaveStatus('saving','Änderungen werden lokal gesichert');}
+async function persist(){clearTimeout(saveTimer);try{await saveLocal(envelope.project);renderMeta();setSaveStatus('saved',`Lokal · ${new Intl.DateTimeFormat('de-DE',{hour:'2-digit',minute:'2-digit'}).format(new Date())}`);}catch(e){setSaveStatus('error','Browser-Speicherung fehlgeschlagen');throw e;}}
 function uniqueName(name,projects){const used=new Set(projects.map(p=>p.name.toLowerCase()));if(!used.has(name.toLowerCase()))return name;for(let i=2;i<1000;i++){const candidate=`${name} (${i})`;if(!used.has(candidate.toLowerCase()))return candidate;}return `${name} ${Date.now()}`;}
 function download(content,name,type){const blob=new Blob([content],{type});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);}
 function safeUrl(v){const raw=String(v||'').trim();if(!raw)return'';try{const u=new URL(raw);return ['http:','https:'].includes(u.protocol)?u.toString():'';}catch{return'';}}
 function clamp(n,min,max){return Math.min(max,Math.max(min,n));}
-function formatDate(v){return new Intl.DateTimeFormat('de-DE').format(new Date(`${v}T12:00:00`));}
+function formatDate(v){if(!v)return'–';return new Intl.DateTimeFormat('de-DE',{timeZone:'UTC'}).format(new Date(`${v}T12:00:00Z`));}
 function formatMoney(v){return new Intl.NumberFormat('de-DE',{style:'currency',currency:'EUR',maximumFractionDigits:0}).format(v||0);}
 function slug(v){return String(v||'projekt').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')||'projekt';}
 function toast(message,error=false){const t=$('toast');t.textContent=message;t.classList.toggle('error',error);t.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove('show'),2600);}
