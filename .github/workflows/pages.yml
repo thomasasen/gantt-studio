@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
   pages: write
   id-token: write
 
@@ -23,6 +23,40 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Apply pending Odin task table migration
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import textwrap
+          source = Path('.github/workflows/apply-task-table-v150.yml').read_text()
+          py_start = "          python - <<'PY'\n"
+          py_end = "\n          PY\n"
+          if py_start not in source:
+              raise SystemExit('migration python block not found')
+          code = source.split(py_start, 1)[1].split(py_end, 1)[0]
+          exec(compile(textwrap.dedent(code), 'task-table-migration', 'exec'))
+          css_start = "          cat > assets/css/task-table.css <<'EOF'\n"
+          css_end = "\n          EOF\n"
+          if css_start not in source:
+              raise SystemExit('migration css block not found')
+          css = source.split(css_start, 1)[1].split(css_end, 1)[0]
+          Path('assets/css/task-table.css').write_text(textwrap.dedent(css))
+          PY
+          node --check assets/js/app.js
+          node --check assets/js/gantt.js
+          test -s assets/css/task-table.css
+          grep -q 'id="taskOverviewPanel"' index.html
+          grep -q 'assets/js/app.js?v=1.5.0' index.html
+          grep -q 'function renderTaskTable' assets/js/app.js
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add index.html assets/js/app.js assets/css/task-table.css
+          if ! git diff --cached --quiet; then
+            git commit -m 'Port Odin task and dependency table'
+            git push origin HEAD:main
+          fi
       - name: Configure Pages
         uses: actions/configure-pages@v5
         with:
