@@ -1,33 +1,53 @@
 # Gantt Studio
 
-**Gantt Studio** ist eine vollständig browserbasierte Projektplanungs-Anwendung für GitHub Pages. Projekte werden lokal im Browser gespeichert und können als portable `.gantt.json`-Dateien importiert und exportiert werden. Es ist kein Backend und kein GitHub-Token im Browser erforderlich.
+**Gantt Studio** ist eine vollständig browserbasierte Projektplanungs-Anwendung für GitHub Pages. Die Pages-Portierung orientiert sich funktional an der bestehenden Docker-Version auf Odin, speichert Projekte jedoch lokal im Browser statt über den Express-Dateispeicher.
 
 ## Live
 
-Nach Aktivierung von GitHub Pages ist die Anwendung unter
+Nach einmaliger Aktivierung von GitHub Pages unter **Settings → Pages → Source → GitHub Actions** ist die Anwendung unter
 
 `https://thomasasen.github.io/gantt-studio/`
 
 erreichbar.
 
-## Funktionen v1.0.0
+## Stand v1.2.0
 
-- Aufgaben mit Start, Ende, Fortschritt, Typ, Owner, Status und Risiko
-- Typen: Workstream, kritisch, Meilenstein und Gate
+### Projektportfolio
+
+- mehrere Projekte im Browser verwalten
+- Projekt auswählen, neu anlegen, umbenennen und löschen
+- automatische lokale Speicherung über IndexedDB
+- Projektimport und -export im bestehenden `gantt-studio.project`-JSON-Format
+- Import erzeugt neue Projekt- und Task-IDs, damit vorhandene Projekte nicht überschrieben werden
+
+### Aufgaben und Gantt
+
+- Workstreams, kritische Aufgaben, Meilensteine und Gates
+- Start, Ende und Fortschritt
+- Owner, Ampelstatus und Risiko
 - Abhängigkeiten zwischen Aufgaben
-- Phasenzuordnung und Phasenbänder
+- Zyklusprüfung für Abhängigkeiten
 - Baseline und Puffer
-- Kosten und Projektkennzahlen
-- Marker, Feiertage und Heute-Linie aus dem bestehenden Gantt-Studio-Datenmodell
-- Zoom: Tag, Woche, Monat
-- automatische lokale Sicherung über IndexedDB
-- Import und Export des bestehenden `gantt-studio.project`-Schemas
-- responsive GitHub-Pages-Oberfläche
-- keine serverseitige Komponente und keine Zugangsdaten im Frontend
+- Kosten
+- Tag-, Wochen- und Monatsansicht
+- Operativ-, Management- und Meilensteinansicht
+
+Die Managementansicht zeigt insbesondere kritische Aufgaben, Meilensteine, Gates, hohe/kritische Risiken, roten Status und überfällige Aufgaben.
+
+### Planung & Darstellung
+
+- Phasen anlegen, bearbeiten und löschen
+- Stichtage/Gates als vertikale Linien verwalten
+- Feiertage und Sondertage verwalten
+- Feiertagsimport für Deutschland über Nager.Date mit optionalem Bundesland-Code
+- Heute-Linie
+- relative Zieldatumslinie
+- Wochenenden, Feiertage, Phasenbänder, Baseline, Puffer, Risiken, Owner, Fortschritt und Abhängigkeiten ein-/ausblenden
+- integrierte Symbolerklärung
 
 ## Datenformat
 
-Die Anwendung verwendet das bestehende Schema:
+Die Anwendung verwendet weiterhin das bestehende Schema:
 
 ```json
 {
@@ -45,31 +65,42 @@ Die Anwendung verwendet das bestehende Schema:
       "markers": [],
       "holidays": []
     },
+    "labelConfig": {},
     "revision": 1
   }
 }
 ```
 
-Vorhandene Gantt-Studio-JSON-Dateien mit Schema-Version 1 können direkt geöffnet werden.
+## Architektur auf GitHub Pages
 
-## Speicherung
+GitHub Pages führt keinen Node-/Express-Server aus. Deshalb wird die Odin-Architektur bewusst so übersetzt:
 
-Der aktuelle Projektstand wird automatisch in **IndexedDB** des Browsers gespeichert. Die explizite Aktion **Speichern** lädt zusätzlich eine `.gantt.json`-Datei herunter. Damit bleibt die Anwendung serverlos und die Projektdaten verlassen nicht automatisch den Browser.
-
-## GitHub Pages
-
-Der Workflow `.github/workflows/pages.yml` veröffentlicht den Repository-Inhalt bei jedem Push auf `main`. In den Repository-Einstellungen muss unter **Settings → Pages → Build and deployment → Source** einmalig **GitHub Actions** ausgewählt sein, falls GitHub das nicht bereits automatisch erkannt hat.
-
-## Lokale Entwicklung
-
-Da die Anwendung ausschließlich statische Dateien verwendet, reicht ein einfacher HTTP-Server, zum Beispiel:
-
-```bash
-python -m http.server 8080
+```text
+Odin / Docker                     GitHub Pages
+────────────────────────────────────────────────────
+Express REST API            →     Browserlogik
+/data/gantts.json            →     IndexedDB
+Server-Autosave             →     Browser-Autosave
+Server-Projektrevision      →     lokale Revision
+Nager.Date Proxy            →     Browser-Abruf Nager.Date
+JSON Import/Export          →     Browser File API
 ```
 
-Danach `http://localhost:8080` öffnen.
+Es werden keine GitHub-Tokens oder andere Secrets im Frontend gespeichert.
 
-## Sicherheit
+## Noch nicht 1:1 aus Odin portiert
 
-Gantt Studio enthält bewusst **keinen GitHub Personal Access Token** und schreibt nicht direkt aus dem Browser in das Repository. Eine spätere Cloud-Synchronisierung sollte über einen sicheren OAuth-/Backend-Flow erfolgen, nicht über eingebettete Secrets.
+Der analysierte Odin-Build `frappe-gantt-online-editor` v1.1.3 besitzt weitere Komfortfunktionen, die schrittweise übernommen werden sollen:
+
+- vollständiger Design-Editor mit Vorlagen und projektspezifischem Designtransfer
+- erweiterter Label-Manager mit Tracks, Leader Lines, Ellipsis und Zwei-Zeilen-Modus
+- PNG-, JPG- und PDF-Export des kompletten Projektplans
+- Microsoft-Project-XML-Import/-Export
+- umfangreiche Aufgaben-Tabelle mit Inline-Editing
+- vollständige Odin-Symbol-/Projektmanagement-Erklärseite
+- Drag/Resize direkt über Frappe Gantt
+- serverseitige Daily Backups entfallen auf Pages konzeptbedingt; die portable JSON-Datei dient als explizites Backup
+
+## Sicherheit und Datenschutz
+
+Projekte werden standardmäßig ausschließlich im IndexedDB-Speicher des jeweiligen Browsers gehalten. Ein Projekt verlässt den Browser nur durch eine explizite Exportaktion oder beim Abruf externer Feiertagsdaten. Es gibt keine zentrale Cloud-Datenbank und keine Benutzerkonten.
