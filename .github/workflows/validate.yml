@@ -36,7 +36,7 @@ jobs:
           grep -q 'assets/css/privacy.css?v=1.4.4' index.html
           grep -q 'assets/css/odin.css?v=1.4.4' index.html
           grep -q 'assets/css/scroll-fix.css?v=1.4.5' index.html
-          grep -q 'assets/css/task-table.css?v=1.5.0' index.html
+          grep -q 'assets/css/task-table.css?v=1.5.1' index.html
           grep -q 'Readability scale v1.4.2' assets/css/odin.css
           grep -q 'Clickable phase rows v1.4.3' assets/css/odin.css
           grep -q "gantt.js?v=1.4.4" assets/js/app.js
@@ -71,3 +71,5 @@ jobs:
           grep -q 'function updateTaskFromTable' assets/js/app.js
           grep -q 'validateGraph(copy)' assets/js/app.js
           grep -q 'const documentUrl=safeUrl(task.url)' assets/js/app.js
+          grep -q 'font-size:13px' assets/css/task-table.css
+          grep -q 'font-size:11px' assets/css/task-table.css
