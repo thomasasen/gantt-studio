@@ -10,7 +10,7 @@ Die Anwendung ist unter
 
 erreichbar.
 
-## Stand v1.4.0
+## Stand v1.5.0
 
 ### Projektportfolio und lokale Speicherung
 
@@ -40,6 +40,21 @@ erreichbar.
 
 **Wichtig:** Die Kennzeichnung `critical` ist derzeit eine manuelle Aufgabenklassifikation. Gantt Studio berechnet aktuell keinen mathematischen Critical Path / CPM.
 
+### Aufgaben & Abhängigkeiten
+
+Der Odin-Aufgabeneditor ist unterhalb des Gantts als zentrale Tabellenansicht portiert:
+
+- kompakte Standardansicht für Aufgabe, Zeitraum, Fortschritt, Verantwortlich, Status und Aktionen
+- `Details anzeigen` blendet Phase, Typ, Risiko, Kosten und Vorgänger ein
+- neue Aufgaben direkt aus der Tabelle anlegen
+- vollständigen Aufgabendialog über `Bearbeiten` öffnen
+- Aufgaben direkt aus der Tabelle löschen
+- Zellen per Klick bzw. `Enter`/`F2` inline bearbeiten
+- direkte Bearbeitung von Name, Phase, Typ, Zeitraum, Fortschritt, Verantwortlichem, Status, Risiko, Kosten und Vorgängern
+- `Escape` verwirft eine laufende Inline-Bearbeitung
+- Änderungen an Vorgängern werden weiterhin gegen zyklische Abhängigkeiten validiert
+- Änderungen aus dem Gantt und der Tabelle werden gegenseitig synchronisiert
+
 ### Phasen
 
 Die Odin-Phasenlogik wurde auf GitHub Pages übertragen:
@@ -49,6 +64,7 @@ Die Odin-Phasenlogik wurde auf GitHub Pages übertragen:
 - Phase einzeln ein- oder ausklappen
 - `Alle ausklappen` / `Alle einklappen`
 - eigene Phasen-Sammelzeile im Zeitplan
+- Phasen-Sammelzeilen links im Zeitplan sind ebenfalls klickbar
 - Ein-/Ausklappzustand wird pro Projekt lokal gespeichert
 - Phasen anlegen, bearbeiten und löschen
 
@@ -59,7 +75,6 @@ Die Odin-Phasenlogik wurde auf GitHub Pages übertragen:
 - Arbeitstage können Wochenenden und importierte Feiertage überspringen
 - Fortschrittslinie und Abhängigkeiten sind getrennt schaltbar
 - Gesamtkosten werden in der Planungsansicht separat ausgewiesen
-
 - separater Arbeitsbereich `Planung & Darstellung`
 - zentrale Anzeigeoptionen
 - Schnellzugriff über `Weitere Einstellungen`
@@ -156,6 +171,5 @@ Der analysierte Odin-Build `frappe-gantt-online-editor` v1.1.3 besitzt weiterhin
 - erweiterter Label-Manager mit Tracks, Leader Lines, Ellipsis und Zwei-Zeilen-Modus
 - nativer PNG-, JPG- und direkter PDF-Export des kompletten Projektplans
 - Microsoft-Project-XML-Import/-Export
-- umfangreiche Aufgaben-Tabelle mit Inline-Editing
 - weitere Detailfunktionen der Odin-Erklär- und Einstellungsoberfläche
 - serverseitige Daily Backups entfallen auf Pages konzeptbedingt; die portable Projektdatei dient als explizites Backup
