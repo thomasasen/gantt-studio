@@ -1,0 +1,31 @@
+name: Validate Gantt Studio
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Check JavaScript syntax
+        run: |
+          node --check assets/js/app.js
+          node --check assets/js/gantt.js
+          node --check assets/js/storage.js
+      - name: Check required static files
+        run: |
+          test -s index.html
+          test -s assets/css/app.css
+          test -s examples/demo.gantt.json
+          python -m json.tool examples/demo.gantt.json >/dev/null
+          grep -q 'assets/js/app.js?v=1.2.0' index.html
+          grep -q 'assets/css/app.css?v=1.2.0' index.html
