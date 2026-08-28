@@ -7,8 +7,8 @@
   <meta name="theme-color" content="#16324f">
   <meta name="description" content="Gantt Studio – browserbasierte Projektplanung mit Portfolio, Aufgaben, Abhängigkeiten, Phasen, Gates, Baselines, Risiken und Import/Export.">
   <title>Gantt Studio</title>
-  <link rel="stylesheet" href="./assets/css/app.css?v=1.2.1">
-  <link rel="stylesheet" href="./assets/css/privacy.css?v=1.2.1">
+  <link rel="stylesheet" href="./assets/css/app.css?v=1.2.2">
+  <link rel="stylesheet" href="./assets/css/privacy.css?v=1.2.2">
 </head>
 <body>
   <header class="topbar">
@@ -113,9 +113,38 @@
 
   <dialog id="entityDialog" class="dialog compact"><form method="dialog"><div class="dialog-head"><div><div class="eyebrow" id="entityEyebrow">PLANUNG</div><h2 id="entityTitle">Element bearbeiten</h2></div><button class="icon-btn" value="cancel" type="submit">×</button></div><input type="hidden" id="entityKind"><input type="hidden" id="entityId"><div id="entityFields" class="form-grid"></div><div class="dialog-actions"><button id="deleteEntityBtn" class="btn danger" type="button">Löschen</button><div class="spacer"></div><button class="btn" value="cancel" type="submit">Abbrechen</button><button id="saveEntityBtn" class="btn primary" type="button">Speichern</button></div></form></dialog>
 
-  <dialog id="guideDialog" class="dialog wide-dialog"><form method="dialog"><div class="dialog-head"><div><div class="eyebrow">GANTT STUDIO VERSTEHEN</div><h2>Projektplan, Symbole & Datenspeicherung</h2></div><button class="icon-btn" value="cancel" type="submit">×</button></div><div class="guide-grid"><article><i class="guide-bar work"></i><h3>Arbeitspaket</h3><p>Ein Balken zeigt Zeitraum und Dauer einer Aufgabe.</p></article><article><i class="guide-bar critical"></i><h3>Kritisch markiertes Arbeitspaket</h3><p>Diese Kennzeichnung wird aktuell manuell gesetzt. Sie ist kein automatisch berechneter Critical Path.</p></article><article><i class="guide-diamond milestone"></i><h3>Meilenstein</h3><p>Eine Raute markiert ein wesentliches Ergebnis oder Ereignis.</p></article><article><i class="guide-diamond gate"></i><h3>Gate</h3><p>Ein Gate steht für eine Freigabe oder Managemententscheidung.</p></article><article><h3>Baseline</h3><p>Die dünne Linie unter einem Balken zeigt den ursprünglich hinterlegten Plan.</p></article><article><h3>Puffer</h3><p>Der gestrichelte Bereich nach einer Aufgabe visualisiert hinterlegten Zeitpuffer.</p></article><article><h3>Status & Risiko</h3><p>Ampelstatus und Risikostufe ergänzen die reine Terminperspektive.</p></article><article><h3>Abhängigkeiten</h3><p>Pfeile zeigen Vorgänger. Gantt Studio verhindert zyklische Abhängigkeiten.</p></article><article class="guide-storage"><span class="guide-local-mark">LOKAL</span><h3>Keine Projektdatenbank</h3><p>Projekt- und Planungsdaten werden in IndexedDB dieses Browsers gespeichert. Es gibt auf GitHub Pages keine serverseitige Gantt-Studio-Projektspeicherung oder automatische Cloud-Synchronisierung.</p></article><article class="guide-warning"><span class="guide-backup-mark">BACKUP</span><h3>Export regelmäßig sichern</h3><p>Browser- oder Website-Daten können gelöscht werden und sind geräte- bzw. profilgebunden. Die JSON-Datei aus „Backup / Export“ ist deine portable Sicherung.</p></article></div><div class="dialog-actions"><div class="spacer"></div><button class="btn primary" value="cancel" type="submit">Verstanden</button></div></form></dialog>
+  <dialog id="guideDialog" class="dialog wide-dialog">
+    <form method="dialog">
+      <div class="dialog-head"><div><div class="eyebrow">GANTT STUDIO VERSTEHEN</div><h2>Projektplan, Symbole & Datenspeicherung</h2></div><button class="icon-btn" value="cancel" type="submit">×</button></div>
+      <div class="guide-grid">
+        <article><i class="guide-bar work"></i><h3>Arbeitspaket</h3><p>Ein Balken zeigt Zeitraum und Dauer einer Aufgabe.</p></article>
+        <article><i class="guide-bar critical"></i><h3>Kritisch markiertes Arbeitspaket</h3><p>Diese Kennzeichnung wird aktuell manuell gesetzt. Sie ist kein automatisch berechneter Critical Path.</p></article>
+        <article><i class="guide-diamond milestone"></i><h3>Meilenstein</h3><p>Eine Raute markiert ein wesentliches Ergebnis oder Ereignis.</p></article>
+        <article><i class="guide-diamond gate"></i><h3>Gate</h3><p>Ein Gate steht für eine Freigabe oder Managemententscheidung.</p></article>
+        <article>
+          <div class="guide-baseline-symbol" aria-hidden="true"><span class="guide-baseline-bar"></span><span class="guide-baseline-line"></span></div>
+          <h3>Baseline</h3><p>Die dünne Linie unter einem Balken zeigt den ursprünglich hinterlegten Plan.</p>
+        </article>
+        <article>
+          <div class="guide-buffer-symbol" aria-hidden="true"><span class="guide-buffer-bar"></span><span class="guide-buffer-extension"></span></div>
+          <h3>Puffer</h3><p>Der gestrichelte Bereich nach einer Aufgabe visualisiert hinterlegten Zeitpuffer.</p>
+        </article>
+        <article>
+          <div class="guide-status-symbol" aria-hidden="true"><span class="guide-status-dot green"></span><span class="guide-status-dot amber"></span><span class="guide-status-dot red"></span><span class="guide-risk-symbol">!</span></div>
+          <h3>Status & Risiko</h3><p>Ampelstatus und Risikostufe ergänzen die reine Terminperspektive.</p>
+        </article>
+        <article>
+          <div class="guide-dependency-symbol" aria-hidden="true"><span class="guide-dependency-from"></span><span class="guide-dependency-path"></span><span class="guide-dependency-to"></span></div>
+          <h3>Abhängigkeiten</h3><p>Pfeile zeigen Vorgänger. Gantt Studio verhindert zyklische Abhängigkeiten.</p>
+        </article>
+        <article class="guide-storage"><span class="guide-local-mark">LOKAL</span><h3>Keine Projektdatenbank</h3><p>Projekt- und Planungsdaten werden in IndexedDB dieses Browsers gespeichert. Es gibt auf GitHub Pages keine serverseitige Gantt-Studio-Projektspeicherung oder automatische Cloud-Synchronisierung.</p></article>
+        <article class="guide-warning"><span class="guide-backup-mark">BACKUP</span><h3>Export regelmäßig sichern</h3><p>Browser- oder Website-Daten können gelöscht werden und sind geräte- bzw. profilgebunden. Die JSON-Datei aus „Backup / Export“ ist deine portable Sicherung.</p></article>
+      </div>
+      <div class="dialog-actions"><div class="spacer"></div><button class="btn primary" value="cancel" type="submit">Verstanden</button></div>
+    </form>
+  </dialog>
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
-  <script type="module" src="./assets/js/app.js?v=1.2.1"></script>
+  <script type="module" src="./assets/js/app.js?v=1.2.2"></script>
 </body>
 </html>
