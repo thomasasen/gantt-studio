@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
   pages: write
   id-token: write
 
@@ -23,34 +23,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          ref: main
-      - name: Finalize task table integration
-        run: |
-          python - <<'PY'
-          from pathlib import Path
-          p=Path('assets/js/app.js')
-          s=p.read_text()
-          old="  sortTasks(); touch(); await persist(); renderMetrics(); renderPhaseToolbar(); renderGanttOnly();\n}"
-          new="  sortTasks(); touch(); await persist(); renderMetrics(); renderPhaseToolbar(); renderGanttOnly(); renderTaskTable();\n}"
-          if old in s:
-              s=s.replace(old,new,1)
-          old_link="    const link=task.url?`<a class=\"task-table-document\" href=\"${esc(task.url)}\" target=\"_blank\" rel=\"noopener noreferrer\">↗ Dokument</a>`:'';"
-          new_link="    const documentUrl=safeUrl(task.url);\n    const link=documentUrl?`<a class=\"task-table-document\" href=\"${esc(documentUrl)}\" target=\"_blank\" rel=\"noopener noreferrer\">↗ Dokument</a>`:'';"
-          if old_link in s:
-              s=s.replace(old_link,new_link,1)
-          p.write_text(s)
-          PY
-          node --check assets/js/app.js
-          grep -q 'renderGanttOnly(); renderTaskTable();' assets/js/app.js
-          grep -q 'const documentUrl=safeUrl(task.url)' assets/js/app.js
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add assets/js/app.js
-          if ! git diff --cached --quiet; then
-            git commit -m 'Finalize task table synchronization'
-            git push origin HEAD:main
-          fi
       - name: Configure Pages
         uses: actions/configure-pages@v5
         with:
