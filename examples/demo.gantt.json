@@ -1,0 +1,42 @@
+{
+  "schema": "gantt-studio.project",
+  "schemaVersion": 1,
+  "exportedAt": "2026-08-28T11:00:00.000Z",
+  "generator": "Gantt Studio",
+  "project": {
+    "id": "demo-project",
+    "name": "Dynamisches Demo-Projekt",
+    "createdAt": "2026-07-29T01:39:42.598Z",
+    "updatedAt": "2026-08-28T11:00:00.000Z",
+    "tasks": [
+      {"id":"demo-kickoff","name":"Projekt-Kick-off","start":"2026-06-17","end":"2026-06-18","progress":100,"type":"milestone","dependencies":[],"phaseId":"demo-phase-init","owner":"Programmleitung","status":"green","risk":"none","baselineStart":"2026-06-14","baselineEnd":"2026-06-15","bufferDays":0,"costEur":5000,"url":"","notes":"Formaler Projektstart und Bestätigung des Mandats.","showInGantt":true},
+      {"id":"demo-analysis","name":"Ist-Analyse und Stakeholder-Interviews","start":"2026-06-19","end":"2026-07-03","progress":100,"type":"workstream","dependencies":["demo-kickoff"],"phaseId":"demo-phase-init","owner":"Business Architecture","status":"green","risk":"low","baselineStart":"2026-06-17","baselineEnd":"2026-06-30","bufferDays":2,"costEur":28000,"url":"","notes":"Interviews, Prozessaufnahme und Konsolidierung.","showInGantt":true},
+      {"id":"demo-design","name":"Zielbild und Lösungsarchitektur","start":"2026-07-05","end":"2026-07-17","progress":90,"type":"critical","dependencies":["demo-analysis"],"phaseId":"demo-phase-design","owner":"Solution Architecture","status":"amber","risk":"medium","baselineStart":"2026-07-04","baselineEnd":"2026-07-15","bufferDays":2,"costEur":42000,"url":"","notes":"Zielarchitektur und fachliche Leitplanken.","showInGantt":true},
+      {"id":"demo-gate-design","name":"Design-Freigabe","start":"2026-07-18","end":"2026-07-19","progress":100,"type":"gate","dependencies":["demo-design"],"phaseId":"demo-phase-design","owner":"Lenkungskreis","status":"green","risk":"none","baselineStart":"2026-07-16","baselineEnd":"2026-07-17","bufferDays":0,"costEur":3000,"url":"","notes":"Entscheidungs-Gate vor Beginn der Umsetzung.","showInGantt":true},
+      {"id":"demo-core","name":"Kernkonfiguration","start":"2026-07-20","end":"2026-08-16","progress":48,"type":"critical","dependencies":["demo-gate-design"],"phaseId":"demo-phase-build","owner":"Application Lead","status":"amber","risk":"medium","baselineStart":"2026-07-17","baselineEnd":"2026-08-12","bufferDays":4,"costEur":86000,"url":"","notes":"Konfiguration der priorisierten Geschäftsprozesse.","showInGantt":true},
+      {"id":"demo-integration","name":"Schnittstellenentwicklung","start":"2026-07-24","end":"2026-08-22","progress":35,"type":"workstream","dependencies":["demo-gate-design"],"phaseId":"demo-phase-build","owner":"Integration Lead","status":"red","risk":"high","baselineStart":"2026-07-21","baselineEnd":"2026-08-17","bufferDays":5,"costEur":74000,"url":"","notes":"Kritische Abhängigkeit zu externen Quellsystemen.","showInGantt":true},
+      {"id":"demo-uat","name":"User Acceptance Test","start":"2026-08-29","end":"2026-09-16","progress":0,"type":"critical","dependencies":["demo-core","demo-integration"],"phaseId":"demo-phase-test","owner":"Business Process Owner","status":"neutral","risk":"medium","baselineStart":"2026-08-26","baselineEnd":"2026-09-13","bufferDays":3,"costEur":39000,"url":"","notes":"Fachliche Abnahme durch die Key User.","showInGantt":true},
+      {"id":"demo-go-live-gate","name":"Go-live-Freigabe","start":"2026-09-17","end":"2026-09-18","progress":0,"type":"gate","dependencies":["demo-uat"],"phaseId":"demo-phase-test","owner":"Lenkungskreis","status":"neutral","risk":"high","baselineStart":"2026-09-14","baselineEnd":"2026-09-15","bufferDays":0,"costEur":4000,"url":"","notes":"Managemententscheidung auf Basis der Readiness.","showInGantt":true},
+      {"id":"demo-go-live","name":"Produktivsetzung","start":"2026-09-19","end":"2026-09-20","progress":0,"type":"milestone","dependencies":["demo-go-live-gate"],"phaseId":"demo-phase-live","owner":"Programmleitung","status":"neutral","risk":"critical","baselineStart":"2026-09-16","baselineEnd":"2026-09-17","bufferDays":0,"costEur":18000,"url":"","notes":"Technische und fachliche Produktivsetzung.","showInGantt":true},
+      {"id":"demo-hypercare","name":"Hypercare und Stabilisierung","start":"2026-09-21","end":"2026-10-17","progress":0,"type":"workstream","dependencies":["demo-go-live"],"phaseId":"demo-phase-live","owner":"Service Management","status":"neutral","risk":"low","baselineStart":"2026-09-18","baselineEnd":"2026-10-12","bufferDays":5,"costEur":26000,"url":"","notes":"Engmaschige Betreuung und Übergabe in den Betrieb.","showInGantt":true}
+    ],
+    "design": {"colors":{"pageBg":"#EEF2F3","panelBg":"#FFFFFF","headerBg":"#16324F","primary":"#16324F","accent":"#607A00","critical":"#16324F","workstream":"#3B7280","milestone":"#607A00","arrow":"#657983","grid":"#DCE4E7","row":"#FFFFFF","alternateRow":"#F7F9FA","text":"#243746","mutedText":"#687D87","barText":"#FFFFFF","border":"#D8E1E4","saturday":"#F1E2E2","sunday":"#F1E2E2","holiday":"#F3CACA"}},
+    "planning": {
+      "settings": {"showToday":true,"showStatusLine":true,"showWeekends":true,"showHolidays":true,"showPhaseBands":true,"showBaseline":true,"showBuffer":true,"showRisk":true,"showOwners":true,"showProgressLabels":true,"showDateLabels":true,"showRelativeToday":true,"relativeOffsetDays":36,"relativeDayMode":"workdays","relativeSkipHolidays":true,"relativeLabel":"Vorbereitungstermin","relativeColor":"#C2007B","relativeStyle":"solid"},
+      "phases": [
+        {"id":"demo-phase-init","name":"Initiierung & Analyse","start":"2026-06-14","end":"2026-07-04","color":"#DCE8EB"},
+        {"id":"demo-phase-design","name":"Zielbild & Design","start":"2026-07-05","end":"2026-07-19","color":"#E7ECD8"},
+        {"id":"demo-phase-build","name":"Umsetzung","start":"2026-07-20","end":"2026-08-28","color":"#DDE7F0"},
+        {"id":"demo-phase-test","name":"Test & Freigabe","start":"2026-08-29","end":"2026-09-18","color":"#F0E5D5"},
+        {"id":"demo-phase-live","name":"Go-live & Hypercare","start":"2026-09-19","end":"2026-10-19","color":"#E1EAD9"}
+      ],
+      "markers": [
+        {"id":"demo-marker-steering","name":"Lenkungskreis","date":"2026-08-18","color":"#3B7280","style":"dashed"},
+        {"id":"demo-marker-freeze","name":"Design Freeze","date":"2026-08-26","color":"#8B5A2B","style":"solid"},
+        {"id":"demo-marker-go-live","name":"Go-live","date":"2026-09-19","color":"#607A00","style":"solid"}
+      ],
+      "holidays": [{"id":"holiday-de-2026-10-03","name":"Tag der Deutschen Einheit","date":"2026-10-03","country":"DE","subdivision":"DE-BY","imported":true}]
+    },
+    "revision": 2
+  }
+}
