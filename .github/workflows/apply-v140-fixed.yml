@@ -1,0 +1,44 @@
+name: Apply Gantt Studio v1.4.0 fixed parity patch
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - tools/run_v140_fixed.py
+      - .github/workflows/apply-v140-fixed.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Apply corrected patch
+        run: python tools/run_v140_fixed.py
+      - name: Validate patched files
+        run: |
+          node --check assets/js/app.js
+          node --check assets/js/gantt.js
+          grep -q 'Dynamische Zieldatumslinie' index.html
+          grep -q 'showDependencies' assets/js/app.js
+          grep -q 'makeStatusLine' assets/js/gantt.js
+          grep -q 'v=1.4.0' index.html
+      - name: Commit v1.4.0
+        run: |
+          if git diff --quiet; then
+            echo 'No patch changes needed.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add index.html assets/js/app.js assets/js/gantt.js assets/css/odin.css README.md .github/workflows/validate.yml
+          git commit -m 'Port Odin planning controls to v1.4.0'
+          git push
