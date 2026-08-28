@@ -211,7 +211,7 @@ async function applyTimelineChange(change){
   const task=envelope.project.tasks.find(t=>t.id===change.id); if(!task)return;
   if(change.start)task.start=change.start; if(change.end)task.end=change.end; if(Number.isFinite(change.progress))task.progress=clamp(Math.round(change.progress),0,100);
   if(task.end<task.start){const x=task.start;task.start=task.end;task.end=x;}
-  sortTasks(); touch(); await persist(); renderMetrics(); renderPhaseToolbar(); renderGanttOnly();
+  sortTasks(); touch(); await persist(); renderMetrics(); renderPhaseToolbar(); renderGanttOnly(); renderTaskTable();
 }
 
 function renderPhaseToolbar(){
@@ -338,7 +338,8 @@ function renderTaskTable(){
     const dependencies=(task.dependencies||[]).map(id=>taskMap.get(String(id))||id).join(', ');
     const phase=phaseMap.get(String(task.phaseId||''))||'–';
     const note=task.notes?`<small class="task-table-note">${esc(task.notes)}</small>`:'';
-    const link=task.url?`<a class="task-table-document" href="${esc(task.url)}" target="_blank" rel="noopener noreferrer">↗ Dokument</a>`:'';
+    const documentUrl=safeUrl(task.url);
+    const link=documentUrl?`<a class="task-table-document" href="${esc(documentUrl)}" target="_blank" rel="noopener noreferrer">↗ Dokument</a>`:'';
     const baseline=task.baselineStart&&task.baselineEnd?`<small class="task-table-baseline">Soll: ${formatDate(task.baselineStart)} – ${formatDate(task.baselineEnd)}</small>`:'';
     return `<tr data-task-row-id="${esc(task.id)}">
       <td class="task-inline-cell" data-task-field="name" tabindex="0"><strong>${esc(task.name)}</strong>${note}${link}</td>
