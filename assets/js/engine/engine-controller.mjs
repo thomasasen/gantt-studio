@@ -11,6 +11,7 @@ export function createEngineController(initialFactory) {
   let mounted=false;
   let mountOptions=null;
   let lastRequest=null;
+  let lastViewport=null;
   return {
     mount(options) {
       if(mounted)throw new Error('Engine is already mounted.');
@@ -29,7 +30,8 @@ export function createEngineController(initialFactory) {
       return engine.render(lastRequest);
     },
     setViewport(viewport) {
-      if(mounted)engine.setViewport({...viewport});
+      lastViewport={...lastViewport,...viewport};
+      if(mounted)engine.setViewport(lastViewport);
     },
     cancelInteraction() {
       if(mounted)engine.cancelInteraction();
@@ -52,6 +54,7 @@ export function createEngineController(initialFactory) {
       try {
         next.mount(mountOptions);
         if(lastRequest)next.render(lastRequest);
+        if(lastViewport)next.setViewport(lastViewport);
         engine=next;
         factory=nextFactory;
       } catch(error) {
@@ -59,6 +62,7 @@ export function createEngineController(initialFactory) {
         // A failed adapter must not destroy the user's current view.
         old.mount(mountOptions);
         if(lastRequest)old.render(lastRequest);
+        if(lastViewport)old.setViewport(lastViewport);
         engine=old;
         throw error;
       }
@@ -67,7 +71,7 @@ export function createEngineController(initialFactory) {
       if(!mounted)return;
       mounted=false;
       try{engine.destroy();}
-      finally{engine=null;lastRequest=null;mountOptions=null;}
+      finally{engine=null;lastRequest=null;lastViewport=null;mountOptions=null;}
     }
   };
 }
