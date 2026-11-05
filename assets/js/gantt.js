@@ -1,5 +1,5 @@
-import { icon } from './icons.mjs?v=2.7.0';
-import { localTodayIso } from './core/date-only.mjs?v=2.7.0';
+import { icon } from './icons.mjs?v=2.8.0';
+import { localTodayIso } from './core/date-only.mjs?v=2.8.0';
 
 const DAY = 86400000;
 const toDate = (s) => new Date(`${s}T00:00:00Z`);
@@ -83,7 +83,16 @@ function headerSegments(start,end,px,zoom){
 }
 
 export function renderGantt(container, project, options={}) {
-  const tasks=project.tasks.filter(t=>t.showInGantt!==false&&t.start&&t.end);container.innerHTML='';if(!tasks.length)return{empty:true};
+  const cancellations=new Set();
+  const opts={
+    ...options,
+    registerInteractionCancel:cancel=>cancellations.add(cancel),
+    unregisterInteractionCancel:cancel=>cancellations.delete(cancel)
+  };
+  const destroy=()=>{for(const cancel of [...cancellations])cancel();cancellations.clear();};
+  const tasks=project.tasks.filter(t=>t.showInGantt!==false&&t.start&&t.end);
+  container.innerHTML='';
+  if(!tasks.length)return{empty:true,destroy};
   const zoom=options.zoom||'week',cfg=ZOOM[zoom],raw=bounds(project),start=addDays(raw.start,-cfg.pad),end=addDays(raw.end,cfg.pad),totalDays=Math.floor((end-start)/DAY)+1,timelineWidth=Math.max(880,totalDays*cfg.px),leftWidth=parseInt(getComputedStyle(document.documentElement).getPropertyValue('--left-width'))||430,totalHeight=56+tasks.length*48;
   const grid=el('div','gantt-grid');grid.style.gridTemplateColumns=`${leftWidth}px ${timelineWidth}px`;grid.style.width=`${leftWidth+timelineWidth}px`;
   const left=el('div','gantt-left'),leftHead=el('div','gantt-head-left');leftHead.innerHTML='<span>Aufgabe</span><span>Owner</span><span>Status</span>';left.appendChild(leftHead);
@@ -129,7 +138,7 @@ export function renderGantt(container, project, options={}) {
     rowR.appendChild(bar);
     if(!synthetic&&settings.showBaseline!==false&&task.baselineStart&&task.baselineEnd){const b=el('div','baseline');b.style.left=`${daysBetween(iso(start),task.baselineStart)*cfg.px}px`;b.style.width=`${Math.max(cfg.px,(daysBetween(task.baselineStart,task.baselineEnd)+1)*cfg.px)}px`;rowR.appendChild(b);}
     if(!synthetic&&settings.showBuffer!==false&&Number(task.bufferDays)>0){const b=el('div','buffer');b.style.left=`${leftPx+widthPx}px`;b.style.width=`${Number(task.bufferDays)*cfg.px}px`;rowR.appendChild(b);}
-    if(!synthetic)attachInteraction(bar,task,cfg,options);
+    if(!synthetic)attachInteraction(bar,task,cfg,opts);
     right.appendChild(rowR);
   });
   const lineItems=[];
@@ -148,7 +157,7 @@ lineItems.sort((a,b)=>a.date-b.date).forEach(item=>{
 });
   if(settings.showDependencies!==false)right.appendChild(makeDependencies(tasks,start,cfg.px,timelineWidth,totalHeight));
   if(settings.showStatusLine!==false)right.appendChild(makeStatusLine(tasks,start,cfg.px,timelineWidth,totalHeight));
-  grid.append(left,right);container.appendChild(grid);return{empty:false,start,end,timelineWidth,leftWidth};
+  grid.append(left,right);container.appendChild(grid);return{empty:false,start,end,timelineWidth,leftWidth,destroy};
 }
 
 function addInteractionHandles(bar,task,settings){if(['milestone','gate'].includes(task.type))return;const l=el('span','bar-handle left'),r=el('span','bar-handle right');l.title='Start verschieben';r.title='Ende verschieben';bar.append(l,r);if(settings.showProgressLabels!==false){const h=el('span','progress-handle');h.style.left=`${clamp(Number(task.progress)||0,0,100)}%`;h.title='Fortschritt anpassen';bar.appendChild(h);}}
@@ -183,6 +192,7 @@ function attachInteraction(bar, task, cfg, options) {
     const cleanup = () => {
       if (!active) return false;
       active = false;
+      options.unregisterInteractionCancel?.(onCancel);
       bar.removeEventListener('pointermove', onMove);
       bar.removeEventListener('pointerup', onUp);
       bar.removeEventListener('pointercancel', onCancel);
@@ -264,6 +274,7 @@ function attachInteraction(bar, task, cfg, options) {
     window.addEventListener('keydown', onKeyDown, true);
     bar.classList.add('dragging');
     bar.setPointerCapture(pointerId);
+    options.registerInteractionCancel?.(onCancel);
   });
 }
 
