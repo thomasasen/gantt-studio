@@ -128,3 +128,130 @@ test('capture manual ordering UI on desktop and mobile',async({page})=>{
   await page.setViewportSize({width:390,height:844});
   await page.screenshot({path:'visual-review/manual-task-order-mobile.png',fullPage:true});
 });
+
+test('Gantt left-list drag reorders both views and persists without changing scheduling',async({page})=>{
+  await page.goto('/');
+  await page.locator('#loadDemoBtn').click();
+  const ganttRows=page.locator('#ganttStage .gantt-left .task-row-left[data-task-id]');
+  await expect(ganttRows).toHaveCount(10);
+  const taskIds=await ganttRows.evaluateAll(rows=>rows.map(row=>row.dataset.taskId));
+  const sourceId=taskIds[0],targetId=taskIds[1];
+  const source=page.locator(`#ganttStage .gantt-left .task-row-left[data-task-id="${sourceId}"]`);
+  const target=page.locator(`#ganttStage .gantt-left .task-row-left[data-task-id="${targetId}"]`);
+  const grip=source.locator('[data-gantt-order-handle]');
+  const table=page.locator('#taskTableBody tr[data-task-row-id]');
+  await expect(page.locator(`#taskTableBody tr[data-task-row-id="${sourceId}"]`)).toHaveAttribute(
+    'data-task-phase-id',await page.locator(`#taskTableBody tr[data-task-row-id="${targetId}"]`).getAttribute('data-task-phase-id'));
+  const initial=await page.evaluate(async()=>{
+    const id=document.querySelector('#projectSelect').value;
+    const db=await new Promise((resolve,reject)=>{
+      const req=indexedDB.open('gantt-studio');req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error);
+    });
+    return await new Promise((resolve,reject)=>{
+      const req=db.transaction('projects','readonly').objectStore('projects').get(id);
+      req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error);
+    });
+  });
+  await grip.scrollIntoViewIfNeeded();
+  const start=await grip.boundingBox(),end=await target.boundingBox();
+  await page.mouse.move(start.x+start.width/2,start.y+start.height/2);
+  await page.mouse.down();
+  await page.mouse.move(end.x+end.width*.68,end.y+end.height*.85,{steps:12});
+  await expect(target).toHaveClass(/gantt-order-drop-after/);
+  await expect(page.locator(`#ganttStage .gantt-right .task-row-right[data-task-id="${targetId}"]`)).toHaveClass(/gantt-order-drop-after/);
+  await page.mouse.up();
+  await expect(page.locator('#taskReorderStatus')).toContainText('gespeichert');
+  await expect(ganttRows.first()).toHaveAttribute('data-task-id',targetId);
+  await expect(ganttRows.nth(1)).toHaveAttribute('data-task-id',sourceId);
+  await expect(table.first()).toHaveAttribute('data-task-row-id',targetId);
+  await expect(table.nth(1)).toHaveAttribute('data-task-row-id',sourceId);
+  const modified=await page.evaluate(async()=>{
+    const id=document.querySelector('#projectSelect').value;
+    const db=await new Promise((resolve,reject)=>{
+      const req=indexedDB.open('gantt-studio');req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error);
+    });
+    return await new Promise((resolve,reject)=>{
+      const req=db.transaction('projects','readonly').objectStore('projects').get(id);
+      req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error);
+    });
+  });
+  for(const before of initial.tasks){
+    const after=modified.tasks.find(task=>task.id===before.id);
+    expect(after).toMatchObject({
+      start:before.start,end:before.end,phaseId:before.phaseId,
+      dependencies:before.dependencies,progress:before.progress
+    });
+  }
+  await page.reload();
+  await expect(ganttRows.first()).toHaveAttribute('data-task-id',targetId);
+  await expect(table.first()).toHaveAttribute('data-task-row-id',targetId);
+  const tableGrip=page.locator(`#taskTableBody tr[data-task-row-id="${sourceId}"] .task-drag-handle`);
+  await tableGrip.focus();
+  await page.keyboard.press('ArrowUp');
+  await expect(table.first()).toHaveAttribute('data-task-row-id',sourceId);
+  await expect(ganttRows.first()).toHaveAttribute('data-task-id',sourceId);
+});
+
+test('Both sort switches stay synchronized and disable Gantt reorder in date mode',async({page})=>{
+  await page.goto('/');
+  await page.locator('#loadDemoBtn').click();
+  const chartManual=page.locator('.gantt-order-switch [data-task-sort-mode="manual"]');
+  const chartDate=page.locator('.gantt-order-switch [data-task-sort-mode="date"]');
+  const tableManual=page.locator('.task-overview-actions [data-task-sort-mode="manual"]');
+  const tableDate=page.locator('.task-overview-actions [data-task-sort-mode="date"]');
+  await expect(chartManual).toHaveAttribute('aria-pressed','true');
+  await chartDate.click();
+  await expect(chartDate).toHaveAttribute('aria-pressed','true');
+  await expect(tableDate).toHaveAttribute('aria-pressed','true');
+  await expect(page.locator('#ganttStage [data-gantt-order-handle]')).toHaveCount(0);
+  await expect(page.locator('#taskTableBody [data-task-drag-handle]')).toHaveCount(0);
+  await tableManual.click();
+  await expect(chartManual).toHaveAttribute('aria-pressed','true');
+  await expect(tableManual).toHaveAttribute('aria-pressed','true');
+  await expect(page.locator('#ganttStage [data-gantt-order-handle]')).toHaveCount(10);
+  await page.locator('[data-management-mode="milestones"]').click();
+  await expect(page.locator('#ganttStage [data-gantt-order-handle]')).toHaveCount(0);
+  await page.locator('[data-management-mode="operational"]').click();
+  await expect(page.locator('#ganttStage [data-gantt-order-handle]')).toHaveCount(10);
+});
+
+test('Gantt keyboard, Escape and phase boundary protect the saved order',async({page})=>{
+  await page.goto('/');
+  await page.locator('#loadDemoBtn').click();
+  const rows=page.locator('#ganttStage .gantt-left .task-row-left[data-task-id]');
+  const ids=await rows.evaluateAll(els=>els.map(el=>el.dataset.taskId));
+  const firstId=ids[0],secondId=ids[1];
+  const secondGrip=page.locator(`#ganttStage .gantt-left .task-row-left[data-task-id="${secondId}"] [data-gantt-order-handle]`);
+  await secondGrip.focus();
+  await page.keyboard.press('ArrowUp');
+  await expect(rows.first()).toHaveAttribute('data-task-id',secondId);
+  await expect(page.locator('#taskTableBody tr[data-task-row-id]').first()).toHaveAttribute('data-task-row-id',secondId);
+  await expect(secondGrip).toBeFocused();
+
+  const from=await secondGrip.boundingBox();
+  const target=page.locator(`#ganttStage .gantt-left .task-row-left[data-task-id="${firstId}"]`);
+  const to=await target.boundingBox();
+  await page.mouse.move(from.x+from.width/2,from.y+from.height/2);
+  await page.mouse.down();
+  await page.mouse.move(to.x+to.width*.55,to.y+to.height*.8,{steps:8});
+  await expect(target).toHaveClass(/gantt-order-drop-after/);
+  await page.keyboard.press('Escape');
+  await page.mouse.up();
+  await expect(rows.first()).toHaveAttribute('data-task-id',secondId);
+  await expect(page.locator('#taskReorderStatus')).toContainText('abgebrochen');
+
+  const tableRows=await page.locator('#taskTableBody tr[data-task-row-id]').evaluateAll(
+    els=>els.map(el=>({id:el.dataset.taskRowId,phase:el.dataset.taskPhaseId})));
+  const foreign=tableRows.find(el=>el.phase!==tableRows[0].phase);
+  expect(foreign).toBeTruthy();
+  const foreignGanttRow=page.locator(`#ganttStage .gantt-left .task-row-left[data-task-id="${foreign.id}"]`);
+  await secondGrip.scrollIntoViewIfNeeded();
+  const start=await secondGrip.boundingBox();
+  const cross=await foreignGanttRow.boundingBox();
+  await page.mouse.move(start.x+start.width/2,start.y+start.height/2);
+  await page.mouse.down();
+  await page.mouse.move(cross.x+cross.width/2,cross.y+cross.height*.75,{steps:8});
+  await page.mouse.up();
+  await expect(rows.first()).toHaveAttribute('data-task-id',secondId);
+  await expect(page.locator('#taskTableBody tr[data-task-row-id]').first()).toHaveAttribute('data-task-row-id',secondId);
+});
