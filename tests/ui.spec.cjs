@@ -144,15 +144,71 @@ test('capture design review screenshots', async ({ page }) => {
   await page.setViewportSize({width:1440,height:900});
   await page.goto('/');
   await createTask(page, 'Design Review · Konzeptphase');
+  await page.waitForTimeout(2700);
+  await page.evaluate(() => { window.scrollTo(0,0); document.activeElement?.blur?.(); });
   await page.screenshot({path:'visual-review/desktop-project.png',fullPage:true});
   await page.locator('#planningTabBtn').click();
+  await page.evaluate(() => { window.scrollTo(0,0); document.activeElement?.blur?.(); });
   await page.screenshot({path:'visual-review/desktop-planning.png',fullPage:true});
   await page.locator('#designBtn').click();
+  await page.evaluate(() => { window.scrollTo(0,0); document.activeElement?.blur?.(); });
   await page.screenshot({path:'visual-review/desktop-design-dialog.png',fullPage:true});
   await page.locator('#designDialog button[value=cancel]').last().click();
   await page.setViewportSize({width:390,height:844});
+  await page.goto('/');
   await page.locator('#projectTabBtn').click();
+  await page.evaluate(() => { window.scrollTo(0,0); document.activeElement?.blur?.(); });
   await page.screenshot({path:'visual-review/mobile-project.png',fullPage:true});
   await page.locator('#planningTabBtn').click();
+  await page.evaluate(() => { window.scrollTo(0,0); document.activeElement?.blur?.(); });
   await page.screenshot({path:'visual-review/mobile-planning.png',fullPage:true});
+});
+
+test('Gantt resizing and progress remain date-precise', async ({ page }) => {
+  await page.goto('/');
+  await createTask(page,'Resize QA');
+  await page.locator('[data-zoom="day"]').click();
+  const bar=page.locator('#ganttStage .gantt-bar.workstream');
+  let box=await bar.boundingBox();
+  expect(box).not.toBeNull();
+
+  // Right-edge resize: add exactly one calendar day.
+  await page.mouse.move(box.x+box.width-5,box.y+box.height/2);
+  await page.mouse.down();
+  await page.mouse.move(box.x+box.width+29,box.y+box.height/2,{steps:5});
+  await page.mouse.up();
+  await expect(page.locator('#taskTableBody tr').first()).toContainText('14.11.2026');
+
+  // Left-edge resize: move start exactly one day, leaving end fixed.
+  box=await bar.boundingBox();
+  await page.mouse.move(box.x+7,box.y+box.height/2);
+  await page.mouse.down();
+  await page.mouse.move(box.x+41,box.y+box.height/2,{steps:5});
+  await page.mouse.up();
+  await expect(page.locator('#taskTableBody tr').first()).toContainText('11.11.2026');
+
+  // Adjust progress through the native editor, then move its diagram handle.
+  await bar.focus();
+  await page.keyboard.press('Enter');
+  await page.locator('#taskProgress').fill('25');
+  await page.locator('#saveTaskBtn').click();
+  await expect(page.locator('#taskDialog')).toBeHidden();
+  box=await bar.boundingBox();
+  const startX=box.x+box.width*.25, y=box.y+box.height/2;
+  await page.mouse.move(startX,y);
+  await page.mouse.down();
+  await page.mouse.move(startX+box.width*.25,y,{steps:5});
+  await page.mouse.up();
+  await expect(page.locator('#taskTableBody tr').first()).toContainText('50 %');
+});
+
+test('mobile Gantt exposes both task list and time grid', async ({ page }) => {
+  await page.setViewportSize({width:390,height:844});
+  await page.goto('/');
+  await createTask(page,'Mobile Gantt');
+  const width=await page.locator('.gantt-left').evaluate(el=>el.getBoundingClientRect().width);
+  expect(width).toBeLessThanOrEqual(195);
+  expect(width).toBeGreaterThanOrEqual(175);
+  const scroller=await page.locator('.gantt-scroller').boundingBox();
+  expect(scroller.height).toBeLessThan(300);
 });
