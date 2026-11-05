@@ -128,9 +128,9 @@ engine.getCapabilities();       // objektive Unterstützung statt Annahmen
 
 - [x] **A-01 – Reproduzierbare Baseline:** Versionsstand und Branch-SHA erfassen; vorhandene Node-/Playwright-Checks ausführen; Ergebnisse und bisherige Warnungen protokollieren. Mindestens Demo, leeres Projekt und mehrere Phasen als Referenzdaten nutzen.
 - [x] **A-02 – Schreibpfade-Audit:** Alle Commit-Pfade aus Gantt, Tabelle, Dialogen, Phasen, Import und Projektwechsel auf Fehler bei IndexedDB, Out-of-order-Writes und verlorene Updates prüfen. Kritische Befunde priorisieren, keine ungezielte Totalneuschreibung.
-- [ ] **A-03 – Sicheren Timeline-Commit implementieren:** Insbesondere `applyTimelineChange()` mit getesteter Validierung, Revision, Save-Fehler/Rollback und korrektem UI-Speicherstatus absichern. Bei Fehler keine heimlich mutierten Tasks; bereits bestätigte Edits nicht verlieren.
-- [ ] **A-04 – Date-only-Vertrag:** DST, lokale Kalendertage, `YYYY-MM-DD`, inklusive Enddaten und reine Sortierung explizit testen; den bekannten UTC-/Lokalzeit-Mismatch von „heute“ beheben, falls reproduziert.
-- [ ] **A-05 – Regression-Gate:** Vorher/nachher gleiche Exportdateien und gleiches Nutzerverhalten abgesehen von notwendigen Bugfixes. Tests für Persistenzfehler, schnelle Folgeänderungen und Projektwechsel erfolgreich.
+- [x] **A-03 – Sicheren Timeline-Commit implementieren:** Insbesondere `applyTimelineChange()` mit getesteter Validierung, Revision, Save-Fehler/Rollback und korrektem UI-Speicherstatus absichern. Bei Fehler keine heimlich mutierten Tasks; bereits bestätigte Edits nicht verlieren.
+- [x] **A-04 – Date-only-Vertrag:** DST, lokale Kalendertage, `YYYY-MM-DD`, inklusive Enddaten und reine Sortierung explizit testen; den bekannten UTC-/Lokalzeit-Mismatch von „heute“ beheben, falls reproduziert.
+- [x] **A-05 – Regression-Gate:** Vorher/nachher gleiche Exportdateien und gleiches Nutzerverhalten abgesehen von notwendigen Bugfixes. Tests für Persistenzfehler, schnelle Folgeänderungen und Projektwechsel erfolgreich.
 
 **Gate A (Pflicht):** Keine Engine-Abstraktion auf unsicherer Commit-Basis.
 
@@ -220,7 +220,7 @@ Erst nach Gate B den separaten Branch `spike/frappe-gantt-adapter` von einem **f
 | Eintrag | Status | Commit / PR / Nachweis | Risiken / nächste Aktion |
 | --- | --- | --- | --- |
 | Plan auf neuem Branch initialisiert | [x] | Diese Datei, erster Branch-Commit | Implementierung noch nicht gestartet |
-| Gate A: Datenintegrität | [ ] | — | Persistenzfehler/Race Conditions absichern |
+| Gate A: Datenintegrität | [x] | [Browser #42122701641](https://github.com/thomasasen/gantt-studio/actions/runs/42122701641): 48/48 passed; [Validate #42122701731](https://github.com/thomasasen/gantt-studio/actions/runs/42122701731): success | P0-Codeschutz nachgewiesen; weitere Deep-Performance-/Cross-Tab-UX-Audits bei B beibehalten |
 | Gate B: Native-Abstraktion | [ ] | — | Volle Feature-Parität |
 | Gate C: Frappe-Spike | [ ] | — | Upstream-/DOM-Kopplung untersuchen |
 | Gate D: Erweiterungen/Parität | [ ] | — | Nur bei Go |
@@ -245,7 +245,25 @@ Erst nach Gate B den separaten Branch `spike/frappe-gantt-adapter` von einem **f
 - Neue Suite `tests/persistence.spec.cjs` überprüft simulierte IndexedDB-Fehler und Rollback, sequentielle Revisionen bei raschen Edits, isolierte Projekte bei verzögerter Speicherung, Schaltjahre/DST, Gantt-Datenbankparität sowie konkurrierende Tabs. **Diese Tests sind noch nicht insgesamt als erfolgreich freigegeben.**
 - Die laufenden Browser-Gates sind unter [GitHub Actions](https://github.com/thomasasen/gantt-studio/actions/workflows/ui-regression.yml) zu prüfen. Ein erneut grüner Testlauf auf dem **endgültigen Branch-Commit** ist notwendig, um A-03, A-04, A-05 und Gate A abzuhaken. Die vollständige Fehlerpfadabdeckung, der Test des Exportformats und Cross-Tab-Konflikte bleiben explizite Reviewpunkte.
 
-**Nächster Schritt:** Aktuelle Browser-Regression auswerten; jeden verbliebenen P0/P1-Fehler korrigieren und alle Tests erneut auf genau dem Final-SHA ausführen. Erst nach Gate A mit B-01/B-02 (Engine-Vertragsentwurf) beginnen. Keine produktive Freischaltung und keine Abweichung vom Branch-/Freigabemodell.
+**Nachprüfung Gate A:** Mit `c731f230` liefen **48/48 Chromium-Tests erfolgreich** ([Run #42122701641](https://github.com/thomasasen/gantt-studio/actions/runs/42122701641)); statisches Validate ebenfalls erfolgreich ([Run #42122701731](https://github.com/thomasasen/gantt-studio/actions/runs/42122701731)). Die späteren Änderungen `49c2b8f` und diese Planpflege sind ausschließlich Dokumentation. A-03/A-04/A-05 und Gate A sind nach den vorhandenen automatisierten Prüfkriterien freigegeben; eine vollständige manuelle Browserabnahme und ein unabhängiger Cross-Tab-UX-Audit bleiben als weitere Qualitätssicherung offen.
+
+**Nächster Schritt:** B-01/B-02 auf derselben Branchbasis: native Verantwortlichkeiten kapseln, dokumentierten Engine-Vertrag definieren und ohne UI-/Schemaänderung durch Contract-Tests prüfen. Frappe bleibt bis zum positiven Gate B und der gesonderten Freigabe ausgeschlossen. Keine produktive Freischaltung und keine Abweichung vom Branch-/Freigabemodell.
+
+### B-01 – Verantwortlichkeitskarte (Ausgangszustand, vor dem Refactor)
+
+| Komponente | Aktuell belegte Aufgabe | Ziel / Schnittstellengrenze |
+| --- | --- | --- |
+| `app.js` / `renderGanttOnly` | Visibility-Projektion, Filter, Zoom, Theme-Vorgaben, Aufruf `renderGantt` | Nur noch `engineController.render({project,view})`, keine direkte Native-Renderfunktion |
+| `app.js` / `applyTimelineChange`, `commitTaskMove` | Validierung und IndexedDB-Commit | Bleibt außerhalb jeder Engine als zentrale fachliche Intent-/Commit-Verarbeitung |
+| `app.js` / `startGanttTaskDrag` und Stage-Listener | Native-DOM-spezifische Tabellenlisten-Drag-/Keyboard-Interaktionen | Als Native-Adapter-Interaktionsschicht kapseln, ausschließlich `Reorder`-Intent ausgeben |
+| `app.js` / `jumpToRelativeLine` | Direkte DOM-Abfrage einer Native-Markierung | Über öffentliche Capability für Marker-Navigation oder explizit dokumentierten Fallback |
+| `gantt.js` / `renderGantt` | DOM-/SVG-Balken, Linien, Phasendarstellung, Zoom und Zeitskala | Unverändert als Renderer im Native-Adapter wiederverwenden |
+| `gantt.js` / `attachInteraction` | Pointer-Preview, Escape/Cancel, Move/Resize/Progress | Native-private UI, emitierte fachliche Intents und bereinigbarer Lifecycle |
+| `task-order.mjs` | Phasenreihenfolge und `displayOrder`-Datenlogik | Ausschließlich Domain/Kommandoebene, nicht im Render-Core implementieren |
+| `storage.js`, `core/project-commits.mjs` | IndexedDB-Revisionsschutz, Queue und canonical publish | Domain-/Persistenzebene unabhängig von allen Engines |
+| `design-presets.mjs`, CSS, Icons | Elf Themen, Print, Accessibility, v2.x ESM-Cache | Engineübergreifendes Design-/Auslieferungssystem |
+
+**Red-Team-Risiken vor B:** Ein direkter Rendererwechsel darf keine Stage-Handler doppelt registrieren, Pointer-Listener beim Destroy zurücklassen oder den DOM der Native-Engine auslesen, um Projektzustände zu rekonstruieren. Die Revisionsprüfung verhindert stille Mehrtab-Überschreibung, aber die UI muss einen Konflikt verständlich anzeigen. Die Cache-Regression muss mit jedem neuen ESM-Knoten erweitert werden.
 
 ## 9. Optimaler Umsetzungs-Prompt für einen neuen Codex-/ChatGPT-Arbeitslauf
 
