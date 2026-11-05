@@ -195,9 +195,12 @@ test('records repeatable Frappe render and rerender costs for 0/1/25/250/1000 ta
         const rerenderStart=performance.now();
         engine.render({project,view:{zoom:'week'}});
         const rerenderMs=performance.now()-rerenderStart;
+        const zoomStart=performance.now();
+        engine.render({project,view:{zoom:'day'}});
+        const zoomMs=performance.now()-zoomStart;
         samples.push({
           count,initialMs:Math.round(initialMs),
-          rerenderMs:Math.round(rerenderMs),
+          rerenderMs:Math.round(rerenderMs),zoomMs:Math.round(zoomMs),
           bars:firstBars,empty:result.empty,
           unchanged:JSON.stringify(project)===snapshot
         });
