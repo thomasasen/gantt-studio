@@ -105,3 +105,115 @@ test('upstream document mouseup listeners remain registered after rerenders and 
   expect(result.unpaired).toBeGreaterThanOrEqual(6);
   console.log('FRAPPE_LIFECYCLE_BLOCKER', JSON.stringify(result));
 });
+
+for (const timezone of ['Europe/Berlin', 'America/New_York', 'Pacific/Auckland']) {
+  test.describe('date-only rendering in ' + timezone, () => {
+    test.use({timezoneId: timezone});
+    test('keeps inclusive dates across DST, leap day, and year boundaries', async ({page}) => {
+      await page.goto('/spikes/frappe/index.html');
+      await expect(page.locator('#status')).toContainText('Frappe: gerendert');
+      const samples = await page.evaluate(async () => {
+        const {mapProjectToFrappeTasks} = await import(
+          '/assets/js/engine/frappe/frappe-task-mapper.mjs?v=2.8.0'
+        );
+        const iso = date => [
+          String(date.getFullYear()).padStart(4,'0'),
+          String(date.getMonth()+1).padStart(2,'0'),
+          String(date.getDate()).padStart(2,'0')
+        ].join('-');
+        const boundaries = [
+          ['2026-03-08','2026-03-08'],
+          ['2026-03-29','2026-03-29'],
+          ['2026-04-05','2026-04-05'],
+          ['2028-02-29','2028-02-29'],
+          ['2026-12-31','2027-01-01']
+        ];
+        const outcomes = [];
+        for (const [start,end] of boundaries) {
+          const root = document.createElement('div');
+          document.body.append(root);
+          try {
+            const tasks = mapProjectToFrappeTasks({tasks:[
+              {id:'boundary',name:'Boundary',start,end,progress:0}
+            ]});
+            const chart = new globalThis.Gantt(root,tasks,{
+              view_mode:'Day',readonly:true,readonly_dates:true,
+              readonly_progress:true,move_dependencies:false,
+              infinite_padding:false,today_button:false,view_mode_select:false,
+              scroll_to:'start'
+            });
+            // Test-only inspection of Frappe's internal parsed dates; no
+            // application adapter relies on these private properties.
+            const parsed = chart.tasks[0];
+            const inclusiveEnd = new Date(parsed._end.getTime()-1000);
+            const rect = root.querySelector('.bar-wrapper .bar');
+            outcomes.push({
+              expectedStart:start,expectedEnd:end,
+              actualStart:iso(parsed._start),actualEnd:iso(inclusiveEnd),
+              width:rect ? Number(rect.getAttribute('width')) : 0
+            });
+          } finally {
+            root.remove();
+          }
+        }
+        return outcomes;
+      });
+      for(const sample of samples) {
+        expect(sample.actualStart).toBe(sample.expectedStart);
+        expect(sample.actualEnd).toBe(sample.expectedEnd);
+        expect(sample.width).toBeGreaterThan(0);
+      }
+    });
+  });
+}
+
+test('records repeatable Frappe render and rerender costs for 0/1/25/250/1000 tasks', async ({page}) => {
+  test.setTimeout(120000);
+  await page.goto('/spikes/frappe/index.html');
+  await expect(page.locator('#status')).toContainText('Frappe: gerendert');
+  const metrics = await page.evaluate(async () => {
+    const {createFrappeEngine} = await import(
+      '/assets/js/engine/frappe/frappe-adapter.mjs?v=2.8.0'
+    );
+    const samples = [];
+    for(const count of [0,1,25,250,1000]) {
+      const tasks = Array.from({length:count}, (_,i)=>({
+        id:'task-'+i,name:'Task '+i,start:'2026-05-01',
+        end:'2026-05-10',progress:i%101
+      }));
+      const project={tasks};
+      const snapshot=JSON.stringify(project);
+      const root=document.createElement('div');
+      document.body.append(root);
+      const engine=createFrappeEngine();
+      try {
+        engine.mount({container:root});
+        const start=performance.now();
+        const result=engine.render({project,view:{zoom:'week'}});
+        const initialMs=performance.now()-start;
+        const firstBars=root.querySelectorAll('.bar-wrapper').length;
+        const rerenderStart=performance.now();
+        engine.render({project,view:{zoom:'week'}});
+        const rerenderMs=performance.now()-rerenderStart;
+        samples.push({
+          count,initialMs:Math.round(initialMs),
+          rerenderMs:Math.round(rerenderMs),
+          bars:firstBars,empty:result.empty,
+          unchanged:JSON.stringify(project)===snapshot
+        });
+      } finally {
+        engine.destroy();
+        root.remove();
+      }
+    }
+    return samples;
+  });
+  for(const metric of metrics) {
+    expect(metric.unchanged).toBe(true);
+    expect(metric.empty).toBe(metric.count===0);
+    if(metric.count)expect(metric.bars).toBe(metric.count);
+    expect(metric.initialMs).toBeGreaterThanOrEqual(0);
+    expect(metric.rerenderMs).toBeGreaterThanOrEqual(0);
+  }
+  console.log('FRAPPE_BENCHMARK_MS',JSON.stringify(metrics));
+});
