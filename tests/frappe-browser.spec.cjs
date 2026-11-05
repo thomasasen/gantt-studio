@@ -23,6 +23,7 @@ test.describe('isolated Frappe 1.2.2 feasibility page', () => {
       indexedDB: await indexedDB.databases(),
       localStorage: localStorage.length
     }));
+    await page.screenshot({path:'visual-review/frappe-native-comparison.png',fullPage:true});
     expect(storage.indexedDB).toHaveLength(0);
     expect(storage.localStorage).toBe(0);
     expect(errors).toEqual([]);
