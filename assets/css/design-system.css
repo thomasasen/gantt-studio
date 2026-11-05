@@ -279,6 +279,8 @@ button:disabled, input:disabled, select:disabled { opacity: .52; cursor: not-all
   margin-top: 7px;
 }
 .metric.warn strong { color: #895e1a; }
+/* Four KPI cards: override the legacy five-card last-child span at <=900px. */
+.metrics > .metric:last-child { grid-column: auto; }
 
 /* Workspace navigation and toolbars */
 .studio-nav {

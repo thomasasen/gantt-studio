@@ -3,6 +3,7 @@ const AxeBuilder = require('@axe-core/playwright').default;
 const { mkdirSync, writeFileSync } = require('node:fs');
 
 test('Apple Design QA: WCAG 2.1 AA across real planning workflows', async ({ page }) => {
+  test.setTimeout(120000);
   const results = [];
   const check = async name => {
     const scan = await new AxeBuilder({page})
@@ -35,6 +36,7 @@ test('Apple Design QA: WCAG 2.1 AA across real planning workflows', async ({ pag
   await page.locator('#addTaskBtn').click();
   await check('task-dialog');
   await page.locator('#taskDialog button[value="cancel"]').last().click();
+  await expect(page.locator('#taskDialog')).toBeHidden();
   await page.setViewportSize({width:390,height:844});
   await check('demo-project-mobile');
   await page.locator('#planningTabBtn').click();

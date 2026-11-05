@@ -273,3 +273,20 @@ test('preview dense demo at desktop and mobile sizes', async ({ page }) => {
   await page.setViewportSize({width:390,height:844});
   await page.screenshot({path:'visual-review/demo-mobile.png',fullPage:true});
 });
+
+test('Apple UX: cancel and close work even with empty required inputs', async ({ page }) => {
+  await page.goto('/');
+  await page.locator('#addTaskBtn').click();
+  await expect(page.locator('#taskName')).toHaveValue('');
+  await page.locator('#taskDialog button[value="cancel"]').last().click();
+  await expect(page.locator('#taskDialog')).toBeHidden();
+  await page.locator('#addTaskBtn').click();
+  await page.locator('#taskDialog .icon-btn').click();
+  await expect(page.locator('#taskDialog')).toBeHidden();
+  await page.locator('#planningTabBtn').click();
+  await page.locator('#phaseSection > summary').click();
+  await page.locator('#addPhaseBtn').click();
+  await expect(page.locator('#entityDialog')).toBeVisible();
+  await page.locator('#entityDialog button[value="cancel"]').last().click();
+  await expect(page.locator('#entityDialog')).toBeHidden();
+});
