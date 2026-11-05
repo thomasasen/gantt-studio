@@ -119,3 +119,23 @@ test('keyboard controls, narrow screens and baseline comparison screenshots', as
   const overflow=await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   expect(overflow).toBeLessThanOrEqual(2);
 });
+
+test('200-percent-equivalent CSS viewport preserves operability and focus', async ({ page }) => {
+  // 1440 physical px / 2 = 720 CSS px: responsive reflow at 200% desktop zoom.
+  // This checks layout equivalence, not the browser chrome's actual zoom setting.
+  await page.setViewportSize({width:720,height:900});
+  await page.goto('/');
+  await expect(page.locator('#projectSelect')).not.toHaveValue('');
+  const overflow=await page.evaluate(() => document.documentElement.scrollWidth-document.documentElement.clientWidth);
+  expect(overflow).toBeLessThanOrEqual(2);
+  await page.locator('#planningTabBtn').focus();
+  await page.keyboard.press('Enter');
+  await expect(page.locator('#planningView')).toBeVisible();
+  await page.locator('#designBtn').click();
+  await expect(page.locator('#designDialog')).toBeVisible();
+  await expect(page.locator('#designDialog .icon-btn')).toHaveAttribute('aria-label','Schließen');
+  await page.locator('#designDialog .icon-btn').click();
+  await expect(page.locator('#designDialog')).toBeHidden();
+  await page.locator('#projectTabBtn').click();
+  await expect(page.locator('#projectView')).toBeVisible();
+});
