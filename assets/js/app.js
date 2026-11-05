@@ -11,7 +11,7 @@ const defaults = {
   schema: 'gantt-studio.project', schemaVersion: 1, generator: 'Gantt Studio Pages',
   project: {
     id: '', name: 'Neues Projekt', createdAt: '', updatedAt: '', tasks: [],
-    design: { colors: { pageBg:'#EEF2F3',panelBg:'#FFFFFF',headerBg:'#16324F',primary:'#16324F',accent:'#607A00',critical:'#16324F',workstream:'#3B7280',milestone:'#607A00',gate:'#8B5A2B',arrow:'#657983',grid:'#DCE4E7',text:'#243746',mutedText:'#687D87',border:'#D8E1E4',saturday:'#F1E2E2',sunday:'#F1E2E2',holiday:'#F3CACA' } },
+    design: { colors: { pageBg:'#F3F6F8',panelBg:'#FFFFFF',headerBg:'#20374E',primary:'#20374E',accent:'#087E75',critical:'#30465F',workstream:'#2C7B88',milestone:'#95732C',gate:'#9C603F',arrow:'#657983',grid:'#DCE4E7',text:'#243746',mutedText:'#687D87',border:'#D8E1E4',saturday:'#F1E2E2',sunday:'#F1E2E2',holiday:'#F3CACA' } },
     planning: { settings: { showToday:true,showStatusLine:true,showDependencies:true,showWeekends:true,showHolidays:true,showPhaseBands:true,showBaseline:true,showBuffer:true,showRisk:true,showOwners:true,showProgressLabels:true,showDateLabels:true,showRelativeToday:false,relativeOffsetDays:14,relativeDayMode:'workdays',relativeSkipHolidays:true,relativeLabel:'Vorbereitungstermin',relativeColor:'#C2007B',relativeStyle:'solid' }, phases:[],markers:[],holidays:[] },
     labelConfig: { enabled:true,tracks:4,leaderLines:true,ellipsis:true,twoLine:true,maxWidth:240,placement:'auto',groups:{name:true,progress:true,owner:false,dates:false,phase:false,status:false,risk:false} },
     revision: 1
@@ -91,6 +91,14 @@ function bindEvents() {
   $('printPdfBtn').addEventListener('click', () => { $('exportDialog').close(); window.print(); });
   $('projectTabBtn').addEventListener('click', () => switchTab('project'));
   $('planningTabBtn').addEventListener('click', () => switchTab('planning'));
+  document.querySelector('.studio-tabs').addEventListener('keydown', e => {
+    const keys=['ArrowLeft','ArrowRight','Home','End'];
+    if(!keys.includes(e.key))return;
+    e.preventDefault();
+    const next=e.key==='Home'?'project':e.key==='End'?'planning':e.key==='ArrowLeft'?'project':'planning';
+    switchTab(next);
+    $(next==='project'?'projectTabBtn':'planningTabBtn').focus();
+  });
   document.querySelectorAll('[data-zoom]').forEach(btn => btn.addEventListener('click', () => setZoom(btn.dataset.zoom)));
   document.querySelectorAll('[data-management-mode]').forEach(btn => btn.addEventListener('click', () => setManagementMode(btn.dataset.managementMode)));
   document.querySelectorAll('[data-management-criterion]').forEach(cb => cb.addEventListener('change', () => { managementCriteria[cb.dataset.managementCriterion] = cb.checked; saveViewState(); renderGanttOnly(); syncControlStates(); }));
@@ -98,7 +106,7 @@ function bindEvents() {
   $('saveTaskBtn').addEventListener('click', saveTask);
   $('deleteTaskBtn').addEventListener('click', deleteTask);
   $('ganttStage').addEventListener('click', e => { if (Date.now() < (window.__ganttDragUntil || 0)) return; const phaseRow=e.target.closest('[data-phase-id]'); const phaseId=phaseRow?.dataset.phaseId; if(phaseId){ collapsedPhases.has(phaseId)?collapsedPhases.delete(phaseId):collapsedPhases.add(phaseId); saveViewState(); renderPhaseToolbar(); renderGanttOnly(); return; } const node=e.target.closest('[data-task-id]'); const id=node?.dataset.taskId; if(id) openTaskDialog(id); });
-  $('ganttStage').addEventListener('keydown', e => { if(!['Enter',' '].includes(e.key)) return; const phaseRow=e.target.closest('[data-phase-id]'); const phaseId=phaseRow?.dataset.phaseId; if(!phaseId)return; e.preventDefault(); collapsedPhases.has(phaseId)?collapsedPhases.delete(phaseId):collapsedPhases.add(phaseId); saveViewState(); renderPhaseToolbar(); renderGanttOnly(); });
+  $('ganttStage').addEventListener('keydown', e => { if(!['Enter',' '].includes(e.key)) return; const phaseRow=e.target.closest('[data-phase-id]'); const phaseId=phaseRow?.dataset.phaseId; if(phaseId){e.preventDefault(); collapsedPhases.has(phaseId)?collapsedPhases.delete(phaseId):collapsedPhases.add(phaseId); saveViewState(); renderPhaseToolbar(); renderGanttOnly(); return;} const taskId=e.target.closest('[data-task-id]')?.dataset.taskId; if(taskId){e.preventDefault(); openTaskDialog(taskId);} });
   $('phaseCollapseToolbar').addEventListener('click', handlePhaseCollapseClick);
   $('addPhaseBtn').addEventListener('click', () => openEntity('phase'));
   $('addMarkerBtn').addEventListener('click', () => openEntity('marker'));
@@ -235,14 +243,15 @@ function switchTab(tab){
   $('projectView').hidden=activeTab!=='project';$('planningView').hidden=activeTab!=='planning';
   $('projectTabBtn').classList.toggle('active',activeTab==='project');$('planningTabBtn').classList.toggle('active',activeTab==='planning');
   $('projectTabBtn').setAttribute('aria-selected',String(activeTab==='project'));$('planningTabBtn').setAttribute('aria-selected',String(activeTab==='planning'));
+  $('projectTabBtn').tabIndex=activeTab==='project'?0:-1;$('planningTabBtn').tabIndex=activeTab==='planning'?0:-1;
   if(activeTab==='planning'){syncSettings();renderPlanningLists();}
 }
 
 function setZoom(value){zoom=['day','week','month'].includes(value)?value:'week';saveViewState();syncControlStates();renderGanttOnly();}
 function setManagementMode(value){managementMode=['operational','management','milestones'].includes(value)?value:'operational';saveViewState();syncControlStates();renderGanttOnly();}
 function syncControlStates(){
-  document.querySelectorAll('[data-zoom]').forEach(b=>b.classList.toggle('active',b.dataset.zoom===zoom));
-  document.querySelectorAll('[data-management-mode]').forEach(b=>b.classList.toggle('active',b.dataset.managementMode===managementMode));
+  document.querySelectorAll('[data-zoom]').forEach(b=>{const selected=b.dataset.zoom===zoom;b.classList.toggle('active',selected);b.setAttribute('aria-pressed',String(selected));});
+  document.querySelectorAll('[data-management-mode]').forEach(b=>{const selected=b.dataset.managementMode===managementMode;b.classList.toggle('active',selected);b.setAttribute('aria-pressed',String(selected));});
   document.querySelectorAll('[data-management-criterion]').forEach(cb=>cb.checked=managementCriteria[cb.dataset.managementCriterion]!==false);
 }
 
@@ -468,7 +477,7 @@ async function deleteEntity(){const kind=$('entityKind').value,id=$('entityId').
 async function importGermanHolidays(){const year=Number(prompt('Jahr für den Feiertagsimport:',String(new Date().getFullYear())));if(!Number.isInteger(year)||year<1975||year>2100)return;const subdivision=(prompt('Bundesland-Code (z. B. DE-BY). Leer = nur bundesweite Feiertage:','DE-BY')||'').trim().toUpperCase();try{const res=await fetch(`https://date.nager.at/api/v3/PublicHolidays/${year}/DE`);if(!res.ok)throw new Error(`HTTP ${res.status}`);const raw=await res.json();const existing=new Set(envelope.project.planning.holidays.map(h=>`${h.date}|${h.name.toLowerCase()}`));let added=0;for(const h of raw){const counties=Array.isArray(h.counties)?h.counties.map(String):[];const national=h.global===true||!counties.length;if(!national&&(!subdivision||!counties.includes(subdivision)))continue;const name=String(h.localName||h.name||'').trim();const key=`${h.date}|${name.toLowerCase()}`;if(existing.has(key))continue;envelope.project.planning.holidays.push({id:uuid(),name,date:h.date,source:'Nager.Date',country:'DE',subdivision,imported:true,importedAt:new Date().toISOString()});existing.add(key);added++;}touch();await persist();renderPlanningLists();renderGanttOnly();toast(`${added} Feiertage importiert.`);}catch(e){toast(`Feiertagsimport fehlgeschlagen: ${e.message}`,true);}}
 
 function openDesignDialog(){const c=envelope.project.design?.colors||{};$('designPrimary').value=c.primary||c.headerBg||'#16324F';$('designAccent').value=c.accent||'#607A00';$('designWorkstream').value=c.workstream||'#3B7280';$('designCritical').value=c.critical||'#16324F';$('designMilestone').value=c.milestone||'#607A00';$('designGate').value=c.gate||'#8B5A2B';$('designPageBg').value=c.pageBg||'#EEF2F3';$('designPanelBg').value=c.panelBg||'#FFFFFF';updateDesignPreview();$('designDialog').showModal();}
-function setDesignPreset(name){const p=name==='neutral'?{primary:'#334155',accent:'#64748B',workstream:'#64748B',critical:'#1E293B',milestone:'#475569',gate:'#78716C',pageBg:'#F1F5F9',panelBg:'#FFFFFF'}:{primary:'#16324F',accent:'#607A00',workstream:'#3B7280',critical:'#16324F',milestone:'#607A00',gate:'#8B5A2B',pageBg:'#EEF2F3',panelBg:'#FFFFFF'};for(const [k,v] of Object.entries(p))$(`design${k[0].toUpperCase()+k.slice(1)}`).value=v;updateDesignPreview();}
+function setDesignPreset(name){const p=name==='neutral'?{primary:'#334155',accent:'#64748B',workstream:'#64748B',critical:'#1E293B',milestone:'#475569',gate:'#78716C',pageBg:'#F1F5F9',panelBg:'#FFFFFF'}:{primary:'#20374E',accent:'#087E75',workstream:'#2C7B88',critical:'#30465F',milestone:'#95732C',gate:'#9C603F',pageBg:'#F3F6F8',panelBg:'#FFFFFF'};for(const [k,v] of Object.entries(p))$(`design${k[0].toUpperCase()+k.slice(1)}`).value=v;updateDesignPreview();}
 function updateDesignPreview(){const d=$('designDialog');if(!d)return;d.style.setProperty('--preview-primary',$('designPrimary').value);d.style.setProperty('--preview-accent',$('designAccent').value);d.style.setProperty('--preview-work',$('designWorkstream').value);d.style.setProperty('--preview-critical',$('designCritical').value);d.style.setProperty('--preview-milestone',$('designMilestone').value);d.style.setProperty('--preview-gate',$('designGate').value);}
 async function saveDesign(){const c=envelope.project.design.colors;c.primary=$('designPrimary').value;c.headerBg=c.primary;c.accent=$('designAccent').value;c.workstream=$('designWorkstream').value;c.critical=$('designCritical').value;c.milestone=$('designMilestone').value;c.gate=$('designGate').value;c.pageBg=$('designPageBg').value;c.panelBg=$('designPanelBg').value;touch();await persist();applyDesign();renderGanttOnly();$('designDialog').close();toast('Design gespeichert.');}
 function applyDesign(){const c=envelope.project.design?.colors||{};const r=document.documentElement;const map={'--bg':c.pageBg,'--panel':c.panelBg,'--primary':c.primary||c.headerBg,'--accent':c.accent,'--workstream':c.workstream,'--critical':c.critical,'--milestone':c.milestone,'--gate':c.gate,'--ink':c.text,'--muted':c.mutedText,'--border':c.border,'--grid':c.grid};for(const [k,v] of Object.entries(map))if(v)r.style.setProperty(k,v);}
