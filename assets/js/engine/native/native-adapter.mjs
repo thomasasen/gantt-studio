@@ -59,6 +59,15 @@ export function createNativeEngine() {
       activeRender?.destroy?.();
       activeRender=null;
     },
+    focusTask(taskId,control='reorder') {
+      if(!container)return false;
+      const selector=control==='reorder'?'[data-gantt-order-handle]':'[data-task-id]';
+      const node=[...container.querySelectorAll(selector)]
+        .find(element=>String(element.dataset.taskId)===String(taskId));
+      if(!node)return false;
+      node.focus({preventScroll:true});
+      return true;
+    },
     locateMarker(kind) {
       if(!container || kind!=='relative-target')return null;
       const line=container.querySelector('.relative-today-line');
