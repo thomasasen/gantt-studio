@@ -1,6 +1,6 @@
 # Gantt Studio: Engine-Abstraktion und optionaler Frappe-Gantt-Adapter
 
-> **Status:** Phasen A und B nachweislich abgeschlossen. Phase C nach ausdrücklicher Freigabe am 06.11.2026 als separater Read-only-Spike begonnen; Gate C nicht erreicht. Keine Aktivierung in Produktion.
+> **Status:** Phasen A und B nachweislich abgeschlossen. Phase C als isolierter Frappe-1.2.2-Spike getestet; **Gate C = NO-GO** wegen nachgewiesenem Lifecycle-Leck und nicht transaktionaler Upstream-Interaktionsschnittstelle. Kein Merge und keine Aktivierung in Produktion.
 >
 > **Arbeitsbranch Phase B:** `refactor/engine-abstraction`  
 > **Experimentbranch Phase C:** `spike/frappe-gantt-adapter` (ab Freigabe-SHA `86397dd762085e2042438802a364f1b71a37d637`)  
@@ -152,12 +152,12 @@ engine.getCapabilities();       // objektive Unterstützung statt Annahmen
 Erst nach Gate B den separaten Branch `spike/frappe-gantt-adapter` von einem **freigegebenen** Abstraktionsstand erstellen; bis dahin diesen Folgeschritt nicht vorwegnehmen.
 
 - [x] **C-01 – Upstream verifizieren:** Bei Start npm-Stable-Version, Tag/Release-Divergenz, Lockfile, Lizenz, dokumentierte öffentliche APIs, bekannte Bugs und Browser-Support erneut prüfen. Ausgangsannahme aus Voranalyse: npm `frappe-gantt@1.2.2` (Stand 05.11.2026), GitHub „Latest Release“ `v1.0.3`; **nicht** ohne erneute Prüfung als aktuell behaupten.
-- [ ] **C-02 – Reproduzierbaren, minimalen Vendor-Build:** Frappe lokal aus npm beziehen und bundeln; keine dynamische Fremd-CDN-Quelle. Wenn dafür ein Build-Schritt nötig wird, dessen Nutzen/Kosten und GitHub-Pages-Deployment dokumentieren; Native-Betrieb muss weitergehen.
+- [x] **C-02 – Reproduzierbaren, minimalen Vendor-Build:** Frappe lokal aus npm beziehen und bundeln; keine dynamische Fremd-CDN-Quelle. Wenn dafür ein Build-Schritt nötig wird, dessen Nutzen/Kosten und GitHub-Pages-Deployment dokumentieren; Native-Betrieb muss weitergehen.
 - [ ] **C-03 – Task-Mapping:** IDs, Aufgabenreihenfolge, feste Datumssemantik, Progress, Meilensteine, Abhängigkeiten und Sondertypen eindeutig konvertieren. Keine Mutation des Originalprojekts; Frappe-Ende ↔ inklusives Projektende explizit lösen.
 - [ ] **C-04 – Read-only Rendering:** Gleiche Fixtures in beiden Engines rendern. Phase-Sammelzeilen und Layer, links/rechts synchronisierte Zeilen, Filter, Scroll-/Zoom-Position und Leerzustand untersuchen; fehlende Fähigkeiten dokumentieren.
 - [ ] **C-05 – Interaktions-Spike:** Datum verschieben, beidseitiges Resize, Fortschritt, Task-Selektion sowie Reihenfolge per Drag und Tastatur. Frappe-interne Terminänderung/automatisches Dependency-Shifting deaktivieren oder effektiv kontrollieren; ausschließlich Intents an Projektkommando-Schicht liefern.
 - [ ] **C-06 – Lifecycle-/Sicherheitstest:** Nach wiederholtem Mount/Destroy keine hängen gebliebenen Handler, SVG-Layer oder Observer; keinerlei Datenbank- oder Netzwerkzugriff durch Frappe auf Projektinhalte.
-- [ ] **C-07 – Feature-Gap-Protokoll:** Jede notwendige private Upstream-Abhängigkeit und jeder erhebliche Eingriff in Bar-/Zeilen-Geometrie als **negatives Upgrade-Signal** erfassen.
+- [x] **C-07 – Feature-Gap-Protokoll:** Jede notwendige private Upstream-Abhängigkeit und jeder erhebliche Eingriff in Bar-/Zeilen-Geometrie als **negatives Upgrade-Signal** erfassen.
 
 **Gate C (Go/No-Go):** Frappe muss die notwendige Basis ohne unvertretbare DOM-Hacks, Upstream-Patches oder Verlust der Datums-/Interaktionssemantik liefern. Bei No-Go: Experiment dokumentieren, Native als Standard behalten, Frappe nicht aktivieren.
 
@@ -337,7 +337,7 @@ Erst nach Gate B den separaten Branch `spike/frappe-gantt-adapter` von einem **f
 - GitHub Actions [UI #42128331083](https://github.com/thomasasen/gantt-studio/actions/runs/42128331083): erfolgreich; `npm ci`, Vendor-Build, lokale Frappe-UMD/CSS, **60/60** Playwright-Tests; Frappe-Smoke/Responsive 390/768/1024/1440 und keine externen Browser-Requests.
 - GitHub Actions [UI #42129315854](https://github.com/thomasasen/gantt-studio/actions/runs/42129315854): erfolgreich; **61/61** Playwright-Tests, einschließlich des neu instrumentierten Lifecycle-Gegenbeweises. Browserprotokoll: `FRAPPE_LIFECYCLE_BLOCKER {"afterMount":7,"added":7,"removed":0,"unpaired":7}`.
 - `spikes/frappe/package-lock.json` wurde in **Commit `70b556d4`** durch `npm install --package-lock-only` in GitHub Actions aus der npm-Registry neu generiert (nicht von Hand editiert), mit SHA-512-Integrität. Ein vorübergehender CI-Schreibjob wurde danach entfernt; die dauerhafte `validate.yml` prüft die Lockfile-/Versionsintegrität read-only. Die Native Engine benötigt weiterhin weder npm noch den Frappe-Build.
-- Ergänzte Browser-Zeitzonen- und Benchmarktests (`tests/frappe-browser.spec.cjs`) müssen anhand ihres konkreten GitHub-Actions-Laufs einzeln als bestanden oder fehlgeschlagen nachgetragen werden; die bloße Aufnahme als Testdatei ist **kein Erfolg**.
+- Ergänzte reale Browser-Zeitzonen- und Geometrietests sowie 0/1/25/250/1000-Aufgaben-Benchmarks sind in [UI #42129659264](https://github.com/thomasasen/gantt-studio/actions/runs/42129659264) **65/65 bestanden**. DST/Schaltjahr/Jahresgrenzen wurden in drei Zeitzonen geprüft. Erfasst wurden dabei nur Einzelmessungen des CI-Runners und noch kein quantitativer Native-vs-Frappe-Vergleich.
 
 **Zwei unabhängige, belastbare Blocker im aktuellen Upstream:**
 
@@ -377,11 +377,11 @@ Legende: **J** = aktuell nachgewiesen; **Ö** = über dokumentierte öffentliche
 | 200-%-Zoom | J | Keine vollständige Frappe-Parität nachgewiesen | — |
 | Druckansicht | J | Kein paritätisches Drucklayout | O / P |
 | Reproduzierbarer Build / Offline | J | npm ci, lokaler Vendor-Build und no-CDN-Smoke erfolgreich | J |
-| Kalenderdaten/DST | J | Mapper-Unit-Tests erfolgreich; zusätzliche echte Geometrie-Tests laufen | Ö / — |
-| Performance 0/1/25/250/1000 | Native als Referenz | Zusätzlicher Chromium-Benchmark eingereicht, noch auszuwerten | — |
+| Kalenderdaten/DST | J | Mapper- und Chromium-Geometrietests in Berlin, New York und Auckland bestanden | J für getestete Fälle |
+| Performance 0/1/25/250/1000 | Native als Referenz | Chromium-Einzelmessung bei 0/1/25/250/1000 bestanden; kein direkter Native-Vergleich | Teilweise |
 | Wiederholtes Mount/Destroy | J | Aktive document-Listener bleiben nach Destroy | **N / No-Go** |
 
-**Datenintegritäts-/Red-Team-Fazit:** Der aktuelle Frappe-Spike ist ausdrücklich read-only; kein Frappe-Code wurde mit einem fachlichen `onIntent`-Speicherpfad verdrahtet. Dadurch wurde kein Datenverlust im kanonischen Projektmodell beobachtet; das ist kein Nachweis einer sicheren editierbaren Integration. `readonly` und `move_dependencies:false` bleiben zwingend. Die Native Engine behält den transaktionalen Projektkommando-Pfad und den vollständigen Cancel-/Rollbackvertrag.
+**Reale Chromium-Performance-Einzelwerte (Run #42129659264, initial/erneut, in ms; keine statistisch abgesicherte Benchmark-Reihe):** 0 Tasks 0/0, 1 Task 19/19, 25 Tasks 19/18, 250 Tasks 52/74, 1.000 Tasks 169/172. Alle fünf erzeugten Projektdaten blieben unverändert; die tatsächliche Balkenzahl entsprach der Fixture-Größe. Ein gesonderter Zoom-Benchmark und ein interaktiver Callback-Gegenversuch wurden zusätzlich eingecheckt und müssen vor ihrem endgültigen Ergebnis gegen den jeweiligen jüngeren CI-Lauf geprüft werden. Diese Messung rechtfertigt keinen Lifecycle-Kompromiss.\n\n**Datenintegritäts-/Red-Team-Fazit:** Der aktuelle Frappe-Spike ist ausdrücklich read-only; kein Frappe-Code wurde mit einem fachlichen `onIntent`-Speicherpfad verdrahtet. Dadurch wurde kein Datenverlust im kanonischen Projektmodell beobachtet; das ist kein Nachweis einer sicheren editierbaren Integration. `readonly` und `move_dependencies:false` bleiben zwingend. Die Native Engine behält den transaktionalen Projektkommando-Pfad und den vollständigen Cancel-/Rollbackvertrag.
 
 **Gate C: NO-GO für den Ersatz der Native Engine durch Frappe 1.2.2.** Der mangelnde Upstream-Teardown ist im Browser bewiesen; die Interaktionsarchitektur verletzt den geforderten transaktionalen Vertrag. Die übrigen zahlreichen Paritätslücken würden erhebliche Overlays und Geometrie-Kopplung erfordern. Die Vorteile der aktuellen Rendering-Bibliothek rechtfertigen diese zusätzliche Fehler- und Wartungsfläche nicht. Es gibt **keine Freigabe für Phase D, keinen Merge nach `main`, keine Änderung des JSON-v1-Formats und keinen produktiven Frappe-Umschalter**. PR #14 bleibt ein dokumentierter experimenteller Draft; PR #13 und seine Native-Architektur werden unabhängig bewertet.
 
