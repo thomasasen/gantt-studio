@@ -322,6 +322,8 @@ Erst nach Gate B den separaten Branch `spike/frappe-gantt-adapter` von einem **f
 
 **Red-Team-Prioritäten:** Paketintegrität nachtragen; reale Frappe-Date-only-Geometrie an DST und Monatsenden prüfen; mögliche globale Event-Listener nach wiederholtem Render/Destroy nachweisen oder isolieren; Frappe-Interaction nur mit verifizierbarem Cancel-Vertrag freigeben; Layout-/Rollen-/Phase-Parität ohne private DOM-Selektoren bewerten. Frappe darf weder Projektdaten schreiben noch `main` ersetzen.
 
+**Review-PR:** [Draft-PR #14](https://github.com/thomasasen/gantt-studio/pull/14) vergleicht den isolierten Spike ausschließlich mit dem freigegebenen Abstraktionsbranch. Zusatzcommits `5323b28` (Ignorierregeln), `74ed1cc` (Lizenzdateiname), `d9effb8` (Build-Dokumentation), `9abc994` und `46aeef9` (vergleichendes Screenshot-Artefakt). Eine statische Gegenprüfung anhand des GitHub-Diffs bestätigte: `assets/js/app.js`, `assets/js/gantt.js` und Produktiv-`index.html` sind unverändert; der Frappe-Adapter enthält weder Projekt-Persistenzaufrufe noch private DOM-Selektoren, ist `readonly` und schaltet Dependency-Move ab. **Diese statische Prüfung ist kein Runtime-/Browsertest.**
+
 **Nächste Schritte:** (1) Build/Unit-/Chromium-Testläufe auf dem Spike-Branch überprüfen und Fehler beheben. (2) Detaillierte DOM-/Lifecycle-Profilierung mit tatsächlichem Frappe 1.2.2. (3) C-05-Interaktionen nur mit nachweisbarem fachlichem Intent-Commit testen, sonst negatives Gate-C-Signal dokumentieren. (4) Gate C nach echter Gegenprobe Go/No-Go entscheiden. `main`, `refactor/engine-abstraction` und PR #13 bleiben unverändert.
 
 ## 9. Optimaler Umsetzungs-Prompt für einen neuen Codex-/ChatGPT-Arbeitslauf
