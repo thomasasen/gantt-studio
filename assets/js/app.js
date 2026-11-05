@@ -1,7 +1,7 @@
 import { renderGantt } from './gantt.js?v=1.4.4';
 import { saveLocal, loadActive, loadProject, listProjects, deleteProject, setActiveProject } from './storage.js';
 import { normalizeTaskOrder, nextDisplayOrder, sortedProjectTasks, phaseKey, reorderTask, nudgeTask } from './task-order.mjs';
-import { DESIGN_COLOR_FIELDS, DESIGN_PRESETS, findDesignPreset, matchDesignPreset } from './design-presets.mjs';
+import { DESIGN_COLOR_FIELDS, DESIGN_PRESETS, findDesignPreset, matchDesignPreset, isDarkDesignColors } from './design-presets.mjs';
 
 const $ = (id) => document.getElementById(id);
 const clone = (x) => JSON.parse(JSON.stringify(x));
@@ -905,12 +905,34 @@ function updateDesignPreview(){
     button.classList.toggle('selected',selected);
     button.setAttribute('aria-pressed',String(selected));
   }
+  const mode=isDarkDesignColors(colors)?'Dunkles':'Helles';
+  $('designPreviewMode').textContent=`${mode} Design · Vorschau`;
+  $('designPreviewCard').dataset.previewMode=isDarkDesignColors(colors)?'dark':'light';
   $('designPresetSelection').textContent=matched
     ? `Vorschau: ${matched.label}. Erst „Design speichern“ übernimmt diese Farben.`
     : 'Individuelle Farbauswahl. Erst „Design speichern“ übernimmt diese Farben.';
 }
 async function saveDesign(){const c=envelope.project.design.colors;c.primary=$('designPrimary').value;c.headerBg=c.primary;c.accent=$('designAccent').value;c.workstream=$('designWorkstream').value;c.critical=$('designCritical').value;c.milestone=$('designMilestone').value;c.gate=$('designGate').value;c.pageBg=$('designPageBg').value;c.panelBg=$('designPanelBg').value;touch();await persist();applyDesign();renderGanttOnly();$('designDialog').close();toast('Design gespeichert.');}
-function applyDesign(){const c=envelope.project.design?.colors||{};const r=document.documentElement;const map={'--bg':c.pageBg,'--panel':c.panelBg,'--primary':c.primary||c.headerBg,'--accent':c.accent,'--workstream':c.workstream,'--critical':c.critical,'--milestone':c.milestone,'--gate':c.gate,'--ink':c.text,'--muted':c.mutedText,'--border':c.border,'--grid':c.grid};for(const [k,v] of Object.entries(map))if(v)r.style.setProperty(k,v);}
+function applyDesign(){
+  const c=envelope.project.design?.colors||{};
+  const root=document.documentElement;
+  root.dataset.themeMode=isDarkDesignColors(c)?'dark':'light';
+  const map={
+    '--bg':c.pageBg,'--panel':c.panelBg,
+    '--primary':c.primary||c.headerBg,'--accent':c.accent,
+    '--workstream':c.workstream,'--critical':c.critical,
+    '--milestone':c.milestone,'--gate':c.gate,
+    '--ink':root.dataset.themeMode==='dark'?'#CDD9E2':c.text,
+    '--muted':root.dataset.themeMode==='dark'?'#AABAC8':c.mutedText,
+    '--border':root.dataset.themeMode==='dark'?'#3A4A56':c.border,
+    '--grid':root.dataset.themeMode==='dark'?'#334451':c.grid
+  };
+  // Do not leak stale project color overrides into another project.
+  for(const [key,value] of Object.entries(map)){
+    if(value)root.style.setProperty(key,value);
+    else root.style.removeProperty(key);
+  }
+}
 
 function validateGraph(tasks){const ids=new Set(tasks.map(t=>t.id)),byId=new Map(tasks.map(t=>[t.id,t]));for(const t of tasks)for(const dep of t.dependencies||[]){if(!ids.has(dep))throw new Error(`Aufgabe „${t.name}“ verweist auf einen unbekannten Vorgänger.`);if(dep===t.id)throw new Error(`Aufgabe „${t.name}“ darf nicht von sich selbst abhängen.`);}const visiting=new Set(),visited=new Set();const visit=id=>{if(visited.has(id))return;if(visiting.has(id))throw new Error('Die Aufgabenabhängigkeiten enthalten einen Zyklus.');visiting.add(id);for(const dep of byId.get(id)?.dependencies||[])visit(dep);visiting.delete(id);visited.add(id);};ids.forEach(visit);}
 function touch(){envelope.project.updatedAt=new Date().toISOString();envelope.project.revision=Math.max(1,Number(envelope.project.revision)||1)+1;setSaveStatus('saving','Änderungen werden lokal gesichert');}
