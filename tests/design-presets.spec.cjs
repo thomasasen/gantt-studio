@@ -1,8 +1,8 @@
 const {test,expect}=require('@playwright/test');
 const AxeBuilder=require('@axe-core/playwright').default;
+const {mkdirSync,readFileSync}=require('node:fs');
 
 const newPresets=['nordlicht','sandstein','waldgruen','marine'];
-const ids=[...newPresets,'odin','neutral'];
 
 function contrast(foreground,background='#FFFFFF'){
   const lum=color=>{
@@ -50,6 +50,8 @@ test('design gallery presents six selectable miniature palettes and keeps cancel
   await expect(grid.locator('button')).toHaveCount(6);
   await expect(page.locator('#designPresetOdin')).toBeVisible();
   await expect(page.locator('#designPresetNeutral')).toBeVisible();
+  mkdirSync('visual-review',{recursive:true});
+  await page.screenshot({path:'visual-review/design-gallery-desktop.png',fullPage:true});
   for(const id of newPresets){
     const button=grid.locator(`[data-design-preset="${id}"]`);
     await expect(button).toBeVisible();
@@ -76,6 +78,7 @@ test('all new designs can be saved, restored and selected after reload',async({p
   await page.locator('#loadDemoBtn').click();
   await expect(page.locator('#taskTableBody tr[data-task-row-id]')).toHaveCount(10);
   const {findDesignPreset}=await import('../assets/js/design-presets.mjs');
+  mkdirSync('visual-review',{recursive:true});
   for(const id of newPresets){
     const preset=findDesignPreset(id);
     await page.locator('#designBtn').click();
@@ -98,12 +101,25 @@ test('all new designs can be saved, restored and selected after reload',async({p
     });
     await expect(page.locator('#taskTableBody tr[data-task-row-id]')).toHaveCount(10);
     await expect(page.locator('#ganttStage .gantt-bar[data-task-id]').first()).toBeVisible();
+    await page.screenshot({path:`visual-review/design-theme-${id}.png`,fullPage:true});
+    const scan=await new AxeBuilder({page})
+      .withTags(['wcag2a','wcag2aa','wcag21a','wcag21aa']).analyze();
+    expect(scan.violations.map(v=>({id:v.id,targets:v.nodes.map(n=>n.target)})),id).toEqual([]);
     await page.reload();
     await expect(page.locator('#projectSelect')).not.toHaveValue('');
     await page.locator('#designBtn').click();
     await expect(page.locator(`#designPresetGrid [data-design-preset="${id}"]`)).toHaveAttribute('aria-pressed','true');
     await page.locator('#designDialog button[value="cancel"]').last().click();
   }
+  // JSON backups must retain the applied palette without changing the schema.
+  const exportedPromise=page.waitForEvent('download');
+  await page.locator('#centralExportBtn').click();
+  await page.locator('#exportJsonBtn').click();
+  const download=await exportedPromise;
+  const exported=JSON.parse(readFileSync(await download.path(),'utf8'));
+  expect(exported.schema).toBe('gantt-studio.project');
+  expect(exported.project.design.colors.primary).toBe(findDesignPreset('marine').colors.primary.toLowerCase());
+  expect(exported.project.tasks).toHaveLength(10);
 });
 
 test('mobile design gallery remains usable without overflow, checked with accessibility audit',async({page})=>{
@@ -116,6 +132,8 @@ test('mobile design gallery remains usable without overflow, checked with access
   await expect(page.locator('#designPresetGrid button')).toHaveCount(6);
   await expect(page.locator('#designPresetGrid')).toBeInViewport();
   await expect(page.locator('#designPresetGrid [data-design-preset="marine"]')).toBeVisible();
+  mkdirSync('visual-review',{recursive:true});
+  await page.screenshot({path:'visual-review/design-gallery-mobile.png',fullPage:true});
   const sizing=await page.evaluate(()=>{
     const dialog=document.querySelector('#designDialog');
     const bounds=dialog.getBoundingClientRect();
