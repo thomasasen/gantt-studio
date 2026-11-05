@@ -88,3 +88,38 @@ test('new and edited task keeps or appends its stable phase position',async({pag
   await page.locator('[data-task-sort-mode="manual"]').click();
   await expect(groupRows.last()).toContainText('Stable order QA');
 });
+
+test('ordering model migrates legacy dates and prevents cross-phase moves',async()=>{
+  const {normalizeTaskOrder,sortedProjectTasks,reorderTask,nudgeTask,nextDisplayOrder}=await import('../assets/js/task-order.mjs');
+  const p={planning:{phases:[{id:'a',start:'2026-01-01'},{id:'b',start:'2026-02-01'}]},tasks:[
+    {id:'later',phaseId:'a',start:'2026-01-12',end:'2026-01-15',dependencies:['early']},
+    {id:'other',phaseId:'b',start:'2026-02-02',end:'2026-02-03',dependencies:[]},
+    {id:'early',phaseId:'a',start:'2026-01-03',end:'2026-01-05',dependencies:[]}
+  ]};
+  const original=p.tasks.map(t=>({id:t.id,start:t.start,end:t.end,phaseId:t.phaseId,dependencies:[...t.dependencies]}));
+  normalizeTaskOrder(p);
+  expect(sortedProjectTasks(p,'manual').map(t=>t.id)).toEqual(['early','later','other']);
+  const prev=p.tasks.find(t=>t.id==='early').displayOrder;
+  expect(reorderTask(p,'later','early','before')).toBe(true);
+  expect(sortedProjectTasks(p,'manual').map(t=>t.id)).toEqual(['later','early','other']);
+  expect(sortedProjectTasks(p,'date').map(t=>t.id)).toEqual(['early','later','other']);
+  expect(reorderTask(p,'early','other','before')).toBe(false);
+  expect(nudgeTask(p,'later',-1)).toBe(false);
+  expect(nudgeTask(p,'early',-1)).toBe(true);
+  expect(nextDisplayOrder(p,'a')).toBeGreaterThan(prev);
+  for(const t of p.tasks){
+    const before=original.find(v=>v.id===t.id);
+    expect({id:t.id,start:t.start,end:t.end,phaseId:t.phaseId,dependencies:t.dependencies}).toEqual(before);
+  }
+});
+
+test('capture manual ordering UI on desktop and mobile',async({page})=>{
+  await page.goto('/');
+  await page.locator('#loadDemoBtn').click();
+  await expect(page.locator('#taskTableBody tr[data-task-row-id]')).toHaveCount(10);
+  const {mkdirSync}=require('node:fs');
+  mkdirSync('visual-review',{recursive:true});
+  await page.screenshot({path:'visual-review/manual-task-order-desktop.png',fullPage:true});
+  await page.setViewportSize({width:390,height:844});
+  await page.screenshot({path:'visual-review/manual-task-order-mobile.png',fullPage:true});
+});
