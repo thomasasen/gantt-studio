@@ -137,3 +137,22 @@ test('reduced motion preserves functionality', async ({ page }) => {
   await page.locator('#planningTabBtn').click();
   await expect(page.locator('#planningView')).toBeVisible();
 });
+
+test('capture design review screenshots', async ({ page }) => {
+  const { mkdirSync } = require('node:fs');
+  mkdirSync('visual-review', { recursive: true });
+  await page.setViewportSize({width:1440,height:900});
+  await page.goto('/');
+  await createTask(page, 'Design Review · Konzeptphase');
+  await page.screenshot({path:'visual-review/desktop-project.png',fullPage:true});
+  await page.locator('#planningTabBtn').click();
+  await page.screenshot({path:'visual-review/desktop-planning.png',fullPage:true});
+  await page.locator('#designBtn').click();
+  await page.screenshot({path:'visual-review/desktop-design-dialog.png',fullPage:true});
+  await page.locator('#designDialog button[value=cancel]').last().click();
+  await page.setViewportSize({width:390,height:844});
+  await page.locator('#projectTabBtn').click();
+  await page.screenshot({path:'visual-review/mobile-project.png',fullPage:true});
+  await page.locator('#planningTabBtn').click();
+  await page.screenshot({path:'visual-review/mobile-planning.png',fullPage:true});
+});
