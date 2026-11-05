@@ -145,22 +145,22 @@ test('capture design review screenshots', async ({ page }) => {
   await page.goto('/');
   await createTask(page, 'Design Review · Konzeptphase');
   await page.waitForTimeout(2700);
-  await page.evaluate(() => { window.scrollTo(0,0); document.activeElement?.blur?.(); });
+  await page.evaluate(() => { document.documentElement.style.scrollBehavior='auto'; window.scrollTo(0,0); document.activeElement?.blur?.(); });
   await page.screenshot({path:'visual-review/desktop-project.png',fullPage:true});
   await page.locator('#planningTabBtn').click();
-  await page.evaluate(() => { window.scrollTo(0,0); document.activeElement?.blur?.(); });
+  await page.evaluate(() => { document.documentElement.style.scrollBehavior='auto'; window.scrollTo(0,0); document.activeElement?.blur?.(); });
   await page.screenshot({path:'visual-review/desktop-planning.png',fullPage:true});
   await page.locator('#designBtn').click();
-  await page.evaluate(() => { window.scrollTo(0,0); document.activeElement?.blur?.(); });
+  await page.evaluate(() => { document.documentElement.style.scrollBehavior='auto'; window.scrollTo(0,0); document.activeElement?.blur?.(); });
   await page.screenshot({path:'visual-review/desktop-design-dialog.png',fullPage:true});
   await page.locator('#designDialog button[value=cancel]').last().click();
   await page.setViewportSize({width:390,height:844});
   await page.goto('/');
   await page.locator('#projectTabBtn').click();
-  await page.evaluate(() => { window.scrollTo(0,0); document.activeElement?.blur?.(); });
+  await page.evaluate(() => { document.documentElement.style.scrollBehavior='auto'; window.scrollTo(0,0); document.activeElement?.blur?.(); });
   await page.screenshot({path:'visual-review/mobile-project.png',fullPage:true});
   await page.locator('#planningTabBtn').click();
-  await page.evaluate(() => { window.scrollTo(0,0); document.activeElement?.blur?.(); });
+  await page.evaluate(() => { document.documentElement.style.scrollBehavior='auto'; window.scrollTo(0,0); document.activeElement?.blur?.(); });
   await page.screenshot({path:'visual-review/mobile-planning.png',fullPage:true});
 });
 
