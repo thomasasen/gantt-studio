@@ -290,3 +290,18 @@ test('Apple UX: cancel and close work even with empty required inputs', async ({
   await page.locator('#entityDialog button[value="cancel"]').last().click();
   await expect(page.locator('#entityDialog')).toBeHidden();
 });
+
+test('responsive timeline recomputes its frozen column after viewport changes', async ({ page }) => {
+  await page.goto('/');
+  await page.locator('#loadDemoBtn').click();
+  await expect(page.locator('#taskTableBody tr')).toHaveCount(10);
+  await expect.poll(() => page.locator('.gantt-left').evaluate(el => Math.round(el.getBoundingClientRect().width))).toBe(430);
+  await page.setViewportSize({width:390,height:844});
+  await expect.poll(() => page.locator('.gantt-left').evaluate(el => Math.round(el.getBoundingClientRect().width))).toBe(190);
+  const right = await page.locator('.gantt-right').boundingBox();
+  const scroller = await page.locator('#ganttScroller').boundingBox();
+  expect(right.x).toBeLessThan(scroller.x + scroller.width);
+  await expect(page.locator('#taskTableBody tr')).toHaveCount(10);
+  await page.setViewportSize({width:1024,height:900});
+  await expect.poll(() => page.locator('.gantt-left').evaluate(el => Math.round(el.getBoundingClientRect().width))).toBe(430);
+});

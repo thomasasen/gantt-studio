@@ -60,6 +60,8 @@ test('Apple Design QA: responsive metrics and Gantt demo visual layout', async (
   mkdirSync('design-audit',{recursive:true});
   for(const width of [1440,1024,768,390]){
     await page.setViewportSize({width,height:900});
+    const expectedLeft = width<=600 ? 190 : width<=850 ? 330 : 430;
+    await expect.poll(() => page.locator('.gantt-left').evaluate(el => Math.round(el.getBoundingClientRect().width))).toBe(expectedLeft);
     await page.screenshot({path:`design-audit/demo-${width}.png`,fullPage:true});
     const stats=await page.evaluate(()=>{
       const metrics=[...document.querySelectorAll('#metrics .metric')].map(e=>{
