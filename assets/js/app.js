@@ -1,13 +1,15 @@
-import { renderGantt } from './gantt.js?v=2.6.0';
-import { icon, hydrateIcons } from './icons.mjs?v=2.6.0';
-import { saveLocal, loadActive, loadProject, listProjects, deleteProject, setActiveProject } from './storage.js?v=2.6.0';
-import { normalizeTaskOrder, nextDisplayOrder, sortedProjectTasks, phaseKey, reorderTask, nudgeTask } from './task-order.mjs?v=2.6.0';
-import { DESIGN_COLOR_FIELDS, DESIGN_PRESETS, findDesignPreset, matchDesignPreset, designThemeMode } from './design-presets.mjs?v=2.6.0';
+import { renderGantt } from './gantt.js?v=2.7.0';
+import { createProjectCommitter } from './core/project-commits.mjs?v=2.7.0';
+import { localTodayIso, isValidIsoDate } from './core/date-only.mjs?v=2.7.0';
+import { icon, hydrateIcons } from './icons.mjs?v=2.7.0';
+import { saveLocal, loadActive, loadProject, listProjects, deleteProject, setActiveProject } from './storage.js?v=2.7.0';
+import { normalizeTaskOrder, nextDisplayOrder, sortedProjectTasks, phaseKey, reorderTask, nudgeTask } from './task-order.mjs?v=2.7.0';
+import { DESIGN_COLOR_FIELDS, DESIGN_PRESETS, findDesignPreset, matchDesignPreset, designThemeMode } from './design-presets.mjs?v=2.7.0';
 
 const $ = (id) => document.getElementById(id);
 const clone = (x) => JSON.parse(JSON.stringify(x));
 const uuid = () => crypto.randomUUID ? crypto.randomUUID() : `id-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-const todayIso = () => new Date().toISOString().slice(0, 10);
+const todayIso = () => localTodayIso();
 const DAY = 86400000;
 
 const defaults = {
@@ -27,7 +29,9 @@ let zoom = 'week';
 let managementMode = 'operational';
 let managementCriteria = { ...managementDefaults };
 let collapsedPhases = new Set();
-let saveTimer = null;
+const projectCommitter = createProjectCommitter(saveLocal);
+const pendingSaves = new Map();
+const lastSaveFailed = new Set();
 let toastTimer = null;
 let activeTab = 'project';
 let taskDetailsExpanded = false;
@@ -75,6 +79,8 @@ async function boot() {
   }
   if (local) envelope = normalizeEnvelope({ schema:'gantt-studio.project', schemaVersion:1, generator:'Gantt Studio', project:local });
   else await saveLocal(envelope.project);
+  setActiveProject(envelope.project.id);
+  projectCommitter.remember(envelope.project);
   loadViewState();
   await renderAll();
   ganttLeftWidth = currentGanttLeftWidth();
@@ -122,7 +128,7 @@ function bindEvents() {
   document.querySelectorAll('[data-zoom]').forEach(btn => btn.addEventListener('click', () => setZoom(btn.dataset.zoom)));
   document.querySelectorAll('[data-management-mode]').forEach(btn => btn.addEventListener('click', () => setManagementMode(btn.dataset.managementMode)));
   document.querySelectorAll('[data-management-criterion]').forEach(cb => cb.addEventListener('change', () => { managementCriteria[cb.dataset.managementCriterion] = cb.checked; saveViewState(); renderGanttOnly(); syncControlStates(); }));
-  $('projectName').addEventListener('change', async e => { envelope.project.name = e.target.value.trim() || 'Unbenanntes Projekt'; touch(); await persist(); await renderPortfolio(); });
+  $('projectName').addEventListener('change', async e => { const name=e.target.value.trim() || 'Unbenanntes Projekt'; try { await commitProjectChange(p=>{p.name=name;}); await renderPortfolio(); } catch { $('projectName').value=envelope.project.name; } });
   $('saveTaskBtn').addEventListener('click', saveTask);
   $('deleteTaskBtn').addEventListener('click', deleteTask);
   $('ganttStage').addEventListener('click', e => { if (Date.now() < (window.__ganttDragUntil || 0) || e.target.closest('[data-gantt-order-handle]')) return; const phaseRow=e.target.closest('[data-phase-id]'); const phaseId=phaseRow?.dataset.phaseId; if(phaseId){ collapsedPhases.has(phaseId)?collapsedPhases.delete(phaseId):collapsedPhases.add(phaseId); saveViewState(); renderPhaseToolbar(); renderGanttOnly(); return; } const node=e.target.closest('[data-task-id]'); const id=node?.dataset.taskId; if(id) openTaskDialog(id); });
@@ -132,7 +138,7 @@ function bindEvents() {
       if(['ArrowUp','ArrowDown'].includes(e.key)){
         e.preventDefault();e.stopPropagation();
         if(canReorderTasks())void commitTaskMove(
-          ()=>nudgeTask(envelope.project,handle.dataset.taskId,e.key==='ArrowUp'?-1:1),
+          project=>nudgeTask(project,handle.dataset.taskId,e.key==='ArrowUp'?-1:1),
           handle.dataset.taskId,'gantt');
       }
       return;
@@ -151,7 +157,7 @@ function bindEvents() {
   $('relativeTargetDate').addEventListener('change', handleRelativeTargetDateChange);
   $('relativeJumpBtn').addEventListener('click', jumpToRelativeLine);
   for (const id of ['phaseList','markerList','holidayList']) $(id).addEventListener('click', e => { const row=e.target.closest('[data-entity-id]'); if(row) openEntity(row.dataset.entityKind,row.dataset.entityId); });
-  document.addEventListener('change', async e => { const key=e.target?.dataset?.setting; if(!key)return; envelope.project.planning.settings[key]=e.target.checked; touch(); await persist(); syncSettings(); renderGanttOnly(); });
+  document.addEventListener('change', async e => { const key=e.target?.dataset?.setting; if(!key)return; const checked=e.target.checked; try { await commitProjectChange(p=>{p.planning.settings[key]=checked;}); } catch {} syncSettings(); renderGanttOnly(); });
   window.addEventListener('keydown', e => { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase()==='s') { e.preventDefault(); exportProject(); } });
   document.addEventListener('input', e => { if (['designPrimary','designAccent','designWorkstream','designCritical','designMilestone','designGate','designPageBg','designPanelBg'].includes(e.target.id)) updateDesignPreview(); });
 }
@@ -181,6 +187,40 @@ function setSaveStatus(state, detail='Lokal im Browser') {
   $('saveStatusText').textContent=state==='saving'?'Speichert…':state==='error'?'Nicht gespeichert':'Gespeichert';
   $('saveStatusDetail').textContent=detail;
   box.querySelector('.save-status-icon').innerHTML=icon(state==='saving'?'loader-circle':state==='error'?'circle-alert':'check');
+}
+
+/**
+ * Only publishes a project after IndexedDB confirms its transaction.
+ * The queue is per project, so a later save cannot overwrite an earlier edit.
+ * An in-flight save for another project never changes the active selection.
+ */
+async function commitProjectChange(change) {
+  const project = envelope.project;
+  const id = project.id;
+  pendingSaves.set(id,(pendingSaves.get(id)||0)+1);
+  if (envelope.project.id===id) setSaveStatus('saving','Änderungen werden lokal gesichert');
+  try {
+    const result = await projectCommitter.commit(project,change);
+    if (envelope.project.id===id) {
+      envelope.project=result.project;
+      renderMeta();
+    }
+    lastSaveFailed.delete(id);
+    return {...result,active:envelope.project.id===id};
+  } catch (error) {
+    lastSaveFailed.add(id);
+    if (envelope.project.id===id) toast(`Speichern fehlgeschlagen: ${error.message||'IndexedDB-Fehler'}`,true);
+    throw error;
+  } finally {
+    const remaining=(pendingSaves.get(id)||1)-1;
+    if (remaining) pendingSaves.set(id,remaining);
+    else pendingSaves.delete(id);
+    if (envelope.project.id===id) {
+      if (remaining) setSaveStatus('saving','Weitere Änderungen werden gesichert');
+      else if (lastSaveFailed.has(id)) setSaveStatus('error','Browser-Speicherung fehlgeschlagen; Änderung nicht übernommen');
+      else setSaveStatus('saved',`Lokal · ${new Intl.DateTimeFormat('de-DE',{hour:'2-digit',minute:'2-digit'}).format(new Date())}`);
+    }
+  }
 }
 
 function renderMetrics() {
@@ -274,11 +314,26 @@ function renderGanttOnly() {
   }
 }
 
-async function applyTimelineChange(change){
-  const task=envelope.project.tasks.find(t=>t.id===change.id); if(!task)return;
-  if(change.start)task.start=change.start; if(change.end)task.end=change.end; if(Number.isFinite(change.progress))task.progress=clamp(Math.round(change.progress),0,100);
-  if(task.end<task.start){const x=task.start;task.start=task.end;task.end=x;}
-  touch(); await persist(); renderMetrics(); renderPhaseToolbar(); renderGanttOnly(); renderTaskTable();
+async function applyTimelineChange(change) {
+  const selectedId=envelope.project.id;
+  for (const key of ['start','end']) {
+    if (change[key]!==undefined && !isValidIsoDate(change[key]))
+      throw new Error('Ungültiges Kalenderdatum im Zeitplan.');
+  }
+  const result=await commitProjectChange(project=>{
+    const task=project.tasks.find(t=>String(t.id)===String(change.id));
+    if(!task)return false;
+    const start=change.start===undefined?task.start:change.start;
+    const end=change.end===undefined?task.end:change.end;
+    if(!isValidIsoDate(start)||!isValidIsoDate(end)||end<start)
+      throw new Error('Der Aufgabenzeitraum ist ungültig.');
+    task.start=start;
+    task.end=end;
+    if(Number.isFinite(change.progress))task.progress=clamp(Math.round(change.progress),0,100);
+  });
+  if(result.changed && result.active && envelope.project.id===selectedId){
+    renderMetrics();renderPhaseToolbar();renderGanttOnly();renderTaskTable();
+  }
 }
 
 function renderPhaseToolbar(){
@@ -630,7 +685,7 @@ function finishGanttTaskDrag(event){
     window.__ganttDragUntil=Date.now()+350;
     if(drop && canReorderTasks())
       void commitTaskMove(
-        ()=>reorderTask(envelope.project,sourceId,drop.targetId,drop.place),
+        project=>reorderTask(project,sourceId,drop.targetId,drop.place),
         sourceId,'gantt');
     else setTaskOrderStatus('Keine gültige Position innerhalb dieser Phase gewählt.');
   }
@@ -706,39 +761,26 @@ function moveTaskDrag(event){
   drag.drop={targetId:target.dataset.taskRowId,place};
 }
 
-async function commitTaskMove(reorder,taskId,focusSurface='table'){
-  const original=envelope.project.tasks.map(task=>[task.id,task.displayOrder]);
-  const oldRevision=envelope.project.revision,oldUpdated=envelope.project.updatedAt;
-  if(!reorder()){
-    setTaskOrderStatus('Die Reihenfolge bleibt unverändert.');
-    return;
-  }
-  touch();
-  try{
-    await persist();
-    const scroller=$('ganttScroller');
-    const scrollX=scroller.scrollLeft,scrollY=scroller.scrollTop;
-    renderGanttOnly();
-    renderTaskTable();
+async function commitTaskMove(reorder,taskId,focusSurface='table') {
+  try {
+    const result=await commitProjectChange(project=>reorder(project));
+    if(!result.active)return;
+    if(!result.changed){
+      setTaskOrderStatus('Die Reihenfolge bleibt unverändert.');
+      return;
+    }
+    const scroller=$('ganttScroller'),scrollX=scroller.scrollLeft,scrollY=scroller.scrollTop;
+    renderGanttOnly();renderTaskTable();
     scroller.scrollLeft=scrollX;scroller.scrollTop=scrollY;
     const surface=focusSurface==='gantt' ? $('ganttStage') : $('taskTableBody');
     const selector=focusSurface==='gantt'?'[data-gantt-order-handle]':'[data-task-drag-handle]';
-    for(const grip of surface.querySelectorAll(selector)){
-      if(grip.dataset.taskId===String(taskId)){
-        grip.focus({preventScroll:true});
-        break;
-      }
+    for(const grip of surface.querySelectorAll(selector)) {
+      if(grip.dataset.taskId===String(taskId)){grip.focus({preventScroll:true});break;}
     }
     setTaskOrderStatus('Aufgabenreihenfolge gespeichert.');
-  }catch(error){
-    const old=new Map(original);
-    envelope.project.tasks.forEach(task=>task.displayOrder=old.get(task.id));
-    envelope.project.revision=oldRevision;
-    envelope.project.updatedAt=oldUpdated;
-    renderGanttOnly();
-    renderTaskTable();
-    setTaskOrderStatus('Speichern fehlgeschlagen. Reihenfolge zurückgesetzt.');
-    toast('Die Aufgabenreihenfolge konnte nicht gespeichert werden.',true);
+  } catch {
+    renderGanttOnly();renderTaskTable();
+    setTaskOrderStatus('Speichern fehlgeschlagen. Reihenfolge unverändert.');
   }
 }
 
@@ -749,7 +791,7 @@ function finishTaskDrag(event){
   const drop=drag.drop,sourceId=drag.row.dataset.taskRowId,wasActive=drag.active;
   cancelTaskDrag();
   if(wasActive && drop && canReorderTasks()){
-    void commitTaskMove(()=>reorderTask(envelope.project,sourceId,drop.targetId,drop.place),sourceId);
+    void commitTaskMove(project=>reorderTask(project,sourceId,drop.targetId,drop.place),sourceId);
   }else if(wasActive){
     setTaskOrderStatus('Keine gültige Position innerhalb dieser Phase gewählt.');
   }
