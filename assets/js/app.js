@@ -524,9 +524,14 @@ async function createProject() {
 
 async function changeProject(e) {
   const id=e.target.value;
+  // Switching projects cancels both the table drag and the active Gantt
+  // gesture before an asynchronous IndexedDB read can complete.
+  cancelTaskDrag();
+  engineController.cancelInteraction();
   try {
     const p=await loadProject(id);
-    if(!p)return;
+    // A second selection may have been made while the first read was pending.
+    if(!p || $('projectSelect').value!==id)return;
     envelope=normalizeEnvelope({schema:'gantt-studio.project',schemaVersion:1,generator:'Gantt Studio',project:p});
     projectCommitter.remember(envelope.project);
     setActiveProject(p.id);
