@@ -1621,6 +1621,9 @@ button:disabled, input:disabled, select:disabled { opacity: .52; cursor: not-all
     color:#fff;
     border-color:var(--primary);
   }
+  :root[data-theme-mode="hybrid"] .gantt-bar.phase-summary .bar-label{
+    color:#F8FAFB;
+  }
   :root[data-theme-mode="hybrid"] .task-overview-table td{
     border-color:var(--ui-outline);
   }

@@ -64,6 +64,11 @@ test('hybrid palettes keep the chart bright and the application shell dark',asyn
     expect(styles.commandbar).not.toBe(styles.gantt);
     expect(styles.metric).not.toBe(styles.gantt);
     expect(styles.tableHeader).not.toBe(styles.table);
+    // Imported phase colors may be pale; the summarized bar itself is dark,
+    // so its visible label must be explicitly light rather than inheriting
+    // the dark data typography.
+    await expect(page.locator('#ganttStage .gantt-bar.phase-summary .bar-label').first())
+      .toHaveCSS('color','rgb(248, 250, 251)');
     await page.screenshot({path:`visual-review/hybrid-${id}-project.png`,fullPage:true});
     await wcag(page,id+' project');
 
