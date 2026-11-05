@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="light">
-  <meta name="theme-color" content="#16324f">
+  <meta name="theme-color" content="#f9fbfc">
   <meta name="description" content="Gantt Studio – browserbasierte Projektplanung mit Portfolio, Aufgaben, Abhängigkeiten, Phasen, Gates, Baselines, Risiken und Import/Export.">
   <title>Gantt Studio</title>
   <link rel="stylesheet" href="./assets/css/app.css?v=1.4.4">
@@ -12,12 +12,14 @@
   <link rel="stylesheet" href="./assets/css/odin.css?v=1.4.4">
   <link rel="stylesheet" href="./assets/css/scroll-fix.css?v=1.4.5">
   <link rel="stylesheet" href="./assets/css/task-table.css?v=1.5.1">
+  <link rel="stylesheet" href="./assets/css/design-system.css?v=2.0.0">
 </head>
 <body>
+  <a class="skip-link" href="#projectView">Direkt zum Arbeitsbereich</a>
   <header class="topbar">
     <div class="brand" aria-label="Gantt Studio">
       <div class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></div>
-      <div><strong>Gantt Studio <span class="local-badge">Nur lokal</span></strong><small>Projektportfolio und Roadmaps · Browser-Speicherung</small></div>
+      <div><strong>Gantt Studio <span class="local-badge">Nur lokal</span></strong><small>Projektportfolio und Zeitpläne · lokal im Browser</small></div>
     </div>
     <nav class="toolbar" aria-label="Projektaktionen">
       <select id="projectSelect" class="project-select" aria-label="Projekt auswählen"></select>
@@ -32,7 +34,7 @@
   <main class="app-shell">
     <section class="project-head panel">
       <div class="project-title-wrap">
-        <label class="eyebrow" for="projectName">EXECUTIVE PROJECT ROADMAP</label>
+        <label class="eyebrow" for="projectName">AKTUELLES PROJEKT</label>
         <input id="projectName" class="project-name" value="Neues Projekt" aria-label="Projektname">
         <div class="project-meta" id="projectMeta">Lokaler Entwurf</div>
       </div>
@@ -54,7 +56,7 @@
       </div>
       <div class="studio-nav-actions">
         <div id="saveStatus" class="save-status saved" role="status" aria-live="polite"><span class="save-status-icon">✓</span><strong id="saveStatusText">Gespeichert</strong><span id="saveStatusDetail">Lokal im Browser</span></div>
-        <button class="text-action" id="guideBtn" type="button">Verstanden / Hilfe</button>
+        <button class="text-action" id="guideBtn" type="button">Hilfe &amp; Legende</button>
         <button class="btn design-btn" id="designBtn" type="button">Design bearbeiten</button>
       </div>
     </section>
@@ -65,7 +67,7 @@
         <div class="timeline-panel-head">
           <div class="timeline-title"><h1>Zeitplan</h1><p>Balken verschieben, verlängern und Fortschritt anpassen.</p></div>
           <div class="timeline-actions">
-            <div class="control-cluster content-cluster" aria-label="Inhaltsansicht">
+            <div class="control-cluster content-cluster" role="group" aria-label="Inhaltsansicht">
               <span class="control-caption">Inhalt</span>
               <button type="button" class="seg-btn active" data-management-mode="operational">Operativ</button>
               <button type="button" class="seg-btn" data-management-mode="management">Management</button>
@@ -73,13 +75,13 @@
               <details id="filterDetails" class="dropdown-control"><summary>Filter <span aria-hidden="true">▾</span></summary><div class="dropdown-panel filter-panel"><strong>Managementansicht zeigt</strong><label><input type="checkbox" data-management-criterion="critical"> Kritisch markierte Aufgaben</label><label><input type="checkbox" data-management-criterion="milestones"> Meilensteine</label><label><input type="checkbox" data-management-criterion="gates"> Entscheidungs-Gates</label><label><input type="checkbox" data-management-criterion="risks"> Hohe und kritische Risiken</label><label><input type="checkbox" data-management-criterion="redStatus"> Aufgaben mit rotem Status</label><label><input type="checkbox" data-management-criterion="overdue"> Überfällige offene Aufgaben</label></div></details>
               <output id="visibleTaskCount" class="task-count">0 Aufgaben</output>
             </div>
-            <div class="control-cluster zoom-cluster" aria-label="Zeitskala"><button type="button" class="seg-btn" data-zoom="day">Tag</button><button type="button" class="seg-btn active" data-zoom="week">Woche</button><button type="button" class="seg-btn" data-zoom="month">Monat</button></div>
+            <div class="control-cluster zoom-cluster" role="group" aria-label="Zeitskala"><button type="button" class="seg-btn" data-zoom="day">Tag</button><button type="button" class="seg-btn active" data-zoom="week">Woche</button><button type="button" class="seg-btn" data-zoom="month">Monat</button></div>
             <details id="moreSettingsDetails" class="dropdown-control more-settings"><summary>Weitere Einstellungen <span aria-hidden="true">▾</span></summary><div id="quickSettingsList" class="dropdown-panel quick-settings"></div></details>
             <button id="centralExportBtn" class="btn primary central-export" type="button"><span aria-hidden="true">⇩</span> Exportieren</button>
           </div>
         </div>
         <section id="phaseCollapseToolbar" class="phase-collapse-toolbar" aria-label="Phasen ein- oder ausblenden"></section>
-        <div class="gantt-scroller" id="ganttScroller"><div class="gantt-stage" id="ganttStage" role="region" aria-label="Gantt-Diagramm"></div></div>
+        <div class="gantt-scroller" id="ganttScroller" tabindex="0" role="region" aria-label="Zeitplan horizontal und vertikal scrollen"><div class="gantt-stage" id="ganttStage" role="region" aria-label="Gantt-Diagramm"></div></div>
       </section>
 
       <section id="taskOverviewPanel" class="task-overview-panel panel" aria-labelledby="taskOverviewTitle">
@@ -93,7 +95,7 @@
   <button id="taskDetailsToggle" class="btn task-details-toggle" type="button" aria-controls="taskOverviewTable" aria-expanded="false"><span aria-hidden="true">▸</span> Details anzeigen</button>
 </div>
         </div>
-        <div class="task-table-wrap">
+        <div class="task-table-wrap" tabindex="0" role="region" aria-label="Aufgabentabelle horizontal scrollen">
 <table id="taskOverviewTable" class="task-overview-table task-details-collapsed">
   <thead>
     <tr>
@@ -168,7 +170,7 @@
 
   <dialog id="taskDialog" class="dialog"><form method="dialog" id="taskForm"><div class="dialog-head"><div><div class="eyebrow">AUFGABE</div><h2 id="taskDialogTitle">Aufgabe bearbeiten</h2></div><button class="icon-btn" value="cancel" aria-label="Schließen" type="submit">×</button></div><input type="hidden" id="taskId"><div class="form-grid"><label class="span-2">Name<input id="taskName" required maxlength="120"></label><label>Start<input id="taskStart" type="date" required></label><label>Ende<input id="taskEnd" type="date" required></label><label>Typ<select id="taskType"><option value="workstream">Workstream</option><option value="critical">Kritisch markiert</option><option value="milestone">Meilenstein</option><option value="gate">Gate</option></select></label><label>Fortschritt<input id="taskProgress" type="number" min="0" max="100" step="5" value="0"></label><label>Owner<input id="taskOwner" maxlength="80"></label><label>Status<select id="taskStatus"><option value="neutral">Neutral</option><option value="green">Grün</option><option value="amber">Gelb</option><option value="red">Rot</option></select></label><label>Risiko<select id="taskRisk"><option value="none">Kein</option><option value="low">Niedrig</option><option value="medium">Mittel</option><option value="high">Hoch</option><option value="critical">Kritisch</option></select></label><label>Phase<select id="taskPhase"></select></label><label class="span-2">Abhängigkeiten<select id="taskDependencies" multiple size="5"></select></label><label>Baseline Start<input id="taskBaselineStart" type="date"></label><label>Baseline Ende<input id="taskBaselineEnd" type="date"></label><label>Puffer (Tage)<input id="taskBuffer" type="number" min="0" max="365" value="0"></label><label>Kosten (€)<input id="taskCost" type="number" min="0" step="100"></label><label class="span-2">Link<input id="taskUrl" type="url" placeholder="https://…"></label><label class="span-2">Notizen<textarea id="taskNotes" rows="3" maxlength="2000"></textarea></label></div><div class="dialog-actions"><button class="btn danger" id="deleteTaskBtn" type="button">Löschen</button><div class="spacer"></div><button class="btn" value="cancel" type="submit">Abbrechen</button><button class="btn primary" id="saveTaskBtn" type="button">Übernehmen</button></div></form></dialog>
 
-  <dialog id="entityDialog" class="dialog compact"><form method="dialog"><div class="dialog-head"><div><div class="eyebrow" id="entityEyebrow">PLANUNG</div><h2 id="entityTitle">Element bearbeiten</h2></div><button class="icon-btn" value="cancel" type="submit">×</button></div><input type="hidden" id="entityKind"><input type="hidden" id="entityId"><div id="entityFields" class="form-grid"></div><div class="dialog-actions"><button id="deleteEntityBtn" class="btn danger" type="button">Löschen</button><div class="spacer"></div><button class="btn" value="cancel" type="submit">Abbrechen</button><button id="saveEntityBtn" class="btn primary" type="button">Speichern</button></div></form></dialog>
+  <dialog id="entityDialog" class="dialog compact"><form method="dialog"><div class="dialog-head"><div><div class="eyebrow" id="entityEyebrow">PLANUNG</div><h2 id="entityTitle">Element bearbeiten</h2></div><button class="icon-btn" value="cancel" aria-label="Schließen" type="submit">×</button></div><input type="hidden" id="entityKind"><input type="hidden" id="entityId"><div id="entityFields" class="form-grid"></div><div class="dialog-actions"><button id="deleteEntityBtn" class="btn danger" type="button">Löschen</button><div class="spacer"></div><button class="btn" value="cancel" type="submit">Abbrechen</button><button id="saveEntityBtn" class="btn primary" type="button">Speichern</button></div></form></dialog>
 
   <dialog id="designDialog" class="dialog wide-dialog"><form method="dialog"><div class="dialog-head"><div><div class="eyebrow">DESIGN</div><h2>Projekt-Design bearbeiten</h2><p class="dialog-intro">Farben werden im Projekt gespeichert und wirken direkt auf den Zeitplan.</p></div><button class="icon-btn" value="cancel" aria-label="Schließen" type="submit">×</button></div><div class="preset-row"><button class="btn small" id="designPresetOdin" type="button">Gantt Studio</button><button class="btn small" id="designPresetNeutral" type="button">Neutral</button></div><div class="design-grid"><label>Header / Primär<input id="designPrimary" type="color"></label><label>Akzent<input id="designAccent" type="color"></label><label>Workstream<input id="designWorkstream" type="color"></label><label>Kritisch<input id="designCritical" type="color"></label><label>Meilenstein<input id="designMilestone" type="color"></label><label>Gate<input id="designGate" type="color"></label><label>Seitenhintergrund<input id="designPageBg" type="color"></label><label>Panel<input id="designPanelBg" type="color"></label></div><div class="design-preview-card"><span class="preview-work"></span><span class="preview-critical"></span><span class="preview-milestone"></span><span class="preview-gate"></span><strong>Live-Vorschau</strong></div><div class="dialog-actions"><div class="spacer"></div><button class="btn" value="cancel" type="submit">Abbrechen</button><button id="saveDesignBtn" class="btn primary" type="button">Design speichern</button></div></form></dialog>
 
