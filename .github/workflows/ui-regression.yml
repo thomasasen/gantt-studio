@@ -32,6 +32,10 @@ jobs:
           node --check assets/js/gantt.js
           node --check assets/js/core/date-only.mjs
           node --check assets/js/core/project-commits.mjs
+          node --check assets/js/engine/engine-contract.mjs
+          node --check assets/js/engine/engine-controller.mjs
+          node --check assets/js/engine/native/native-adapter.mjs
+          node --check tests/engine-contract.spec.cjs
           node --check tests/persistence.spec.cjs
           node --check assets/js/storage.js
           node --check tests/ui.spec.cjs
