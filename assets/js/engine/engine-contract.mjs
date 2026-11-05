@@ -13,10 +13,10 @@
  * @typedef {{project:object, view:{zoom:'day'|'week'|'month',reorderable:boolean}}} RenderRequest
  *
  * Required lifecycle: mount(options), render(request), setViewport(viewport),
- * cancelInteraction(), destroy(), getCapabilities(). destroy is idempotent.
+ * cancelInteraction(), locateMarker(kind), destroy(), getCapabilities(). destroy is idempotent.
  */
 export const ENGINE_METHODS = Object.freeze([
-  'mount','render','setViewport','cancelInteraction','destroy','getCapabilities'
+  'mount','render','setViewport','cancelInteraction','locateMarker','destroy','getCapabilities'
 ]);
 
 export function assertEngineContract(engine) {
