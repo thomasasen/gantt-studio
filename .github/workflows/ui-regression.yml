@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - refactor/engine-abstraction
+      - spike/frappe-gantt-adapter
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -36,6 +37,11 @@ jobs:
           node --check assets/js/engine/engine-controller.mjs
           node --check assets/js/engine/native/native-adapter.mjs
           node --check assets/js/engine/native/native-interactions.mjs
+          node --check assets/js/engine/frappe/frappe-task-mapper.mjs
+          node --check assets/js/engine/frappe/frappe-adapter.mjs
+          node --check tests/frappe-spike.spec.mjs
+          node --check spikes/frappe/spike.mjs
+          node --check spikes/frappe/build.mjs
           node --check tests/engine-contract.spec.cjs
           node --check tests/persistence.spec.cjs
           node --check assets/js/storage.js
@@ -43,6 +49,14 @@ jobs:
           node --check tests/icon-system.spec.cjs
           node --check tests/apple-design-audit.spec.cjs
           node --check playwright.config.cjs
+      - name: Install pinned Frappe spike vendor (build-time only)
+        run: |
+          npm ci --prefix spikes/frappe --ignore-scripts --no-audit --no-fund
+          npm run build --prefix spikes/frappe
+          test -s spikes/frappe/vendor/frappe-gantt.umd.js
+          test -s spikes/frappe/vendor/frappe-gantt.css
+      - name: Frappe adapter contract tests
+        run: node --test tests/frappe-spike.spec.mjs
       - name: Install browser test dependency
         run: npm install --no-save --no-package-lock @playwright/test@1.56.1 @axe-core/playwright@4.11.0
       - name: Install Chromium
