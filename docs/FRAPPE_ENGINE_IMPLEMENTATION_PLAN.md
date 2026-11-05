@@ -1,6 +1,6 @@
 # Gantt Studio: Engine-Abstraktion und optionaler Frappe-Gantt-Adapter
 
-> **Status:** Verbindlicher Umsetzungsplan, noch keine technische Umsetzung.
+> **Status:** Phase A in Umsetzung; P0-Schreibpfade auf transaktionale Projektkommandos umgestellt. Gate A noch offen, da Browser-Regression aussteht.
 >
 > **Arbeitsbranch:** `refactor/engine-abstraction`  
 > **Repository:** https://github.com/thomasasen/gantt-studio  
@@ -126,8 +126,8 @@ engine.getCapabilities();       // objektive Unterstützung statt Annahmen
 
 ### Phase A – Baseline und Datenintegrität (P0)
 
-- [ ] **A-01 – Reproduzierbare Baseline:** Versionsstand und Branch-SHA erfassen; vorhandene Node-/Playwright-Checks ausführen; Ergebnisse und bisherige Warnungen protokollieren. Mindestens Demo, leeres Projekt und mehrere Phasen als Referenzdaten nutzen.
-- [ ] **A-02 – Schreibpfade-Audit:** Alle Commit-Pfade aus Gantt, Tabelle, Dialogen, Phasen, Import und Projektwechsel auf Fehler bei IndexedDB, Out-of-order-Writes und verlorene Updates prüfen. Kritische Befunde priorisieren, keine ungezielte Totalneuschreibung.
+- [x] **A-01 – Reproduzierbare Baseline:** Versionsstand und Branch-SHA erfassen; vorhandene Node-/Playwright-Checks ausführen; Ergebnisse und bisherige Warnungen protokollieren. Mindestens Demo, leeres Projekt und mehrere Phasen als Referenzdaten nutzen.
+- [x] **A-02 – Schreibpfade-Audit:** Alle Commit-Pfade aus Gantt, Tabelle, Dialogen, Phasen, Import und Projektwechsel auf Fehler bei IndexedDB, Out-of-order-Writes und verlorene Updates prüfen. Kritische Befunde priorisieren, keine ungezielte Totalneuschreibung.
 - [ ] **A-03 – Sicheren Timeline-Commit implementieren:** Insbesondere `applyTimelineChange()` mit getesteter Validierung, Revision, Save-Fehler/Rollback und korrektem UI-Speicherstatus absichern. Bei Fehler keine heimlich mutierten Tasks; bereits bestätigte Edits nicht verlieren.
 - [ ] **A-04 – Date-only-Vertrag:** DST, lokale Kalendertage, `YYYY-MM-DD`, inklusive Enddaten und reine Sortierung explizit testen; den bekannten UTC-/Lokalzeit-Mismatch von „heute“ beheben, falls reproduziert.
 - [ ] **A-05 – Regression-Gate:** Vorher/nachher gleiche Exportdateien und gleiches Nutzerverhalten abgesehen von notwendigen Bugfixes. Tests für Persistenzfehler, schnelle Folgeänderungen und Projektwechsel erfolgreich.
@@ -228,6 +228,24 @@ Erst nach Gate B den separaten Branch `spike/frappe-gantt-adapter` von einem **f
 | Gate F: produktive Freigabe | [ ] | — | Separates Approval |
 
 **Fortschrittsregel:** Bei jeder Implementierungssitzung erst diesen Abschnitt und die offenen Checkboxen aktualisieren; abgeschlossene Punkte müssen nachvollziehbar testbar sein. Bei Änderungen an der Zielarchitektur zuerst die Entscheidung und Begründung dokumentieren.
+
+### Umsetzungssitzung 05.11.2026: Phase A / P0 (laufend)
+
+**Basis und Historie.** Ursprünglicher Arbeitsbranch `7ded49b` (ein Dokumentationscommit nach `main@1ef29c9`). Es gab beim Start keine Abweichungen zwischen der Codebasis von `main` und dem Arbeitsbranch. Letzter bereits abgeschlossener Baseline-Lauf auf `main@1ef29c9`: [Validate #42111424927](https://github.com/thomasasen/gantt-studio/actions/runs/42111424927) **success**, [UI #42111424663](https://github.com/thomasasen/gantt-studio/actions/runs/42111424663) **success**. Diese Baseline enthielt Demo-, Empty-State-, Mehrphasen-, Drag-, Responsive- und Design-Suites. Der experimentelle Arbeitsbranch wird separat geprüft; frühere CI-Erfolge gelten nicht als Beweis für den neuen Code.
+
+**Schreibpfad-Audit (A-02).** Die Vorgängerversion schrieb vor dem Persistenz-Commit mutierend in `envelope.project`, etwa über `applyTimelineChange`, `saveTask`, `updateTaskFromTable`, `deleteTask`, `commitTaskMove`, Settings, relativen Termin, Phasen/Marker/Feiertage, Feiertagsimport und Design. `saveLocal` hatte zudem einen versteckten Nebeneffekt auf die aktive Auswahl in `localStorage`. Die mutierenden `touch()/persist()`-Aufrufe sind im Arbeitsstand aus den Projektedits entfernt. Neue Projektanlage, Demo und JSON-Import schreiben ein separates Projekt zunächst vollständig und wechseln erst danach die Auswahl; Löschen wartet auf noch laufende projektbezogene Commits. Erhebliche Restrisiken aus dem Audit: zweite Browser-Tabs mit veralteten Revisionen, fehlgeschlagene lokale Speicherung, erneuter Projektwechsel während asynchroner UI-Aktualisierungen, nicht im Browser verifizierte Export-Parität.
+
+**Implementierung A-03/A-04, unter Regressionstest:** `assets/js/core/project-commits.mjs` (per Projekt serialisierte, isolierte Drafts, Commit erst nach erfolgreichem Save, fehlgeschlagene Queue-Einträge blockieren spätere Edits nicht), `assets/js/storage.js` (keine verdeckte Aktivierung des zuletzt geschriebenen Projekts; atomare Revision-Prüfung im IndexedDB-Readwrite-Transaction), `assets/js/core/date-only.mjs` (strenge Gregorian-Daten und lokale »Heute«-Berechnung), `assets/js/app.js` (alle zentralen Änderungsoperationen als Projektkommando), `assets/js/gantt.js` (lokale Heute-Linie), synchron versionierte ESM-Imports `2.7.0` und GitHub-Actions-Validierung. Das Projektdateischema bleibt `gantt-studio.project` / v1; Native Engine bleibt aktiv.
+
+**Reviewbare Commits:** `d9b881b`, `116ab03`, `46d912d`, `be1b693`, `e2236dc`, `bee3342`, `26e634f`, `5a35bfc`, `588fa64`, `27bd111`, `00f7739`, `ab74224`, `047a44f`, `e1c4ef1`, `269cd6f`, `c157fd2`, `5b41c94`, `c731f23`. Keine Änderung an `main`, kein Frappe, kein PR-Merge.
+
+**Tests / Red Team:**
+- GitHub-Actions-Validate für `c731f230`: [Run #42122701731](https://github.com/thomasasen/gantt-studio/actions/runs/42122701731), **success** (ESM-/JS-Syntax und strukturelle Prüfungen).
+- Der erste vollständige Browserlauf `ab742241`: [Run #42122138588](https://github.com/thomasasen/gantt-studio/actions/runs/42122138588), **failure**, sechs konkrete Testfehler. Ursache für mehrere Gantt-Interaktionen war ein doppelt escaptes Regex (`isValidIsoDate`, Fix `c157fd2`); die Tabellen-Tastatur-Reihenfolge editierte noch das kanonische Projekt (Fix `c731f23`); ein neues DST-Subprozess-Testfixture enthielt Klammer-/Zeilenumbruchfehler (Fix `5b41c94`).
+- Neue Suite `tests/persistence.spec.cjs` überprüft simulierte IndexedDB-Fehler und Rollback, sequentielle Revisionen bei raschen Edits, isolierte Projekte bei verzögerter Speicherung, Schaltjahre/DST, Gantt-Datenbankparität sowie konkurrierende Tabs. **Diese Tests sind noch nicht insgesamt als erfolgreich freigegeben.**
+- Die laufenden Browser-Gates sind unter [GitHub Actions](https://github.com/thomasasen/gantt-studio/actions/workflows/ui-regression.yml) zu prüfen. Ein erneut grüner Testlauf auf dem **endgültigen Branch-Commit** ist notwendig, um A-03, A-04, A-05 und Gate A abzuhaken. Die vollständige Fehlerpfadabdeckung, der Test des Exportformats und Cross-Tab-Konflikte bleiben explizite Reviewpunkte.
+
+**Nächster Schritt:** Aktuelle Browser-Regression auswerten; jeden verbliebenen P0/P1-Fehler korrigieren und alle Tests erneut auf genau dem Final-SHA ausführen. Erst nach Gate A mit B-01/B-02 (Engine-Vertragsentwurf) beginnen. Keine produktive Freischaltung und keine Abweichung vom Branch-/Freigabemodell.
 
 ## 9. Optimaler Umsetzungs-Prompt für einen neuen Codex-/ChatGPT-Arbeitslauf
 
