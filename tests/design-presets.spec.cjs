@@ -260,6 +260,16 @@ test('dark themes update every major UI surface and revert cleanly across projec
     expect(contrast(cssRGB(surfaces.title.color),cssRGB(surfaces.ganttRow.background)),id+' task title').toBeGreaterThanOrEqual(4.5);
     expect(contrast(cssRGB(surfaces.button.color),cssRGB(surfaces.button.background)),id+' primary action').toBeGreaterThanOrEqual(4.5);
 
+    // Phase-summary bars must not become white-on-pale, even if imported
+    // projects define almost-white colors for their phases.
+    const summaries=await page.locator('#ganttStage .gantt-bar.phase-summary').evaluateAll(bars=>
+      bars.map(bar=>({
+        bg:getComputedStyle(bar).backgroundColor,
+        text:getComputedStyle(bar.querySelector('.bar-label')).color
+      })));
+    expect(summaries.length).toBeGreaterThan(0);
+    for(const summary of summaries)
+      expect(contrast(cssRGB(summary.bg),cssRGB(summary.text)),id+' phase summary contrast').toBeGreaterThanOrEqual(4.5);
     await page.screenshot({path:`visual-review/dark-${id}-gantt.png`,fullPage:true});
     const scan=await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa','wcag21a','wcag21aa']).analyze();
     expect(scan.violations.map(v=>({id:v.id,impact:v.impact,targets:v.nodes.map(n=>n.target)})),id+' project Axe').toEqual([]);

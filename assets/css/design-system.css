@@ -1493,6 +1493,13 @@ button:disabled, input:disabled, select:disabled { opacity: .52; cursor: not-all
 :root[data-theme-mode="dark"] .gantt-bar:hover{
   box-shadow:0 2px 9px rgba(0,0,0,.32);
 }
+/* Imported phase colors can be near-white. Preserve their hue but darken the
+   summary bands themselves, rather than dimming their text. */
+:root[data-theme-mode="dark"] .gantt-bar.phase-summary{
+  background:color-mix(in srgb,var(--phase-source,#DCE8EB) 18%,var(--panel)) !important;
+  border-color:color-mix(in srgb,var(--phase-source,#DCE8EB) 32%,var(--ui-outline));
+  color:#F1F5F7;
+}
 :root[data-theme-mode="dark"] .gantt-bar .bar-label{color:#F1F5F7;}
 :root[data-theme-mode="dark"] .dependency-line{stroke:#98B0C0;}
 :root[data-theme-mode="dark"] .baseline{background:#91A9B9;}
