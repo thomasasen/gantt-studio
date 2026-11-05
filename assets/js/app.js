@@ -582,8 +582,40 @@ function calculateRelativeTarget(baseIso=todayIso()){const settings=envelope.pro
 function offsetFromTarget(targetIso){const settings=envelope.project.planning.settings;normalizeRelativeSettings(settings);const base=todayIso();if(settings.relativeDayMode!=='workdays')return Math.round((new Date(`${targetIso}T00:00:00Z`)-new Date(`${base}T00:00:00Z`))/DAY);const target=new Date(`${targetIso}T00:00:00Z`),current=new Date(`${base}T00:00:00Z`);if(target.getTime()===current.getTime())return 0;const step=target>current?1:-1;let count=0;while(current.getTime()!==target.getTime()){current.setUTCDate(current.getUTCDate()+step);const candidate=current.toISOString().slice(0,10),weekend=[0,6].includes(current.getUTCDay()),holiday=settings.relativeSkipHolidays!==false&&holidaySet().has(candidate);if(!weekend&&!holiday)count+=step;}return count;}
 function relativeDisplayLabel(){const settings=envelope.project.planning.settings;if(settings.relativeLabel)return settings.relativeLabel;const n=Number(settings.relativeOffsetDays)||0;if(n===0)return'Heute';return`Heute ${n>0?'+':'−'} ${Math.abs(n)} ${settings.relativeDayMode==='workdays'?'AT':'T'}`;}
 function syncRelativeEditor(){const settings=envelope.project.planning.settings;normalizeRelativeSettings(settings);$('relativeEnabled').checked=settings.showRelativeToday;$('relativeOffset').value=String(settings.relativeOffsetDays);$('relativeMode').value=settings.relativeDayMode;$('relativeLabel').value=settings.relativeLabel;$('relativeColor').value=settings.relativeColor;$('relativeStyle').value=settings.relativeStyle;$('relativeSkipHolidays').checked=settings.relativeSkipHolidays;$('relativeSkipHolidays').disabled=settings.relativeDayMode!=='workdays';const target=calculateRelativeTarget();$('relativeTargetDate').value=target;$('relativeResultText').textContent=`${relativeDisplayLabel()} · ${formatDate(target)}`;$('relativeJumpBtn').disabled=!settings.showRelativeToday;$('relative-today-editor').classList.toggle('inactive',!settings.showRelativeToday);}
-async function handleRelativeSettingChange(e){const settings=envelope.project.planning.settings;if(e.target.id==='relativeEnabled')settings.showRelativeToday=e.target.checked;if(e.target.id==='relativeOffset')settings.relativeOffsetDays=Number(e.target.value);if(e.target.id==='relativeMode')settings.relativeDayMode=e.target.value;if(e.target.id==='relativeLabel')settings.relativeLabel=e.target.value;if(e.target.id==='relativeColor')settings.relativeColor=e.target.value;if(e.target.id==='relativeStyle')settings.relativeStyle=e.target.value;if(e.target.id==='relativeSkipHolidays')settings.relativeSkipHolidays=e.target.checked;normalizeRelativeSettings(settings);touch();await persist();syncRelativeEditor();renderGanttOnly();}
-async function handleRelativeTargetDateChange(){const target=$('relativeTargetDate').value;if(!target)return;const settings=envelope.project.planning.settings;normalizeRelativeSettings(settings);if(settings.relativeDayMode==='workdays'&&!isWorkdayIso(target,settings.relativeSkipHolidays!==false)){toast('Das gewählte Datum ist kein Arbeitstag. Bitte einen Arbeitstag wählen oder auf Kalendertage umstellen.',true);syncRelativeEditor();return;}settings.relativeOffsetDays=offsetFromTarget(target);touch();await persist();syncRelativeEditor();renderGanttOnly();}
+async function handleRelativeSettingChange(e) {
+  const key={
+    relativeEnabled:'showRelativeToday',relativeOffset:'relativeOffsetDays',
+    relativeMode:'relativeDayMode',relativeLabel:'relativeLabel',
+    relativeColor:'relativeColor',relativeStyle:'relativeStyle',
+    relativeSkipHolidays:'relativeSkipHolidays'
+  }[e.target.id];
+  if(!key)return;
+  const value=['relativeEnabled','relativeSkipHolidays'].includes(e.target.id)
+    ? e.target.checked : e.target.id==='relativeOffset'?Number(e.target.value):e.target.value;
+  try {
+    await commitProjectChange(project=>{
+      const settings=project.planning.settings;
+      settings[key]=value;
+      normalizeRelativeSettings(settings);
+    });
+  } catch {}
+  syncRelativeEditor();renderGanttOnly();
+}
+
+async function handleRelativeTargetDateChange() {
+  const target=$('relativeTargetDate').value;
+  if(!isValidIsoDate(target))return;
+  const settings=envelope.project.planning.settings;
+  if(settings.relativeDayMode==='workdays'&&!isWorkdayIso(target,settings.relativeSkipHolidays!==false)) {
+    toast('Das gewählte Datum ist kein Arbeitstag. Bitte einen Arbeitstag wählen oder auf Kalendertage umstellen.',true);
+    syncRelativeEditor();return;
+  }
+  const offset=offsetFromTarget(target);
+  try { await commitProjectChange(project=>{project.planning.settings.relativeOffsetDays=offset;}); }
+  catch {}
+  syncRelativeEditor();renderGanttOnly();
+}
+
 function jumpToRelativeLine(){if(!envelope.project.planning.settings.showRelativeToday)return;switchTab('project');renderGanttOnly();requestAnimationFrame(()=>{const line=document.querySelector('.relative-today-line'),scroller=$('ganttScroller');if(!line||!scroller){toast(`Das Zieldatum ${formatDate(calculateRelativeTarget())} liegt außerhalb des aktuell dargestellten Projektzeitraums.`,true);return;}const leftWidth=parseInt(getComputedStyle(document.documentElement).getPropertyValue('--left-width'))||430;scroller.scrollTo({left:Math.max(0,leftWidth+line.offsetLeft-scroller.clientWidth/2),behavior:'smooth'});});}
 
 function toggleTaskDetails(){
@@ -992,10 +1024,83 @@ function renderPlanningLists(){const planning=envelope.project.planning,cost=env
 function entityRows(kind,items,detail){return items.length?items.slice().sort((a,b)=>(a.start||a.date||'').localeCompare(b.start||b.date||'')).map(x=>`<button type="button" class="entity-row" data-entity-kind="${kind}" data-entity-id="${esc(x.id)}"><span><strong>${esc(x.name)}</strong><small>${detail(x)}</small></span><span class="entity-row-edit">${icon('pencil')}</span><i style="background:${esc(x.color||'#DCE8EB')}"></i></button>`).join(''):'<div class="muted-empty">Noch keine Einträge.</div>';}
 
 function openEntity(kind,id=''){const list=kind==='phase'?envelope.project.planning.phases:kind==='marker'?envelope.project.planning.markers:envelope.project.planning.holidays;const item=list.find(x=>x.id===id)||{};$('entityKind').value=kind;$('entityId').value=id;$('deleteEntityBtn').style.visibility=id?'visible':'hidden';const cfg={phase:['PHASE','Phase bearbeiten'],marker:['STICHTAG','Stichtag bearbeiten'],holiday:['SONDERTAG','Sondertag bearbeiten']}[kind];$('entityEyebrow').textContent=cfg[0];$('entityTitle').textContent=id?cfg[1]:cfg[1].replace('bearbeiten','anlegen');if(kind==='phase')$('entityFields').innerHTML=`<label class="span-2">Name<input id="entityName" maxlength="120" required value="${esc(item.name||'')}"></label><label>Start<input id="entityStart" type="date" required value="${esc(item.start||todayIso())}"></label><label>Ende<input id="entityEnd" type="date" required value="${esc(item.end||todayIso())}"></label><label>Farbe<input id="entityColor" type="color" value="${esc(item.color||'#DCE8EB')}"></label>`;if(kind==='marker')$('entityFields').innerHTML=`<label class="span-2">Name<input id="entityName" maxlength="120" required value="${esc(item.name||'')}"></label><label>Datum<input id="entityDate" type="date" required value="${esc(item.date||todayIso())}"></label><label>Farbe<input id="entityColor" type="color" value="${esc(item.color||'#607A00')}"></label><label>Linie<select id="entityStyle"><option value="solid">Durchgezogen</option><option value="dashed">Gestrichelt</option><option value="dotted">Gepunktet</option></select></label>`;if(kind==='holiday')$('entityFields').innerHTML=`<label class="span-2">Name<input id="entityName" maxlength="120" required value="${esc(item.name||'')}"></label><label>Datum<input id="entityDate" type="date" required value="${esc(item.date||todayIso())}"></label>`;if(kind==='marker')$('entityStyle').value=item.style||'solid';$('entityDialog').showModal();}
-async function saveEntity(){const kind=$('entityKind').value,id=$('entityId').value||uuid(),name=$('entityName').value.trim();if(!name)return toast('Name darf nicht leer sein.',true);const p=envelope.project.planning;const list=kind==='phase'?p.phases:kind==='marker'?p.markers:p.holidays;let item;if(kind==='phase'){const start=$('entityStart').value,end=$('entityEnd').value;if(!start||!end||end<start)return toast('Bitte einen gültigen Phasenzeitraum angeben.',true);item={id,name,start,end,color:$('entityColor').value};}else if(kind==='marker'){item={id,name,date:$('entityDate').value,color:$('entityColor').value,style:$('entityStyle').value};}else{item={id,name,date:$('entityDate').value,source:'manual',country:'',subdivision:'',imported:false,importedAt:''};}const idx=list.findIndex(x=>x.id===id);if(idx>=0)list[idx]=item;else list.push(item);touch();await persist();$('entityDialog').close();renderPlanningLists();populateTaskPhases();renderPhaseToolbar();renderGanttOnly();toast('Planungselement gespeichert.');}
-async function deleteEntity(){const kind=$('entityKind').value,id=$('entityId').value;if(!id)return;const p=envelope.project.planning;if(kind==='phase'){p.phases=p.phases.filter(x=>x.id!==id);envelope.project.tasks=envelope.project.tasks.map(t=>t.phaseId===id?{...t,phaseId:''}:t);collapsedPhases.delete(String(id));}else if(kind==='marker')p.markers=p.markers.filter(x=>x.id!==id);else p.holidays=p.holidays.filter(x=>x.id!==id);touch();await persist();$('entityDialog').close();renderPlanningLists();populateTaskPhases();renderPhaseToolbar();renderGanttOnly();toast('Planungselement gelöscht.');}
+async function saveEntity() {
+  const kind=$('entityKind').value,id=$('entityId').value||uuid(),name=$('entityName').value.trim();
+  if(!name)return toast('Name darf nicht leer sein.',true);
+  let item;
+  if(kind==='phase'){
+    const start=$('entityStart').value,end=$('entityEnd').value;
+    if(!isValidIsoDate(start)||!isValidIsoDate(end)||end<start)
+      return toast('Bitte einen gültigen Phasenzeitraum angeben.',true);
+    item={id,name,start,end,color:$('entityColor').value};
+  } else if(kind==='marker'){
+    const date=$('entityDate').value;
+    if(!isValidIsoDate(date))return toast('Ungültiges Datum.',true);
+    item={id,name,date,color:$('entityColor').value,style:$('entityStyle').value};
+  } else {
+    const date=$('entityDate').value;
+    if(!isValidIsoDate(date))return toast('Ungültiges Datum.',true);
+    item={id,name,date,source:'manual',country:'',subdivision:'',imported:false,importedAt:''};
+  }
+  try {
+    const result=await commitProjectChange(project=>{
+      const planning=project.planning;
+      const list=kind==='phase'?planning.phases:kind==='marker'?planning.markers:planning.holidays;
+      const index=list.findIndex(x=>String(x.id)===String(id));
+      if(index>=0)list[index]=item;else list.push(item);
+    });
+    if(!result.active)return;
+    $('entityDialog').close();renderPlanningLists();populateTaskPhases();renderPhaseToolbar();renderGanttOnly();
+    toast('Planungselement gespeichert.');
+  } catch {}
+}
 
-async function importGermanHolidays(){const year=Number(prompt('Jahr für den Feiertagsimport:',String(new Date().getFullYear())));if(!Number.isInteger(year)||year<1975||year>2100)return;const subdivision=(prompt('Bundesland-Code (z. B. DE-BY). Leer = nur bundesweite Feiertage:','DE-BY')||'').trim().toUpperCase();try{const res=await fetch(`https://date.nager.at/api/v3/PublicHolidays/${year}/DE`);if(!res.ok)throw new Error(`HTTP ${res.status}`);const raw=await res.json();const existing=new Set(envelope.project.planning.holidays.map(h=>`${h.date}|${h.name.toLowerCase()}`));let added=0;for(const h of raw){const counties=Array.isArray(h.counties)?h.counties.map(String):[];const national=h.global===true||!counties.length;if(!national&&(!subdivision||!counties.includes(subdivision)))continue;const name=String(h.localName||h.name||'').trim();const key=`${h.date}|${name.toLowerCase()}`;if(existing.has(key))continue;envelope.project.planning.holidays.push({id:uuid(),name,date:h.date,source:'Nager.Date',country:'DE',subdivision,imported:true,importedAt:new Date().toISOString()});existing.add(key);added++;}touch();await persist();renderPlanningLists();renderGanttOnly();toast(`${added} Feiertage importiert.`);}catch(e){toast(`Feiertagsimport fehlgeschlagen: ${e.message}`,true);}}
+async function deleteEntity() {
+  const kind=$('entityKind').value,id=$('entityId').value;
+  if(!id)return;
+  try {
+    const result=await commitProjectChange(project=>{
+      const planning=project.planning;
+      if(kind==='phase'){
+        planning.phases=planning.phases.filter(x=>String(x.id)!==String(id));
+        project.tasks=project.tasks.map(t=>String(t.phaseId)===String(id)?{...t,phaseId:''}:t);
+      } else if(kind==='marker') planning.markers=planning.markers.filter(x=>String(x.id)!==String(id));
+      else planning.holidays=planning.holidays.filter(x=>String(x.id)!==String(id));
+    });
+    if(!result.active)return;
+    if(kind==='phase')collapsedPhases.delete(String(id));
+    $('entityDialog').close();renderPlanningLists();populateTaskPhases();renderPhaseToolbar();renderGanttOnly();
+    toast('Planungselement gelöscht.');
+  } catch {}
+}
+
+async function importGermanHolidays() {
+  const year=Number(prompt('Jahr für den Feiertagsimport:',String(new Date().getFullYear())));
+  if(!Number.isInteger(year)||year<1975||year>2100)return;
+  const subdivision=(prompt('Bundesland-Code (z. B. DE-BY). Leer = nur bundesweite Feiertage:','DE-BY')||'').trim().toUpperCase();
+  try {
+    const res=await fetch(`https://date.nager.at/api/v3/PublicHolidays/${year}/DE`);
+    if(!res.ok)throw new Error(`HTTP ${res.status}`);
+    const raw=await res.json();
+    let added=0;
+    const result=await commitProjectChange(project=>{
+      const holidays=project.planning.holidays;
+      const existing=new Set(holidays.map(h=>`${h.date}|${h.name.toLowerCase()}`));
+      for(const h of raw){
+        const counties=Array.isArray(h.counties)?h.counties.map(String):[];
+        const national=h.global===true||!counties.length;
+        if(!national&&(!subdivision||!counties.includes(subdivision)))continue;
+        const name=String(h.localName||h.name||'').trim();
+        if(!name||!isValidIsoDate(h.date))continue;
+        const key=`${h.date}|${name.toLowerCase()}`;
+        if(existing.has(key))continue;
+        holidays.push({id:uuid(),name,date:h.date,source:'Nager.Date',country:'DE',subdivision,imported:true,importedAt:new Date().toISOString()});
+        existing.add(key);added++;
+      }
+    });
+    if(result.active){renderPlanningLists();renderGanttOnly();toast(`${added} Feiertage importiert.`);}
+  } catch(error) { toast(`Feiertagsimport fehlgeschlagen: ${error.message}`,true); }
+}
 
 function designInputId(key){return `design${key[0].toUpperCase()+key.slice(1)}`;}
 
@@ -1065,7 +1170,22 @@ function updateDesignPreview(){
     ? `Vorschau: ${matched.label}. Erst „Design speichern“ übernimmt diese Farben.`
     : 'Individuelle Farbauswahl. Erst „Design speichern“ übernimmt diese Farben.';
 }
-async function saveDesign(){const c=envelope.project.design.colors;c.primary=$('designPrimary').value;c.headerBg=c.primary;c.accent=$('designAccent').value;c.workstream=$('designWorkstream').value;c.critical=$('designCritical').value;c.milestone=$('designMilestone').value;c.gate=$('designGate').value;c.pageBg=$('designPageBg').value;c.panelBg=$('designPanelBg').value;touch();await persist();applyDesign();renderGanttOnly();$('designDialog').close();toast('Design gespeichert.');}
+async function saveDesign() {
+  const colors={
+    primary:$('designPrimary').value,accent:$('designAccent').value,
+    workstream:$('designWorkstream').value,critical:$('designCritical').value,
+    milestone:$('designMilestone').value,gate:$('designGate').value,
+    pageBg:$('designPageBg').value,panelBg:$('designPanelBg').value
+  };
+  try {
+    const result=await commitProjectChange(project=>{
+      Object.assign(project.design.colors,colors,{headerBg:colors.primary});
+    });
+    if(!result.active)return;
+    applyDesign();renderGanttOnly();$('designDialog').close();toast('Design gespeichert.');
+  } catch {}
+}
+
 function applyDesign(){
   const c=envelope.project.design?.colors||{};
   const root=document.documentElement;
@@ -1090,8 +1210,6 @@ function applyDesign(){
 }
 
 function validateGraph(tasks){const ids=new Set(tasks.map(t=>t.id)),byId=new Map(tasks.map(t=>[t.id,t]));for(const t of tasks)for(const dep of t.dependencies||[]){if(!ids.has(dep))throw new Error(`Aufgabe „${t.name}“ verweist auf einen unbekannten Vorgänger.`);if(dep===t.id)throw new Error(`Aufgabe „${t.name}“ darf nicht von sich selbst abhängen.`);}const visiting=new Set(),visited=new Set();const visit=id=>{if(visited.has(id))return;if(visiting.has(id))throw new Error('Die Aufgabenabhängigkeiten enthalten einen Zyklus.');visiting.add(id);for(const dep of byId.get(id)?.dependencies||[])visit(dep);visiting.delete(id);visited.add(id);};ids.forEach(visit);}
-function touch(){envelope.project.updatedAt=new Date().toISOString();envelope.project.revision=Math.max(1,Number(envelope.project.revision)||1)+1;setSaveStatus('saving','Änderungen werden lokal gesichert');}
-async function persist(){clearTimeout(saveTimer);try{await saveLocal(envelope.project);renderMeta();setSaveStatus('saved',`Lokal · ${new Intl.DateTimeFormat('de-DE',{hour:'2-digit',minute:'2-digit'}).format(new Date())}`);}catch(e){setSaveStatus('error','Browser-Speicherung fehlgeschlagen');throw e;}}
 function uniqueName(name,projects){const used=new Set(projects.map(p=>p.name.toLowerCase()));if(!used.has(name.toLowerCase()))return name;for(let i=2;i<1000;i++){const candidate=`${name} (${i})`;if(!used.has(candidate.toLowerCase()))return candidate;}return `${name} ${Date.now()}`;}
 function download(content,name,type){const blob=new Blob([content],{type});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);}
 function safeUrl(v){const raw=String(v||'').trim();if(!raw)return'';try{const u=new URL(raw);return ['http:','https:'].includes(u.protocol)?u.toString():'';}catch{return'';}}
