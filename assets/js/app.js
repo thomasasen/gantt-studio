@@ -31,6 +31,7 @@ let activeTab = 'project';
 let taskDetailsExpanded = false;
 let taskSortMode = 'manual';
 let taskDrag = null;
+let ganttTaskDrag = null;
 let ganttLeftWidth = 0;
 let resizeRenderQueued = false;
 
@@ -90,6 +91,7 @@ function bindEvents() {
   $('taskTableBody').addEventListener('click', handleTaskTableClick);
   $('taskTableBody').addEventListener('keydown', handleTaskTableKeydown);
   $('taskTableBody').addEventListener('pointerdown', startTaskDrag);
+  $('ganttStage').addEventListener('pointerdown', startGanttTaskDrag);
   document.querySelectorAll('[data-task-sort-mode]').forEach(button =>
     button.addEventListener('click', () => setTaskSortMode(button.dataset.taskSortMode)));
 
@@ -118,8 +120,19 @@ function bindEvents() {
   $('projectName').addEventListener('change', async e => { envelope.project.name = e.target.value.trim() || 'Unbenanntes Projekt'; touch(); await persist(); await renderPortfolio(); });
   $('saveTaskBtn').addEventListener('click', saveTask);
   $('deleteTaskBtn').addEventListener('click', deleteTask);
-  $('ganttStage').addEventListener('click', e => { if (Date.now() < (window.__ganttDragUntil || 0)) return; const phaseRow=e.target.closest('[data-phase-id]'); const phaseId=phaseRow?.dataset.phaseId; if(phaseId){ collapsedPhases.has(phaseId)?collapsedPhases.delete(phaseId):collapsedPhases.add(phaseId); saveViewState(); renderPhaseToolbar(); renderGanttOnly(); return; } const node=e.target.closest('[data-task-id]'); const id=node?.dataset.taskId; if(id) openTaskDialog(id); });
-  $('ganttStage').addEventListener('keydown', e => { if(!['Enter',' '].includes(e.key)) return; const phaseRow=e.target.closest('[data-phase-id]'); const phaseId=phaseRow?.dataset.phaseId; if(phaseId){e.preventDefault(); collapsedPhases.has(phaseId)?collapsedPhases.delete(phaseId):collapsedPhases.add(phaseId); saveViewState(); renderPhaseToolbar(); renderGanttOnly(); return;} const taskId=e.target.closest('[data-task-id]')?.dataset.taskId; if(taskId){e.preventDefault(); openTaskDialog(taskId);} });
+  $('ganttStage').addEventListener('click', e => { if (Date.now() < (window.__ganttDragUntil || 0) || e.target.closest('[data-gantt-order-handle]')) return; const phaseRow=e.target.closest('[data-phase-id]'); const phaseId=phaseRow?.dataset.phaseId; if(phaseId){ collapsedPhases.has(phaseId)?collapsedPhases.delete(phaseId):collapsedPhases.add(phaseId); saveViewState(); renderPhaseToolbar(); renderGanttOnly(); return; } const node=e.target.closest('[data-task-id]'); const id=node?.dataset.taskId; if(id) openTaskDialog(id); });
+  $('ganttStage').addEventListener('keydown', e => {
+    const handle=e.target.closest('[data-gantt-order-handle]');
+    if(handle){
+      if(['ArrowUp','ArrowDown'].includes(e.key)){
+        e.preventDefault();e.stopPropagation();
+        if(canReorderTasks())void commitTaskMove(
+          ()=>nudgeTask(envelope.project,handle.dataset.taskId,e.key==='ArrowUp'?-1:1),
+          handle.dataset.taskId,'gantt');
+      }
+      return;
+    }
+    if(!['Enter',' '].includes(e.key)) return; const phaseRow=e.target.closest('[data-phase-id]'); const phaseId=phaseRow?.dataset.phaseId; if(phaseId){e.preventDefault(); collapsedPhases.has(phaseId)?collapsedPhases.delete(phaseId):collapsedPhases.add(phaseId); saveViewState(); renderPhaseToolbar(); renderGanttOnly(); return;} const taskId=e.target.closest('[data-task-id]')?.dataset.taskId; if(taskId){e.preventDefault(); openTaskDialog(taskId);} });
   $('phaseCollapseToolbar').addEventListener('click', handlePhaseCollapseClick);
   $('addPhaseBtn').addEventListener('click', () => openEntity('phase'));
   $('addMarkerBtn').addEventListener('click', () => openEntity('marker'));
@@ -243,7 +256,10 @@ function renderGanttOnly() {
   const tasks = visibleTasks();
   project.tasks = tasks;
   const stage = $('ganttStage');
-  const result = renderGantt(stage, project, { zoom, onTaskChange:applyTimelineChange });
+  cancelGanttTaskDrag();
+  const result = renderGantt(stage, project, {
+    zoom, onTaskChange:applyTimelineChange, reorderable:canReorderTasks()
+  });
   const actualCount=tasks.filter(t=>!t.syntheticPhase).length;
   $('visibleTaskCount').textContent = actualCount===1?'1 Aufgabe':`${actualCount} Aufgaben`;
   if (result.empty) {
@@ -296,6 +312,7 @@ function syncControlStates(){
 function setTaskSortMode(value) {
   if(!['manual','date'].includes(value) || value===taskSortMode)return;
   cancelTaskDrag();
+  cancelGanttTaskDrag();
   taskSortMode=value;
   saveViewState();
   renderTaskTable();
@@ -507,6 +524,113 @@ function handleTaskTableKeydown(e){
 
 function setTaskOrderStatus(message){$('taskReorderStatus').textContent=message;}
 
+/* Gantt ordering lives on the left task list only; bar drag and resize remain
+   exclusively horizontal on the right timeline. Both surfaces share commitTaskMove. */
+function clearGanttDropMarkers(state){
+  state.left.querySelectorAll('.gantt-order-drop-before,.gantt-order-drop-after')
+    .forEach(row=>row.classList.remove('gantt-order-drop-before','gantt-order-drop-after'));
+  state.right.querySelectorAll('.gantt-order-drop-before,.gantt-order-drop-after')
+    .forEach(row=>row.classList.remove('gantt-order-drop-before','gantt-order-drop-after'));
+}
+
+function cancelGanttTaskDrag(){
+  const state=ganttTaskDrag;
+  if(!state)return;
+  ganttTaskDrag=null;
+  state.row.style.transform='';
+  state.row.classList.remove('gantt-row-dragging');
+  state.handle.classList.remove('active');
+  clearGanttDropMarkers(state);
+  window.removeEventListener('pointermove',moveGanttTaskDrag);
+  window.removeEventListener('pointerup',finishGanttTaskDrag);
+  window.removeEventListener('pointercancel',cancelGanttTaskDrag);
+  window.removeEventListener('keydown',cancelGanttDragOnEscape,true);
+  window.removeEventListener('blur',cancelGanttTaskDrag);
+  if(state.handle.hasPointerCapture?.(state.pointerId))
+    state.handle.releasePointerCapture(state.pointerId);
+}
+
+function cancelGanttDragOnEscape(event){
+  if(event.key!=='Escape')return;
+  event.preventDefault();
+  event.stopPropagation();
+  const handle=ganttTaskDrag?.handle;
+  cancelGanttTaskDrag();
+  handle?.focus({preventScroll:true});
+  window.__ganttDragUntil=Date.now()+350;
+  setTaskOrderStatus('Verschieben im Gantt abgebrochen.');
+}
+
+function startGanttTaskDrag(event){
+  if(!canReorderTasks() || event.button!==0 || !event.isPrimary || ganttTaskDrag)return;
+  const handle=event.target.closest('[data-gantt-order-handle]');
+  if(!handle)return;
+  const row=handle.closest('.task-row-left[data-task-id]');
+  const left=$('ganttStage').querySelector('.gantt-left');
+  const right=$('ganttStage').querySelector('.gantt-right');
+  if(!row || !left || !right)return;
+  event.preventDefault();
+  event.stopPropagation();
+  ganttTaskDrag={
+    handle,row,left,right,pointerId:event.pointerId,
+    startY:event.clientY,active:false,drop:null,
+    phase:phaseKey(envelope.project,envelope.project.tasks.find(task=>String(task.id)===String(row.dataset.taskId)))
+  };
+  handle.setPointerCapture(event.pointerId);
+  window.addEventListener('pointermove',moveGanttTaskDrag);
+  window.addEventListener('pointerup',finishGanttTaskDrag);
+  window.addEventListener('pointercancel',cancelGanttTaskDrag);
+  window.addEventListener('keydown',cancelGanttDragOnEscape,true);
+  window.addEventListener('blur',cancelGanttTaskDrag);
+}
+
+function moveGanttTaskDrag(event){
+  const drag=ganttTaskDrag;
+  if(!drag || event.pointerId!==drag.pointerId)return;
+  const delta=event.clientY-drag.startY;
+  if(!drag.active && Math.abs(delta)<6)return;
+  if(!drag.active){
+    drag.active=true;
+    drag.row.classList.add('gantt-row-dragging');
+    drag.handle.classList.add('active');
+  }
+  drag.row.style.transform=`translateY(${delta}px)`;
+  clearGanttDropMarkers(drag);
+  drag.drop=null;
+  const target=[...drag.left.querySelectorAll('.task-row-left[data-task-id]')]
+    .filter(row=>row!==drag.row)
+    .find(row=>{
+      const rect=row.getBoundingClientRect();
+      return event.clientY>=rect.top && event.clientY<=rect.bottom;
+    });
+  if(!target)return;
+  const targetTask=envelope.project.tasks.find(t=>String(t.id)===String(target.dataset.taskId));
+  if(!targetTask || phaseKey(envelope.project,targetTask)!==drag.phase)return;
+  const rect=target.getBoundingClientRect();
+  const place=event.clientY<rect.top+rect.height/2?'before':'after';
+  const cssClass=place==='before'?'gantt-order-drop-before':'gantt-order-drop-after';
+  target.classList.add(cssClass);
+  [...drag.right.querySelectorAll('.task-row-right[data-task-id]')]
+    .find(row=>row.dataset.taskId===target.dataset.taskId)?.classList.add(cssClass);
+  drag.drop={targetId:target.dataset.taskId,place};
+}
+
+function finishGanttTaskDrag(event){
+  const drag=ganttTaskDrag;
+  if(!drag || event.pointerId!==drag.pointerId)return;
+  moveGanttTaskDrag(event);
+  const drop=drag.drop,sourceId=drag.row.dataset.taskId,active=drag.active;
+  cancelGanttTaskDrag();
+  if(active){
+    window.__ganttDragUntil=Date.now()+350;
+    if(drop && canReorderTasks())
+      void commitTaskMove(
+        ()=>reorderTask(envelope.project,sourceId,drop.targetId,drop.place),
+        sourceId,'gantt');
+    else setTaskOrderStatus('Keine gültige Position innerhalb dieser Phase gewählt.');
+  }
+}
+
 function cancelTaskDrag(){
   const state=taskDrag;
   if(!state)return;
@@ -577,7 +701,7 @@ function moveTaskDrag(event){
   drag.drop={targetId:target.dataset.taskRowId,place};
 }
 
-async function commitTaskMove(reorder,taskId){
+async function commitTaskMove(reorder,taskId,focusSurface='table'){
   const original=envelope.project.tasks.map(task=>[task.id,task.displayOrder]);
   const oldRevision=envelope.project.revision,oldUpdated=envelope.project.updatedAt;
   if(!reorder()){
@@ -587,10 +711,19 @@ async function commitTaskMove(reorder,taskId){
   touch();
   try{
     await persist();
+    const scroller=$('ganttScroller');
+    const scrollX=scroller.scrollLeft,scrollY=scroller.scrollTop;
     renderGanttOnly();
     renderTaskTable();
-    const moved=$('taskTableBody').querySelectorAll('[data-task-drag-handle]');
-    for(const grip of moved)if(grip.dataset.taskId===taskId){grip.focus();break;}
+    scroller.scrollLeft=scrollX;scroller.scrollTop=scrollY;
+    const surface=focusSurface==='gantt' ? $('ganttStage') : $('taskTableBody');
+    const selector=focusSurface==='gantt'?'[data-gantt-order-handle]':'[data-task-drag-handle]';
+    for(const grip of surface.querySelectorAll(selector)){
+      if(grip.dataset.taskId===String(taskId)){
+        grip.focus({preventScroll:true});
+        break;
+      }
+    }
     setTaskOrderStatus('Aufgabenreihenfolge gespeichert.');
   }catch(error){
     const old=new Map(original);

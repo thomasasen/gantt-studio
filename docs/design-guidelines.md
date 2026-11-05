@@ -50,7 +50,7 @@ Keine macOS-Kopie, kein Funktionsverlust zugunsten des Minimalismus, keine Anima
 - `displayOrder` ist eine per Aufgabe gespeicherte **Darstellungsreihenfolge** innerhalb der bestehenden Phase (oder der Gruppe ohne Phase), keine Terminfolge und keine Vorgängerbeziehung.
 - In der Aufgabentabelle und im Gantt müssen dieselben gefilterten Aufgaben in derselben phasenweisen Sortierung erscheinen. Phasen bleiben chronologisch nach ihrem Start sortiert.
 - Die manuelle Sortierung ist der Standard. Bei Bestandsprojekten wird eine chronologische Ausgangsreihenfolge migriert; ein Umschalten auf „Nach Datum“ ändert das gespeicherte `displayOrder` nicht.
-- Drag-and-drop nur am ausdrücklich gekennzeichneten Griff und nur innerhalb derselben Phase. Ein anderer Phasenbereich oder eine gefilterte Gantt-Ansicht darf kein unbeabsichtigtes Umordnen auslösen.
+- Drag-and-drop nur am ausdrücklich gekennzeichneten Griff und nur innerhalb derselben Phase. Die linke Gantt-Aufgabenliste und die Aufgabentabelle bieten dieselbe Aktion mit identischer gespeicherter Reihenfolge. Die Datums-/Manuell-Schalter sind in beiden Bereichen synchron. Auf der rechten Zeitachse bleiben Balken-Drag und Resize unverändert. Ein anderer Phasenbereich oder eine gefilterte Gantt-Ansicht darf kein unbeabsichtigtes Umordnen auslösen.
 - Das Verschieben einer Aufgabe darf weder `start`/`end`, `phaseId` noch `dependencies` verändern.
 - Eine Pfeiltasten-Alternative am Griff ist erforderlich. Escape und Pointer-Cancel verwerfen die Vorschau ohne Persistenz. Erst der gültige Drop speichert einmalig; Speicherfehler führen zum Rollback.
 - Der Order-Wert ist Teil der portablen Projektdatei und muss beim Import/Export und bei Projektwechseln erhalten bleiben.

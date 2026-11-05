@@ -35,7 +35,7 @@ erreichbar.
 - Operativ-, Management- und Meilensteinansicht
 - konfigurierbarer Managementfilter für kritische Aufgaben, Meilensteine, Gates, hohe/kritische Risiken, roten Status und überfällige offene Aufgaben
 - sichtbarer Zähler der aktuell angezeigten Aufgaben
-- Aufgaben innerhalb einer Phase in der Aufgabentabelle per Drag-Griff und Tastaturpfeilen manuell umsortieren; alternativ nach Startdatum anzeigen
+- Aufgaben innerhalb einer Phase **sowohl in der Gantt-Aufgabenliste als auch in der Aufgabentabelle** per Drag-Griff und Tastaturpfeilen manuell umsortieren; alternativ nach Startdatum anzeigen
 - Manuelle Reihenfolge bleibt im Projekt samt JSON-Export erhalten; ein Sortierwechsel beeinflusst keine Termine, Phasen oder Abhängigkeiten
 - Balken direkt im Zeitplan verschieben
 - Start und Ende per Resize-Griff ändern
