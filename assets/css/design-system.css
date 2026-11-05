@@ -369,7 +369,9 @@ button:disabled, input:disabled, select:disabled { opacity: .52; cursor: not-all
   line-height: 1.55;
   margin-top: 5px;
 }
-.timeline-actions { width: 100%; gap: 9px; align-items: center; justify-content: flex-start; }
+.timeline-actions { width: 100%; gap: 7px; align-items: center; justify-content: flex-start; }
+/* Keep all planning controls on the first desktop toolbar row after adding icons. */
+.timeline-actions .control-cluster .seg-btn { padding-inline: 9px; }
 .control-cluster {
   border: 1px solid #dee6eb;
   background: #f6f8fa;
