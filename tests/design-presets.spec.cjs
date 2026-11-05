@@ -303,6 +303,17 @@ test('dark themes update every major UI surface and revert cleanly across projec
     await page.locator('#designDialog button[value="cancel"]').last().click();
   }
 
+  // Export from a dark project contains the actual colors, not a browser-local theme id.
+  const exportedPromise=page.waitForEvent('download');
+  await page.locator('#centralExportBtn').click();
+  await page.locator('#exportJsonBtn').click();
+  const download=await exportedPromise;
+  const saved=JSON.parse(readFileSync(await download.path(),'utf8'));
+  expect(saved.schema).toBe('gantt-studio.project');
+  expect(saved.project.design.colors.panelBg.toLowerCase()).toBe('#23332d');
+  expect(saved.project.design.preset).toBeUndefined();
+  expect(saved.project.tasks).toHaveLength(10);
+
   await page.locator('#projectSelect').selectOption(lightId);
   await expect(page.locator('html')).toHaveAttribute('data-theme-mode','light');
   const light=await page.evaluate(()=>{
