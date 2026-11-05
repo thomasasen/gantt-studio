@@ -24,6 +24,8 @@ jobs:
         run: |
           node --check assets/js/app.js
           node --check assets/js/task-order.mjs
+          node --check assets/js/design-presets.mjs
+          node --check tests/design-presets.spec.cjs
           node --check tests/task-order.spec.cjs
           node --check assets/js/gantt.js
           node --check assets/js/storage.js
