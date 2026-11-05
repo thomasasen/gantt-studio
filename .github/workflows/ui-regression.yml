@@ -26,13 +26,21 @@ jobs:
           node --check assets/js/gantt.js
           node --check assets/js/storage.js
           node --check tests/ui.spec.cjs
+          node --check tests/apple-design-audit.spec.cjs
           node --check playwright.config.cjs
       - name: Install browser test dependency
-        run: npm install --no-save --no-package-lock @playwright/test@1.56.1
+        run: npm install --no-save --no-package-lock @playwright/test@1.56.1 @axe-core/playwright@4.11.0
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
       - name: Run responsive and interaction checks
         run: npx playwright test --reporter=line
+      - name: Upload design audit report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: apple-design-qa
+          path: design-audit/
+          if-no-files-found: ignore
       - name: Upload visual review screenshots
         if: always()
         uses: actions/upload-artifact@v4

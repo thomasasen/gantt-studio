@@ -261,3 +261,15 @@ test('mobile Gantt exposes both task list and time grid', async ({ page }) => {
   const scroller=await page.locator('.gantt-scroller').boundingBox();
   expect(scroller.height).toBeLessThan(300);
 });
+
+test('preview dense demo at desktop and mobile sizes', async ({ page }) => {
+  await page.goto('/');
+  await page.locator('#loadDemoBtn').click();
+  await expect(page.locator('#taskTableBody tr')).toHaveCount(10);
+  const { mkdirSync } = require('node:fs');
+  mkdirSync('visual-review',{recursive:true});
+  await page.setViewportSize({width:1440,height:900});
+  await page.screenshot({path:'visual-review/demo-desktop.png',fullPage:true});
+  await page.setViewportSize({width:390,height:844});
+  await page.screenshot({path:'visual-review/demo-mobile.png',fullPage:true});
+});
