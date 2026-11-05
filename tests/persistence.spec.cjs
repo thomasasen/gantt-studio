@@ -215,6 +215,5 @@ test('JSON export matches committed IndexedDB project and retains schema v1',asy
     buffer:Buffer.from(JSON.stringify(file))
   });
   await expect(page.locator('#taskTableBody tr[data-task-row-id]')).toHaveCount(10);
-  const importedId=await page.locator('#projectSelect').inputValue();
-  expect(importedId).not.toBe(persisted.id);
+  await expect(page.locator('#projectSelect')).not.toHaveValue(persisted.id);
 });
