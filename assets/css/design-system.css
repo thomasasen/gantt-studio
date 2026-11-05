@@ -1555,6 +1555,19 @@ button:disabled, input:disabled, select:disabled { opacity: .52; cursor: not-all
     color:var(--ui-muted);
     opacity:1;
   }
+  /* Planning toggles are on the light content surface. Legacy styles use
+     var(--ink), which is intentionally light for the outer shell. */
+  :root[data-theme-mode="hybrid"] .planning-page .switch-label,
+  :root[data-theme-mode="hybrid"] .planning-page .relative-skip-row{
+    color:var(--ui-ink) !important;
+    background:var(--panel);
+    border-color:var(--ui-outline);
+  }
+  :root[data-theme-mode="hybrid"] .relative-editor.inactive .relative-editor-grid,
+  :root[data-theme-mode="hybrid"] .relative-editor.inactive .relative-skip-row,
+  :root[data-theme-mode="hybrid"] .relative-editor.inactive .relative-result-row{
+    opacity:1;
+  }
   /* The actual data/editing surfaces remain on a muted light material. */
   :root[data-theme-mode="hybrid"] .gantt-stage,
   :root[data-theme-mode="hybrid"] .gantt-left,
