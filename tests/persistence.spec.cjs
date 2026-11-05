@@ -88,10 +88,10 @@ test('local today and strict date-only values survive DST and UTC midnight', asy
   expect(isValidIsoDate('2026-11-31')).toBe(false);
   expect(isValidIsoDate('2026-00-10')).toBe(false);
   const source = `import { localTodayIso } from '${dateUrl}';
-console.log(localTodayIso(new Date('2026-03-28T23:30:00.000Z'))));
-console.log(localTodayIso(new Date('2026-10-25T00:30:00.000Z'))));`;
+console.log(localTodayIso(new Date('2026-03-28T23:30:00.000Z')));
+console.log(localTodayIso(new Date('2026-10-25T00:30:00.000Z')));`;
   const read = TZ => execFileSync(process.execPath,['--input-type=module','-e',source],
-    {env:{...process.env,TZ},encoding:'utf8'}).trim().split('\\n');
+    {env:{...process.env,TZ},encoding:'utf8'}).trim().split('\n');
   expect(read('Europe/Berlin')).toEqual(['2026-03-29','2026-10-25']);
   expect(read('America/Los_Angeles')).toEqual(['2026-03-28','2026-10-24']);
 });
