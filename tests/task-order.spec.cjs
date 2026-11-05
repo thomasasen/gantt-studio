@@ -54,6 +54,7 @@ test('manual reorder by pointer persists, synchronizes Gantt and preserves plann
 test('keyboard reorder, Escape cancellation, other-phase rejection',async({page})=>{
   await page.goto('/');
   await page.locator('#loadDemoBtn').click();
+  await expect(page.locator('#taskTableBody tr[data-task-row-id]')).toHaveCount(10);
   const rows=await page.locator('#taskTableBody tr[data-task-row-id]').evaluateAll(els=>els.map(e=>({id:e.dataset.taskRowId,phase:e.dataset.taskPhaseId})));
   const idx=rows.findIndex((row,i)=>i+1<rows.length&&rows[i+1].phase===row.phase);
   const first=rows[idx],second=rows[idx+1];
@@ -197,6 +198,7 @@ test('Gantt left-list drag reorders both views and persists without changing sch
 test('Both sort switches stay synchronized and disable Gantt reorder in date mode',async({page})=>{
   await page.goto('/');
   await page.locator('#loadDemoBtn').click();
+  await expect(page.locator('#ganttStage .gantt-left .task-row-left[data-task-id]')).toHaveCount(10);
   const chartManual=page.locator('.gantt-order-switch [data-task-sort-mode="manual"]');
   const chartDate=page.locator('.gantt-order-switch [data-task-sort-mode="date"]');
   const tableManual=page.locator('.task-overview-actions [data-task-sort-mode="manual"]');
@@ -221,6 +223,7 @@ test('Gantt keyboard, Escape and phase boundary protect the saved order',async({
   await page.goto('/');
   await page.locator('#loadDemoBtn').click();
   const rows=page.locator('#ganttStage .gantt-left .task-row-left[data-task-id]');
+  await expect(rows).toHaveCount(10);
   const ids=await rows.evaluateAll(els=>els.map(el=>el.dataset.taskId));
   const firstId=ids[0],secondId=ids[1];
   const secondGrip=page.locator(`#ganttStage .gantt-left .task-row-left[data-task-id="${secondId}"] [data-gantt-order-handle]`);
