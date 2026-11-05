@@ -180,6 +180,10 @@ Der analysierte Odin-Build `frappe-gantt-online-editor` v1.1.3 besitzt weiterhin
 - weitere Detailfunktionen der Odin-Erklär- und Einstellungsoberfläche
 - serverseitige Daily Backups entfallen auf Pages konzeptbedingt; die portable Projektdatei dient als explizites Backup
 
+## Projekt-Designs
+
+Im Dialog **Design bearbeiten** stehen sechs aufeinander abgestimmte Farbwelten zur Verfügung: die bisherigen **Gantt Studio** und **Neutral** sowie neu **Nordlicht**, **Sandstein**, **Waldgrün** und **Marine**. Jede Vorlage zeigt eine kleine Vorschau; einzelne Farben können weiterhin individuell angepasst werden. Die Auswahl wirkt zunächst nur im Dialog und wird erst mit **Design speichern** ins Projekt übernommen. Die Farben bleiben in der exportierten Projektdatei erhalten.
+
 ## Entwicklungs- und Designvorgaben
 
 Der [Apple-Design-QS-Bericht vom 05.11.2026](docs/apple-design-qa-2026-11-05.md) dokumentiert die vertiefte visuelle, funktionale und WCAG-basierte Qualitätssicherung samt behobenen Fehlern und offenen Prüfgrenzen.

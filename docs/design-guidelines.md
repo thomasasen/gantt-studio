@@ -25,6 +25,10 @@ Keine macOS-Kopie, kein Funktionsverlust zugunsten des Minimalismus, keine Anima
 - Zielwerte: regulärer UI-Text überwiegend 14–16 CSS-Pixel; sekundäre Texte möglichst mindestens 12 CSS-Pixel. Kleinere vorhandene Definitionen schrittweise bereinigen, ohne die Datendichte zu zerstören. Der Textkontrast in der Standardgestaltung muss für normalen Text mindestens 4,5:1 betragen, einschließlich alternierender Tabellenzeilen.
 - Gantt-Balken, Datumsraster, Aufgaben und Status klar unterscheidbar. Status/Risiko nie nur über Farben ausdrücken.
 - Projektspezifische Presets/Farben und Kontrast berücksichtigen. Kein gestapeltes Glassmorphism oder transluzente Schichten über wichtigen Daten. Dezente Tiefe nur zur Orientierung.
+- Die Farbvorlagen sind **Gantt Studio, Neutral, Nordlicht, Sandstein, Waldgrün und Marine**. Sie behalten das helle, lesbare Datenraster; ein dunkler Farbsatz darf nicht auf ein nur für helle Flächen konzipiertes Stylesheet angewendet werden.
+- Jede Vorlage besitzt eine nachvollziehbare Miniaturvorschau mit Bezeichnung und Kurzbeschreibung. Auswahl und Änderung einzelner Farben betreffen zunächst nur den Design-Dialog; **erst „Design speichern“** aktualisiert Projekt, IndexedDB und Gantt. Abbrechen muss den gespeicherten Stand vollständig erhalten.
+- Die beiden bestehenden Vorlagen bleiben farblich unverändert. Neue Vorlagen verwenden für Primär-/Akzent- und Gantt-Markierungsfarben auf Weiß möglichst mindestens **4,5:1 Kontrast**. Der gespeicherte JSON-Projektstand enthält weiterhin reine Farben und keine vom Browser abhängige Vorlagen-ID; vorhandene Dateien bleiben kompatibel.
+- Falls die manuelle Farbwahl von einer Vorlage abweicht, muss die Auswahl sichtbar als **individuell** gekennzeichnet werden. Wiedererkennen erfolgt über einen exakten Farbvergleich, ohne eine falsche Auswahl zu markieren.
 - Häufige Aktionen sichtbar halten, sekundäre Funktionen logisch gruppieren und beschriften.
 
 ## 4. Gantt-Interaktionsvertrag

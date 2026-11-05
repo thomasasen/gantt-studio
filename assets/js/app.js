@@ -1,6 +1,7 @@
 import { renderGantt } from './gantt.js?v=1.4.4';
 import { saveLocal, loadActive, loadProject, listProjects, deleteProject, setActiveProject } from './storage.js';
 import { normalizeTaskOrder, nextDisplayOrder, sortedProjectTasks, phaseKey, reorderTask, nudgeTask } from './task-order.mjs';
+import { DESIGN_COLOR_FIELDS, DESIGN_PRESETS, findDesignPreset, matchDesignPreset } from './design-presets.mjs';
 
 const $ = (id) => document.getElementById(id);
 const clone = (x) => JSON.parse(JSON.stringify(x));
@@ -98,8 +99,10 @@ function bindEvents() {
   $('guideBtn').addEventListener('click', () => $('guideDialog').showModal());
   $('designBtn').addEventListener('click', openDesignDialog);
   $('saveDesignBtn').addEventListener('click', saveDesign);
-  $('designPresetOdin').addEventListener('click', () => setDesignPreset('odin'));
-  $('designPresetNeutral').addEventListener('click', () => setDesignPreset('neutral'));
+  $('designPresetGrid').addEventListener('click', event=>{
+    const button=event.target.closest('button[data-design-preset]');
+    if(button)setDesignPreset(button.dataset.designPreset);
+  });
   $('centralExportBtn').addEventListener('click', () => $('exportDialog').showModal());
   $('exportJsonBtn').addEventListener('click', exportProject);
   $('exportCsvBtn').addEventListener('click', exportCsv);
@@ -842,9 +845,70 @@ async function deleteEntity(){const kind=$('entityKind').value,id=$('entityId').
 
 async function importGermanHolidays(){const year=Number(prompt('Jahr für den Feiertagsimport:',String(new Date().getFullYear())));if(!Number.isInteger(year)||year<1975||year>2100)return;const subdivision=(prompt('Bundesland-Code (z. B. DE-BY). Leer = nur bundesweite Feiertage:','DE-BY')||'').trim().toUpperCase();try{const res=await fetch(`https://date.nager.at/api/v3/PublicHolidays/${year}/DE`);if(!res.ok)throw new Error(`HTTP ${res.status}`);const raw=await res.json();const existing=new Set(envelope.project.planning.holidays.map(h=>`${h.date}|${h.name.toLowerCase()}`));let added=0;for(const h of raw){const counties=Array.isArray(h.counties)?h.counties.map(String):[];const national=h.global===true||!counties.length;if(!national&&(!subdivision||!counties.includes(subdivision)))continue;const name=String(h.localName||h.name||'').trim();const key=`${h.date}|${name.toLowerCase()}`;if(existing.has(key))continue;envelope.project.planning.holidays.push({id:uuid(),name,date:h.date,source:'Nager.Date',country:'DE',subdivision,imported:true,importedAt:new Date().toISOString()});existing.add(key);added++;}touch();await persist();renderPlanningLists();renderGanttOnly();toast(`${added} Feiertage importiert.`);}catch(e){toast(`Feiertagsimport fehlgeschlagen: ${e.message}`,true);}}
 
-function openDesignDialog(){const c=envelope.project.design?.colors||{};$('designPrimary').value=c.primary||c.headerBg||'#16324F';$('designAccent').value=c.accent||'#607A00';$('designWorkstream').value=c.workstream||'#3B7280';$('designCritical').value=c.critical||'#16324F';$('designMilestone').value=c.milestone||'#607A00';$('designGate').value=c.gate||'#8B5A2B';$('designPageBg').value=c.pageBg||'#EEF2F3';$('designPanelBg').value=c.panelBg||'#FFFFFF';updateDesignPreview();$('designDialog').showModal();}
-function setDesignPreset(name){const p=name==='neutral'?{primary:'#334155',accent:'#64748B',workstream:'#64748B',critical:'#1E293B',milestone:'#475569',gate:'#78716C',pageBg:'#F1F5F9',panelBg:'#FFFFFF'}:{primary:'#20374E',accent:'#087E75',workstream:'#2C7B88',critical:'#30465F',milestone:'#95732C',gate:'#9C603F',pageBg:'#F3F6F8',panelBg:'#FFFFFF'};for(const [k,v] of Object.entries(p))$(`design${k[0].toUpperCase()+k.slice(1)}`).value=v;updateDesignPreview();}
-function updateDesignPreview(){const d=$('designDialog');if(!d)return;d.style.setProperty('--preview-primary',$('designPrimary').value);d.style.setProperty('--preview-accent',$('designAccent').value);d.style.setProperty('--preview-work',$('designWorkstream').value);d.style.setProperty('--preview-critical',$('designCritical').value);d.style.setProperty('--preview-milestone',$('designMilestone').value);d.style.setProperty('--preview-gate',$('designGate').value);}
+function designInputId(key){return `design${key[0].toUpperCase()+key.slice(1)}`;}
+
+function readDesignColors(){
+  return Object.fromEntries(DESIGN_COLOR_FIELDS.map(key=>[key,$(designInputId(key)).value.toUpperCase()]));
+}
+
+function renderDesignPresets(){
+  $('designPresetGrid').innerHTML=DESIGN_PRESETS.map(preset=>{
+    const c=preset.colors;
+    // Preset names and colors are constants, never HTML from project imports.
+    const legacyId=preset.id==='odin'?'designPresetOdin':preset.id==='neutral'?'designPresetNeutral':`designPreset-${preset.id}`;
+    return `<button type="button" id="${legacyId}" class="design-preset-option" data-design-preset="${preset.id}" aria-pressed="false">
+      <span class="design-preset-art" aria-hidden="true" style="--preset-primary:${c.primary};--preset-canvas:${c.pageBg};--preset-panel:${c.panelBg};--preset-work:${c.workstream};--preset-accent:${c.accent};--preset-milestone:${c.milestone}">
+        <span class="preset-art-head"></span>
+        <span class="preset-art-surface"><span class="preset-art-line"></span><span class="preset-art-bar"></span><span class="preset-art-line short"></span><span class="preset-art-milestone"></span></span>
+      </span>
+      <span class="design-preset-name">${preset.label}</span>
+      <span class="design-preset-description">${preset.description}</span>
+    </button>`;
+  }).join('');
+}
+
+function openDesignDialog(){
+  const c=envelope.project.design?.colors||{};
+  $('designPrimary').value=c.primary||c.headerBg||'#16324F';
+  $('designAccent').value=c.accent||'#607A00';
+  $('designWorkstream').value=c.workstream||'#3B7280';
+  $('designCritical').value=c.critical||'#16324F';
+  $('designMilestone').value=c.milestone||'#607A00';
+  $('designGate').value=c.gate||'#8B5A2B';
+  $('designPageBg').value=c.pageBg||'#EEF2F3';
+  $('designPanelBg').value=c.panelBg||'#FFFFFF';
+  renderDesignPresets();
+  updateDesignPreview();
+  $('designDialog').showModal();
+}
+
+function setDesignPreset(id){
+  const preset=findDesignPreset(id);
+  if(!preset)return;
+  for(const [key,value] of Object.entries(preset.colors))$(designInputId(key)).value=value;
+  updateDesignPreview();
+}
+
+function updateDesignPreview(){
+  const dialog=$('designDialog');
+  if(!dialog)return;
+  const colors=readDesignColors();
+  for(const [key,cssKey] of [
+    ['primary','--preview-primary'],['accent','--preview-accent'],
+    ['workstream','--preview-work'],['critical','--preview-critical'],
+    ['milestone','--preview-milestone'],['gate','--preview-gate'],
+    ['pageBg','--preview-page'],['panelBg','--preview-panel']
+  ])dialog.style.setProperty(cssKey,colors[key]);
+  const matched=matchDesignPreset(colors);
+  for(const button of $('designPresetGrid').querySelectorAll('[data-design-preset]')){
+    const selected=button.dataset.designPreset===matched?.id;
+    button.classList.toggle('selected',selected);
+    button.setAttribute('aria-pressed',String(selected));
+  }
+  $('designPresetSelection').textContent=matched
+    ? `Vorschau: ${matched.label}. Erst „Design speichern“ übernimmt diese Farben.`
+    : 'Individuelle Farbauswahl. Erst „Design speichern“ übernimmt diese Farben.';
+}
 async function saveDesign(){const c=envelope.project.design.colors;c.primary=$('designPrimary').value;c.headerBg=c.primary;c.accent=$('designAccent').value;c.workstream=$('designWorkstream').value;c.critical=$('designCritical').value;c.milestone=$('designMilestone').value;c.gate=$('designGate').value;c.pageBg=$('designPageBg').value;c.panelBg=$('designPanelBg').value;touch();await persist();applyDesign();renderGanttOnly();$('designDialog').close();toast('Design gespeichert.');}
 function applyDesign(){const c=envelope.project.design?.colors||{};const r=document.documentElement;const map={'--bg':c.pageBg,'--panel':c.panelBg,'--primary':c.primary||c.headerBg,'--accent':c.accent,'--workstream':c.workstream,'--critical':c.critical,'--milestone':c.milestone,'--gate':c.gate,'--ink':c.text,'--muted':c.mutedText,'--border':c.border,'--grid':c.grid};for(const [k,v] of Object.entries(map))if(v)r.style.setProperty(k,v);}
 
