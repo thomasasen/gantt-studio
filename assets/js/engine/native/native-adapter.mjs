@@ -27,7 +27,7 @@ export function createNativeEngine() {
       container=options.container;
       onIntent=options.onIntent;
       interactions=createNativeInteractions({container,onIntent:options.onIntent,
-        onSelect:options.onSelect,onError:options.onError});
+        onSelect:options.onSelect,onError:options.onError,onStatus:options.onStatus});
     },
     render({project,view}) {
       if(!container)throw new Error('Native engine is not mounted.');
