@@ -43,6 +43,8 @@ test('demonstration project loads without overwriting existing projects', async 
   await page.goto('/');
   await expect(page.locator('#loadDemoBtn')).toBeVisible();
   await expect(page.locator('#emptyDemoBtn')).toBeVisible();
+  await expect(page.locator('#projectSelect option')).toHaveCount(1);
+  await expect(page.locator('#projectSelect')).not.toHaveValue('');
   const originalId = await page.locator('#projectSelect').inputValue();
   const originalName = await page.locator('#projectName').inputValue();
 
@@ -74,6 +76,9 @@ test('demonstration project loads without overwriting existing projects', async 
 
 test('demo fetch failure preserves current project and shows an error', async ({ page }) => {
   await page.goto('/');
+  // IndexedDB initialization and the first project-select render are async.
+  await expect(page.locator('#projectSelect option')).toHaveCount(1);
+  await expect(page.locator('#projectSelect')).not.toHaveValue('');
   const originalId = await page.locator('#projectSelect').inputValue();
   const originalName = await page.locator('#projectName').inputValue();
   await page.route('**/examples/demo.gantt.json', route => route.fulfill({
