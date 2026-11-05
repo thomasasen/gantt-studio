@@ -1260,7 +1260,7 @@ button:disabled, input:disabled, select:disabled { opacity: .52; cursor: not-all
     --ui-surface:var(--panel);
     --ui-subtle:color-mix(in srgb,var(--panel) 91%,#fff);
     --ui-ink:#243744;
-    --ui-muted:#536776;
+    --ui-muted:#425766;
     --ui-outline:color-mix(in srgb,var(--panel) 78%,var(--bg));
     --ui-shadow:0 6px 22px rgba(8,17,25,.11);
     --hybrid-raised:color-mix(in srgb,var(--bg) 88%,var(--panel));
@@ -1520,6 +1520,41 @@ button:disabled, input:disabled, select:disabled { opacity: .52; cursor: not-all
     background:var(--hybrid-hover) !important;
   }
 
+  /* Dark command bars require explicit light foregrounds: legacy selectors
+     otherwise inherit the data-canvas ink and become unreadable. */
+  :root[data-theme-mode="hybrid"] .storage-notice summary,
+  :root[data-theme-mode="hybrid"] .storage-notice summary:hover,
+  :root[data-theme-mode="hybrid"] #visibleTaskCount,
+  :root[data-theme-mode="hybrid"] .phase-collapse-heading strong,
+  :root[data-theme-mode="hybrid"] .phase-collapse-toolbar button[data-phase-action]{
+    color:var(--hybrid-text);
+  }
+  :root[data-theme-mode="hybrid"] .phase-collapse-heading span{
+    color:var(--hybrid-muted);
+  }
+  :root[data-theme-mode="hybrid"] .phase-collapse-toolbar button[data-phase-action]{
+    background:var(--hybrid-raised);
+    border-color:var(--hybrid-line);
+  }
+  :root[data-theme-mode="hybrid"] .phase-collapse-toolbar button[data-phase-action]:hover{
+    background:var(--hybrid-hover);
+  }
+
+  /* Native form fields explicitly use dark ink on the light editing canvas.
+     Project name and project selector live outside these surfaces and keep
+     their contrasting light-on-dark treatment. */
+  :root[data-theme-mode="hybrid"] .dialog :is(input:not([type="checkbox"]):not([type="radio"]),select,textarea),
+  :root[data-theme-mode="hybrid"] .planning-page :is(input:not([type="checkbox"]):not([type="radio"]),select,textarea),
+  :root[data-theme-mode="hybrid"] .task-overview-panel :is(input:not([type="checkbox"]):not([type="radio"]),select,textarea){
+    background:var(--panel);
+    color:var(--ui-ink);
+    border-color:var(--ui-outline);
+  }
+  :root[data-theme-mode="hybrid"] .dialog :is(input,textarea)::placeholder,
+  :root[data-theme-mode="hybrid"] .planning-page :is(input,textarea)::placeholder{
+    color:var(--ui-muted);
+    opacity:1;
+  }
   /* The actual data/editing surfaces remain on a muted light material. */
   :root[data-theme-mode="hybrid"] .gantt-stage,
   :root[data-theme-mode="hybrid"] .gantt-left,

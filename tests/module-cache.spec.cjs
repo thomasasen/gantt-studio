@@ -45,7 +45,7 @@ test('stale unversioned module cache must not disable all buttons',async({page})
   await page.locator('#taskDialog button[value="cancel"]').last().click();
   await page.locator('#designBtn').click();
   await expect(page.locator('#designDialog')).toBeVisible();
-  await expect(page.locator('#designPresetGrid button')).toHaveCount(9);
+  await expect(page.locator('#designPresetGrid button')).toHaveCount(11);
   await page.locator('#designDialog button[value="cancel"]').last().click();
   expect(errors).toEqual([]);
 });
