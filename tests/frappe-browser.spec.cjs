@@ -1,4 +1,5 @@
 const {test,expect} = require('@playwright/test');
+const {mkdirSync} = require('node:fs');
 
 test.describe('isolated Frappe 1.2.2 feasibility page', () => {
   test('local assets, two renderers, switches and never writes project storage', async ({page}) => {
@@ -23,6 +24,7 @@ test.describe('isolated Frappe 1.2.2 feasibility page', () => {
       indexedDB: await indexedDB.databases(),
       localStorage: localStorage.length
     }));
+    mkdirSync('visual-review',{recursive:true});
     await page.screenshot({path:'visual-review/frappe-native-comparison.png',fullPage:true});
     expect(storage.indexedDB).toHaveLength(0);
     expect(storage.localStorage).toBe(0);
