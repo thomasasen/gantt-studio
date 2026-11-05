@@ -1,10 +1,11 @@
-import { renderGantt } from './gantt.js?v=2.7.0';
-import { createProjectCommitter } from './core/project-commits.mjs?v=2.7.0';
-import { localTodayIso, isValidIsoDate } from './core/date-only.mjs?v=2.7.0';
-import { icon, hydrateIcons } from './icons.mjs?v=2.7.0';
-import { saveLocal, loadActive, loadProject, listProjects, deleteProject, setActiveProject } from './storage.js?v=2.7.0';
-import { normalizeTaskOrder, nextDisplayOrder, sortedProjectTasks, phaseKey, reorderTask, nudgeTask } from './task-order.mjs?v=2.7.0';
-import { DESIGN_COLOR_FIELDS, DESIGN_PRESETS, findDesignPreset, matchDesignPreset, designThemeMode } from './design-presets.mjs?v=2.7.0';
+import { createEngineController } from './engine/engine-controller.mjs?v=2.8.0';
+import { createNativeEngine } from './engine/native/native-adapter.mjs?v=2.8.0';
+import { createProjectCommitter } from './core/project-commits.mjs?v=2.8.0';
+import { localTodayIso, isValidIsoDate } from './core/date-only.mjs?v=2.8.0';
+import { icon, hydrateIcons } from './icons.mjs?v=2.8.0';
+import { saveLocal, loadActive, loadProject, listProjects, deleteProject, setActiveProject } from './storage.js?v=2.8.0';
+import { normalizeTaskOrder, nextDisplayOrder, sortedProjectTasks, phaseKey, reorderTask, nudgeTask } from './task-order.mjs?v=2.8.0';
+import { DESIGN_COLOR_FIELDS, DESIGN_PRESETS, findDesignPreset, matchDesignPreset, designThemeMode } from './design-presets.mjs?v=2.8.0';
 
 const $ = (id) => document.getElementById(id);
 const clone = (x) => JSON.parse(JSON.stringify(x));
@@ -30,6 +31,7 @@ let managementMode = 'operational';
 let managementCriteria = { ...managementDefaults };
 let collapsedPhases = new Set();
 const projectCommitter = createProjectCommitter(saveLocal);
+const engineController = createEngineController(createNativeEngine);
 const pendingSaves = new Map();
 const lastSaveFailed = new Set();
 let toastTimer = null;
@@ -69,6 +71,8 @@ function normalizeEnvelope(raw) {
 
 async function boot() {
   hydrateIcons();
+  engineController.mount({container:$('ganttStage'),onIntent:handleEngineIntent});
+  window.addEventListener('beforeunload',()=>engineController.destroy(),{once:true});
   bindEvents();
   buildSettings();
   let local = null;
@@ -302,9 +306,7 @@ function renderGanttOnly() {
   project.tasks = tasks;
   const stage = $('ganttStage');
   cancelGanttTaskDrag();
-  const result = renderGantt(stage, project, {
-    zoom, onTaskChange:applyTimelineChange, reorderable:canReorderTasks()
-  });
+  const result = engineController.render({project,view:{zoom,reorderable:canReorderTasks()}});
   const actualCount=tasks.filter(t=>!t.syntheticPhase).length;
   $('visibleTaskCount').textContent = actualCount===1?'1 Aufgabe':`${actualCount} Aufgaben`;
   if (result.empty) {
@@ -312,6 +314,11 @@ function renderGanttOnly() {
     $('emptyAddBtn2').addEventListener('click',()=>openTaskDialog());
     $('emptyDemoBtn')?.addEventListener('click', loadDemoProject);
   }
+}
+
+function handleEngineIntent(intent){
+  if(intent?.type==='task-change')return applyTimelineChange(intent.change);
+  throw new Error('Unbekannte Engine-Aktion: '+String(intent?.type));
 }
 
 async function applyTimelineChange(change) {
