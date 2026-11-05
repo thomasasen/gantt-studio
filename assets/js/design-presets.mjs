@@ -54,12 +54,12 @@ export const DESIGN_PRESETS=Object.freeze([
   {
     id:'fjordlicht',label:'Fjordlicht',description:'Hybrid · Dunkler Schiefer & heller Fjord',
     colors:{primary:'#234557',accent:'#22666D',workstream:'#326A7B',critical:'#3B4F66',
-      milestone:'#786337',gate:'#865A46',pageBg:'#26343E',panelBg:'#E8EFF0'}
+      milestone:'#786337',gate:'#865A46',pageBg:'#313D46',panelBg:'#E5EBED'}
   },
   {
     id:'kupferatelier',label:'Kupferatelier',description:'Hybrid · Graphit & warmes Papier',
     colors:{primary:'#50413E',accent:'#805846',workstream:'#806256',critical:'#63495B',
-      milestone:'#78643C',gate:'#825648',pageBg:'#302D2E',panelBg:'#F0E9E0'}
+      milestone:'#78643C',gate:'#825648',pageBg:'#373332',panelBg:'#ECE4DB'}
   }
 ]);
 

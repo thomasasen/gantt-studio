@@ -1263,8 +1263,8 @@ button:disabled, input:disabled, select:disabled { opacity: .52; cursor: not-all
     --ui-muted:#536776;
     --ui-outline:color-mix(in srgb,var(--panel) 78%,var(--bg));
     --ui-shadow:0 6px 22px rgba(8,17,25,.11);
-    --hybrid-raised:color-mix(in srgb,var(--bg) 78%,var(--panel));
-    --hybrid-hover:color-mix(in srgb,var(--bg) 65%,var(--panel));
+    --hybrid-raised:color-mix(in srgb,var(--bg) 88%,var(--panel));
+    --hybrid-hover:color-mix(in srgb,var(--bg) 80%,var(--panel));
     --hybrid-line:color-mix(in srgb,var(--bg) 69%,var(--panel));
     --hybrid-text:color-mix(in srgb,var(--panel) 91%,var(--bg));
     --hybrid-muted:color-mix(in srgb,var(--panel) 78%,var(--bg));
