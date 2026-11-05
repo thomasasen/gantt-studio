@@ -71,6 +71,7 @@ async function boot() {
 
 function bindEvents() {
   $('newProjectBtn').addEventListener('click', createProject);
+  $('loadDemoBtn').addEventListener('click', loadDemoProject);
   $('deleteProjectBtn').addEventListener('click', removeProject);
   $('projectSelect').addEventListener('change', changeProject);
   $('openProjectBtn').addEventListener('click', () => $('fileInput').click());
@@ -210,8 +211,9 @@ function renderGanttOnly() {
   const actualCount=tasks.filter(t=>!t.syntheticPhase).length;
   $('visibleTaskCount').textContent = actualCount===1?'1 Aufgabe':`${actualCount} Aufgaben`;
   if (result.empty) {
-    stage.innerHTML = `<div class="empty-state"><strong>${envelope.project.tasks.length?'Keine Aufgaben in dieser Ansicht':'Noch keine Aufgaben'}</strong><span>${envelope.project.tasks.length?'Passe Filter oder Phasen an.':'Erstelle eine Aufgabe oder importiere ein Projekt.'}</span><button class="btn primary" id="emptyAddBtn2" type="button">Aufgabe erstellen</button></div>`;
+    stage.innerHTML = `<div class="empty-state"><strong>${envelope.project.tasks.length?'Keine Aufgaben in dieser Ansicht':'Noch keine Aufgaben'}</strong><span>${envelope.project.tasks.length?'Passe Filter oder Phasen an.':'Erstelle eine Aufgabe oder lade das Demoprojekt.'}</span><div class="empty-actions"><button class="btn primary" id="emptyAddBtn2" type="button">Aufgabe erstellen</button>${envelope.project.tasks.length?'':'<button class="btn demo-btn" id="emptyDemoBtn" type="button">Demoprojekt laden</button>'}</div></div>`;
     $('emptyAddBtn2').addEventListener('click',()=>openTaskDialog());
+    $('emptyDemoBtn')?.addEventListener('click', loadDemoProject);
   }
 }
 
@@ -297,6 +299,39 @@ async function saveTask() {
 }
 
 async function deleteTask() {const id=$('taskId').value;if(!id)return;envelope.project.tasks=envelope.project.tasks.filter(t=>t.id!==id).map(t=>({...t,dependencies:(t.dependencies||[]).filter(dep=>dep!==id)}));touch();await persist();$('taskDialog').close();await renderAll();toast('Aufgabe gelöscht.');}
+
+async function loadDemoProject() {
+  const button = $('loadDemoBtn');
+  const emptyButton = $('emptyDemoBtn');
+  if (button.disabled) return;
+  const originalLabel = button.textContent;
+  button.disabled = true;
+  button.textContent = 'Lade Demo…';
+  if (emptyButton) emptyButton.disabled = true;
+  try {
+    const demoUrl = new URL('../../examples/demo.gantt.json', import.meta.url);
+    const response = await fetch(demoUrl, { cache: 'no-store' });
+    if (!response.ok) throw new Error(`Beispieldatei nicht erreichbar (HTTP ${response.status})`);
+
+    // Identischer Validierungs- und ID-Migrationspfad wie beim Dateiimport.
+    // Zuerst als separates Projekt speichern, erst danach die aktive Ansicht wechseln.
+    const demo = cloneForImport(normalizeEnvelope(await response.json()));
+    demo.project.name = uniqueName(demo.project.name, await listProjects());
+    await saveLocal(demo.project);
+    envelope = demo;
+    loadViewState();
+    switchTab('project');
+    await renderAll();
+    toast('Demoprojekt geladen. Bestehende Projekte bleiben erhalten.');
+  } catch (error) {
+    console.error('Demoprojekt konnte nicht geladen werden:', error);
+    toast('Demoprojekt konnte nicht geladen werden. Bitte erneut versuchen.', true);
+  } finally {
+    button.disabled = false;
+    button.textContent = originalLabel;
+    if (emptyButton?.isConnected) emptyButton.disabled = false;
+  }
+}
 
 async function createProject() {const name=(prompt('Name des neuen Projekts:','Neues Projekt')||'').trim();if(!name)return;envelope=createEnvelope();envelope.project.name=uniqueName(name,await listProjects());await saveLocal(envelope.project);setActiveProject(envelope.project.id);loadViewState();await renderAll();toast('Projekt wurde angelegt.');}
 async function changeProject(e) {const p=await loadProject(e.target.value);if(!p)return;envelope=normalizeEnvelope({schema:'gantt-studio.project',schemaVersion:1,generator:'Gantt Studio',project:p});setActiveProject(p.id);loadViewState();await renderAll();}

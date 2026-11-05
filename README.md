@@ -16,6 +16,7 @@ erreichbar.
 
 - mehrere Projekte im Browser verwalten
 - Projekt auswählen, neu anlegen, umbenennen und löschen
+- Demoprojekt über **„Demo laden“** direkt im Kopfbereich oder in der leeren Zeitplanansicht als zusätzliches Projekt laden; erneutes Laden erzeugt eine eigenständige Kopie, bestehende Projekte werden nicht überschrieben
 - automatische lokale Speicherung über IndexedDB
 - sichtbarer Speicherstatus `Speichert… / Gespeichert / Nicht gespeichert`
 - Projektimport und -export im bestehenden `gantt-studio.project`-JSON-Format
