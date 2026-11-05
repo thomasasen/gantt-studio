@@ -28,6 +28,8 @@ let saveTimer = null;
 let toastTimer = null;
 let activeTab = 'project';
 let taskDetailsExpanded = false;
+let ganttLeftWidth = 0;
+let resizeRenderQueued = false;
 
 function createEnvelope() {
   const now = new Date().toISOString();
@@ -67,9 +69,11 @@ async function boot() {
   else await saveLocal(envelope.project);
   loadViewState();
   await renderAll();
+  ganttLeftWidth = currentGanttLeftWidth();
 }
 
 function bindEvents() {
+  window.addEventListener('resize', queueResponsiveGanttRender);
   $('newProjectBtn').addEventListener('click', createProject);
   $('loadDemoBtn').addEventListener('click', loadDemoProject);
   $('deleteProjectBtn').addEventListener('click', removeProject);
@@ -200,6 +204,30 @@ function makePhaseSummary(phase,tasks){
   const start=phase.start||starts[0]||todayIso(), end=phase.end||ends.at(-1)||start;
   const progress=tasks.length?Math.round(tasks.reduce((s,t)=>s+Number(t.progress||0),0)/tasks.length):0;
   return {id:`phase-summary-${phase.id}`,name:phase.name||'Phase',start,end,progress,type:'phase-summary',dependencies:[],phaseId:phase.id,owner:`${tasks.length} Aufgaben`,status:'neutral',risk:'none',showInGantt:true,syntheticPhase:true,phaseColor:phase.color||'#DCE8EB',collapsed:collapsedPhases.has(String(phase.id)),taskCount:tasks.length};
+}
+
+function currentGanttLeftWidth() {
+  return Number.parseInt(getComputedStyle(document.documentElement).getPropertyValue('--left-width'), 10) || 430;
+}
+
+function queueResponsiveGanttRender() {
+  if (resizeRenderQueued) return;
+  resizeRenderQueued = true;
+  requestAnimationFrame(() => {
+    resizeRenderQueued = false;
+    const nextWidth = currentGanttLeftWidth();
+    if (nextWidth === ganttLeftWidth) return;
+    ganttLeftWidth = nextWidth;
+    const scroller = $('ganttScroller');
+    if (!scroller) return;
+    const previousX = scroller.scrollLeft;
+    const previousY = scroller.scrollTop;
+    // The timeline grid uses pixel columns calculated at render time.
+    // Re-render only when the responsive left-column token changes.
+    renderGanttOnly();
+    scroller.scrollLeft = previousX;
+    scroller.scrollTop = previousY;
+  });
 }
 
 function renderGanttOnly() {

@@ -22,7 +22,7 @@ Keine macOS-Kopie, kein Funktionsverlust zugunsten des Minimalismus, keine Anima
 
 ## 3. Typografie und visuelle Hierarchie
 - Systemnahe Schrift bevorzugen; Schriftgrad, Gewicht, Laufweite und Zeilenhöhe passend kombinieren. Zoom und vergrößerte Nutzerschrift respektieren.
-- Zielwerte: regulärer UI-Text überwiegend 14–16 CSS-Pixel; sekundäre Texte möglichst mindestens 12 CSS-Pixel. Kleinere vorhandene Definitionen schrittweise bereinigen, ohne die Datendichte zu zerstören.
+- Zielwerte: regulärer UI-Text überwiegend 14–16 CSS-Pixel; sekundäre Texte möglichst mindestens 12 CSS-Pixel. Kleinere vorhandene Definitionen schrittweise bereinigen, ohne die Datendichte zu zerstören. Der Textkontrast in der Standardgestaltung muss für normalen Text mindestens 4,5:1 betragen, einschließlich alternierender Tabellenzeilen.
 - Gantt-Balken, Datumsraster, Aufgaben und Status klar unterscheidbar. Status/Risiko nie nur über Farben ausdrücken.
 - Projektspezifische Presets/Farben und Kontrast berücksichtigen. Kein gestapeltes Glassmorphism oder transluzente Schichten über wichtigen Daten. Dezente Tiefe nur zur Orientierung.
 - Häufige Aktionen sichtbar halten, sekundäre Funktionen logisch gruppieren und beschriften.
@@ -43,7 +43,7 @@ Keine macOS-Kopie, kein Funktionsverlust zugunsten des Minimalismus, keine Anima
 - Datumswerte niemals geschwindigkeitsabhängig weiterlaufen lassen; kein Bounce, Momentum oder Rubber-Banding im Zeitraster.
 - Verschieben, linkes/rechtes Resize, Fortschrittsgriff, Mindestdauer und Abhängigkeiten separat testen.
 - Pointer Capture und Listener beim Commit/Abbruch aufräumen; keine unbeabsichtigten Klicks nach Drag.
-- Zeitleiste, linke Aufgabenliste, Pfeile, Baselines, Marker und Statuslinien müssen bei Zoom und Scroll konsistent bleiben.
+- Zeitleiste, linke Aufgabenliste, Pfeile, Baselines, Marker und Statuslinien müssen bei Zoom und Scroll konsistent bleiben. Bei responsiven Änderungen der linken Gantt-Spaltenbreite ist die Pixelgeometrie neu zu berechnen.
 - Keine vollständigen Gantt-Neurenderings oder Datenbank-Schreibvorgänge auf jedem Pointer-Move.
 
 ## 5. Feedback, Animation und Raum
@@ -57,7 +57,7 @@ Keine macOS-Kopie, kein Funktionsverlust zugunsten des Minimalismus, keine Anima
 - Nutzer erkennen jederzeit aktuelles Projekt, Arbeitsbereich und nächsten Schritt. Fokus sichtbar, Labels sinnvoll verknüpft, Dialoge mit Tastatur nutzbar.
 - Der lokale Speicherstatus („Speichert…“, „Gespeichert“, „Nicht gespeichert“) bleibt korrekt, ebenso die Hinweise auf fehlende Cloud-Synchronisierung und notwendige Backups.
 - Gantt, Tabelle, Editoren und gespeichertes Projekt müssen denselben Datenstand repräsentieren. Enter/F2/Escape-Konventionen bestehender Inline-Editoren erhalten.
-- Destruktive Aktionen gegen Fehlbedienung schützen; Nutzerkontrolle und Abbruchmöglichkeit priorisieren.
+- Destruktive Aktionen gegen Fehlbedienung schützen; Nutzerkontrolle und Abbruchmöglichkeit priorisieren. Natürliche Dialog-Abbruchaktionen müssen selbst bei ungültigen Pflichtfeldern funktionieren (z. B. `formnovalidate`).
 
 ## 7. Umsetzung und Qualitätssicherung
 

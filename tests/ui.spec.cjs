@@ -261,3 +261,47 @@ test('mobile Gantt exposes both task list and time grid', async ({ page }) => {
   const scroller=await page.locator('.gantt-scroller').boundingBox();
   expect(scroller.height).toBeLessThan(300);
 });
+
+test('preview dense demo at desktop and mobile sizes', async ({ page }) => {
+  await page.goto('/');
+  await page.locator('#loadDemoBtn').click();
+  await expect(page.locator('#taskTableBody tr')).toHaveCount(10);
+  const { mkdirSync } = require('node:fs');
+  mkdirSync('visual-review',{recursive:true});
+  await page.setViewportSize({width:1440,height:900});
+  await page.screenshot({path:'visual-review/demo-desktop.png',fullPage:true});
+  await page.setViewportSize({width:390,height:844});
+  await page.screenshot({path:'visual-review/demo-mobile.png',fullPage:true});
+});
+
+test('Apple UX: cancel and close work even with empty required inputs', async ({ page }) => {
+  await page.goto('/');
+  await page.locator('#addTaskBtn').click();
+  await expect(page.locator('#taskName')).toHaveValue('');
+  await page.locator('#taskDialog button[value="cancel"]').last().click();
+  await expect(page.locator('#taskDialog')).toBeHidden();
+  await page.locator('#addTaskBtn').click();
+  await page.locator('#taskDialog .icon-btn').click();
+  await expect(page.locator('#taskDialog')).toBeHidden();
+  await page.locator('#planningTabBtn').click();
+  await page.locator('#phaseSection > summary').click();
+  await page.locator('#addPhaseBtn').click();
+  await expect(page.locator('#entityDialog')).toBeVisible();
+  await page.locator('#entityDialog button[value="cancel"]').last().click();
+  await expect(page.locator('#entityDialog')).toBeHidden();
+});
+
+test('responsive timeline recomputes its frozen column after viewport changes', async ({ page }) => {
+  await page.goto('/');
+  await page.locator('#loadDemoBtn').click();
+  await expect(page.locator('#taskTableBody tr')).toHaveCount(10);
+  await expect.poll(() => page.locator('.gantt-left').evaluate(el => Math.round(el.getBoundingClientRect().width))).toBe(430);
+  await page.setViewportSize({width:390,height:844});
+  await expect.poll(() => page.locator('.gantt-left').evaluate(el => Math.round(el.getBoundingClientRect().width))).toBe(190);
+  const right = await page.locator('.gantt-right').boundingBox();
+  const scroller = await page.locator('#ganttScroller').boundingBox();
+  expect(right.x).toBeLessThan(scroller.x + scroller.width);
+  await expect(page.locator('#taskTableBody tr')).toHaveCount(10);
+  await page.setViewportSize({width:1024,height:900});
+  await expect.poll(() => page.locator('.gantt-left').evaluate(el => Math.round(el.getBoundingClientRect().width))).toBe(430);
+});
