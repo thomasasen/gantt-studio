@@ -4,12 +4,15 @@ const {readFileSync}=require('node:fs');
 test('production entrypoint versions every static ESM dependency',()=>{
   const html=readFileSync('index.html','utf8');
   const app=readFileSync('assets/js/app.js','utf8');
+  const gantt=readFileSync('assets/js/gantt.js','utf8');
   const entry=html.match(/<script[^>]+type="module"[^>]+src="([^"]+)"[^>]*><\/script>/);
   expect(entry,'application entrypoint').not.toBeNull();
   const version=new URL(entry[1],'https://example.test/').searchParams.get('v');
   expect(version,'versioned app module').toBeTruthy();
   const imports=[...app.matchAll(/^import\s+[^;]+?\s+from\s+['"]([^'"]+)['"]/gm)].map(m=>m[1]);
-  expect(imports.length).toBeGreaterThanOrEqual(4);
+  expect(imports.length).toBeGreaterThanOrEqual(5);
+  const ganttImports=[...gantt.matchAll(/^import\s+[^;]+?\s+from\s+['"]([^'"]+)['"]/gm)].map(m=>m[1]);
+  expect(ganttImports).toContain(`./icons.mjs?v=${version}`);
   for(const modulePath of imports){
     const imported=new URL(modulePath,'https://example.test/assets/js/');
     expect(imported.searchParams.get('v'),`Unversioned ESM dependency: ${modulePath}`).toBe(version);
