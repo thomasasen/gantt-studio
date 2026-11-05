@@ -1,5 +1,6 @@
 import { renderGantt } from './gantt.js?v=1.4.4';
 import { saveLocal, loadActive, loadProject, listProjects, deleteProject, setActiveProject } from './storage.js';
+import { normalizeTaskOrder, nextDisplayOrder, sortedProjectTasks, phaseKey, reorderTask, nudgeTask } from './task-order.mjs';
 
 const $ = (id) => document.getElementById(id);
 const clone = (x) => JSON.parse(JSON.stringify(x));
@@ -28,6 +29,8 @@ let saveTimer = null;
 let toastTimer = null;
 let activeTab = 'project';
 let taskDetailsExpanded = false;
+let taskSortMode = 'manual';
+let taskDrag = null;
 let ganttLeftWidth = 0;
 let resizeRenderQueued = false;
 
@@ -53,6 +56,7 @@ function normalizeEnvelope(raw) {
   n.project.id ||= uuid();
   n.project.tasks = n.project.tasks.map(t => ({ dependencies:[],progress:0,type:'workstream',owner:'',status:'neutral',risk:'none',baselineStart:'',baselineEnd:'',bufferDays:0,costEur:0,url:'',notes:'',showInGantt:true,...t }));
   validateGraph(n.project.tasks);
+  normalizeTaskOrder(n.project);
   return n;
 }
 
@@ -85,6 +89,10 @@ function bindEvents() {
   $('taskDetailsToggle').addEventListener('click', toggleTaskDetails);
   $('taskTableBody').addEventListener('click', handleTaskTableClick);
   $('taskTableBody').addEventListener('keydown', handleTaskTableKeydown);
+  $('taskTableBody').addEventListener('pointerdown', startTaskDrag);
+  document.querySelectorAll('[data-task-sort-mode]').forEach(button =>
+    button.addEventListener('click', () => setTaskSortMode(button.dataset.taskSortMode)));
+
   $('guideBtn').addEventListener('click', () => $('guideDialog').showModal());
   $('designBtn').addEventListener('click', openDesignDialog);
   $('saveDesignBtn').addEventListener('click', saveDesign);
@@ -182,7 +190,7 @@ function filteredBaseTasks() {
 }
 
 function visibleTasks() {
-  const base=filteredBaseTasks();
+  const base=sortedProjectTasks(envelope.project,taskSortMode,filteredBaseTasks());
   const phases=(envelope.project.planning?.phases||[]).slice().sort((a,b)=>(a.start||'').localeCompare(b.start||''));
   if(!phases.length) return base;
   const byPhase=new Map(phases.map(p=>[p.id,[]]));
@@ -249,7 +257,7 @@ async function applyTimelineChange(change){
   const task=envelope.project.tasks.find(t=>t.id===change.id); if(!task)return;
   if(change.start)task.start=change.start; if(change.end)task.end=change.end; if(Number.isFinite(change.progress))task.progress=clamp(Math.round(change.progress),0,100);
   if(task.end<task.start){const x=task.start;task.start=task.end;task.end=x;}
-  sortTasks(); touch(); await persist(); renderMetrics(); renderPhaseToolbar(); renderGanttOnly(); renderTaskTable();
+  touch(); await persist(); renderMetrics(); renderPhaseToolbar(); renderGanttOnly(); renderTaskTable();
 }
 
 function renderPhaseToolbar(){
@@ -278,16 +286,40 @@ function switchTab(tab){
 }
 
 function setZoom(value){zoom=['day','week','month'].includes(value)?value:'week';saveViewState();syncControlStates();renderGanttOnly();}
-function setManagementMode(value){managementMode=['operational','management','milestones'].includes(value)?value:'operational';saveViewState();syncControlStates();renderGanttOnly();}
+function setManagementMode(value){managementMode=['operational','management','milestones'].includes(value)?value:'operational';saveViewState();syncControlStates();renderGanttOnly();renderTaskTable();}
 function syncControlStates(){
   document.querySelectorAll('[data-zoom]').forEach(b=>{const selected=b.dataset.zoom===zoom;b.classList.toggle('active',selected);b.setAttribute('aria-pressed',String(selected));});
   document.querySelectorAll('[data-management-mode]').forEach(b=>{const selected=b.dataset.managementMode===managementMode;b.classList.toggle('active',selected);b.setAttribute('aria-pressed',String(selected));});
   document.querySelectorAll('[data-management-criterion]').forEach(cb=>cb.checked=managementCriteria[cb.dataset.managementCriterion]!==false);
 }
 
+function setTaskSortMode(value) {
+  if(!['manual','date'].includes(value) || value===taskSortMode)return;
+  cancelTaskDrag();
+  taskSortMode=value;
+  saveViewState();
+  renderTaskTable();
+  renderGanttOnly();
+}
+
+function canReorderTasks() { return taskSortMode==='manual' && managementMode==='operational'; }
+
+function syncTaskSortControls(){
+  document.querySelectorAll('[data-task-sort-mode]').forEach(button=>{
+    const active=button.dataset.taskSortMode===taskSortMode;
+    button.classList.toggle('active',active);
+    button.setAttribute('aria-pressed',String(active));
+  });
+  $('taskOrderHint').textContent=taskSortMode==='date'
+    ? 'Chronologisch nach Startdatum. Zum Verschieben auf „Manuell“ wechseln.'
+    : managementMode!=='operational'
+      ? 'Zum Verschieben zuerst im Zeitplan die Ansicht „Operativ“ auswählen.'
+      : 'Aufgaben nur innerhalb ihrer Phase verschieben: Griff ziehen oder am Griff Pfeil nach oben/unten drücken. Termine und Abhängigkeiten bleiben unverändert.';
+}
+
 function viewKey(){return `gantt-studio.view-v2:${envelope.project.id}`;}
-function loadViewState(){try{const v=JSON.parse(localStorage.getItem(viewKey())||'{}');zoom=['day','week','month'].includes(v.zoom)?v.zoom:'week';managementMode=['operational','management','milestones'].includes(v.managementMode)?v.managementMode:'operational';managementCriteria={...managementDefaults,...(v.managementCriteria||{})};collapsedPhases=new Set(Array.isArray(v.collapsedPhases)?v.collapsedPhases.map(String):[]);}catch{zoom='week';managementMode='operational';managementCriteria={...managementDefaults};collapsedPhases=new Set();}}
-function saveViewState(){localStorage.setItem(viewKey(),JSON.stringify({zoom,managementMode,managementCriteria,collapsedPhases:[...collapsedPhases]}));}
+function loadViewState(){try{const v=JSON.parse(localStorage.getItem(viewKey())||'{}');zoom=['day','week','month'].includes(v.zoom)?v.zoom:'week';managementMode=['operational','management','milestones'].includes(v.managementMode)?v.managementMode:'operational';managementCriteria={...managementDefaults,...(v.managementCriteria||{})};collapsedPhases=new Set(Array.isArray(v.collapsedPhases)?v.collapsedPhases.map(String):[]);taskSortMode=v.taskSortMode==='date'?'date':'manual';}catch{zoom='week';managementMode='operational';managementCriteria={...managementDefaults};collapsedPhases=new Set();taskSortMode='manual';}}
+function saveViewState(){localStorage.setItem(viewKey(),JSON.stringify({zoom,managementMode,managementCriteria,collapsedPhases:[...collapsedPhases],taskSortMode}));}
 
 function renderQuickSettings(){
   const labels={showToday:'Heute-Linie',showStatusLine:'Fortschrittslinie',showDependencies:'Abhängigkeiten',showWeekends:'Wochenenden',showHolidays:'Feiertage',showPhaseBands:'Phasenbänder',showBaseline:'Baseline / Soll-Plan',showBuffer:'Pufferzeiten',showRisk:'Risikoindikatoren',showOwners:'Verantwortliche',showProgressLabels:'Fortschritt im Balken',showDateLabels:'Start- und Enddatum'};
@@ -319,11 +351,15 @@ async function saveTask() {
   const baselineStart=$('taskBaselineStart').value, baselineEnd=$('taskBaselineEnd').value;
   if(baselineStart&&baselineEnd&&baselineEnd<baselineStart) return toast('Das Baseline-Enddatum darf nicht vor dem Start liegen.',true);
   const id=$('taskId').value||uuid();
-  const task={id,name,start,end,progress:clamp(Number($('taskProgress').value)||0,0,100),type:$('taskType').value,dependencies:[...$('taskDependencies').selectedOptions].map(o=>o.value),phaseId:$('taskPhase').value||'',owner:$('taskOwner').value.trim().slice(0,80),status:$('taskStatus').value,risk:$('taskRisk').value,baselineStart,baselineEnd,bufferDays:clamp(Number($('taskBuffer').value)||0,0,365),costEur:Math.max(0,Number($('taskCost').value)||0),url:safeUrl($('taskUrl').value),notes:$('taskNotes').value.trim().slice(0,2000),showInGantt:true};
+  const old=envelope.project.tasks.find(t=>String(t.id)===String(id));
+  const phaseId=$('taskPhase').value||'';
+  const order=old && phaseKey(envelope.project,old)===phaseKey(envelope.project,{phaseId})
+    ? old.displayOrder : nextDisplayOrder(envelope.project,phaseId);
+  const task={id,name,start,end,progress:clamp(Number($('taskProgress').value)||0,0,100),type:$('taskType').value,dependencies:[...$('taskDependencies').selectedOptions].map(o=>o.value),phaseId,displayOrder:order,owner:$('taskOwner').value.trim().slice(0,80),status:$('taskStatus').value,risk:$('taskRisk').value,baselineStart,baselineEnd,bufferDays:clamp(Number($('taskBuffer').value)||0,0,365),costEur:Math.max(0,Number($('taskCost').value)||0),url:safeUrl($('taskUrl').value),notes:$('taskNotes').value.trim().slice(0,2000),showInGantt:true};
   const copy=envelope.project.tasks.map(t=>t.id===id?task:t); if(!copy.some(t=>t.id===id)) copy.push(task);
   try { validateGraph(copy); } catch(e) { return toast(e.message,true); }
   const idx=envelope.project.tasks.findIndex(t=>t.id===id); if(idx>=0) envelope.project.tasks[idx]=task; else envelope.project.tasks.push(task);
-  sortTasks(); touch(); await persist(); $('taskDialog').close(); await renderAll(); toast(idx>=0?'Aufgabe aktualisiert.':'Aufgabe erstellt.');
+  touch(); await persist(); $('taskDialog').close(); await renderAll(); toast(idx>=0?'Aufgabe aktualisiert.':'Aufgabe erstellt.');
 }
 
 async function deleteTask() {const id=$('taskId').value;if(!id)return;envelope.project.tasks=envelope.project.tasks.filter(t=>t.id!==id).map(t=>({...t,dependencies:(t.dependencies||[]).filter(dep=>dep!==id)}));touch();await persist();$('taskDialog').close();await renderAll();toast('Aufgabe gelöscht.');}
@@ -369,7 +405,7 @@ async function importFile(event) {const file=event.target.files?.[0];if(!file)re
 function cloneForImport(source) {const e=clone(source),map=new Map();e.project.tasks.forEach(t=>map.set(t.id,uuid()));e.project.tasks=e.project.tasks.map(t=>({...t,id:map.get(t.id),dependencies:(t.dependencies||[]).map(d=>map.get(d)).filter(Boolean)}));const now=new Date().toISOString();e.project.id=uuid();e.project.createdAt=now;e.project.updatedAt=now;e.project.revision=1;e.exportedAt=now;return e;}
 
 function exportProject() {const payload=clone(envelope);payload.exportedAt=new Date().toISOString();download(JSON.stringify(payload,null,2),`${slug(payload.project.name)}-${todayIso()}.gantt.json`,'application/json');$('exportDialog').close();toast('Projektdatei exportiert.');}
-function exportCsv(){const q=v=>`"${String(v??'').replaceAll('"','""')}"`;const rows=[['Name','Start','Ende','Fortschritt','Typ','Owner','Status','Risiko','Phase','Kosten','Vorgänger'].join(';'),...envelope.project.tasks.map(t=>[t.name,t.start,t.end,t.progress,t.type,t.owner,t.status,t.risk,(envelope.project.planning.phases.find(p=>p.id===t.phaseId)?.name||''),t.costEur,(t.dependencies||[]).join(',')].map(q).join(';'))];download('\ufeff'+rows.join('\n'),`${slug(envelope.project.name)}-${todayIso()}.csv`,'text/csv;charset=utf-8');$('exportDialog').close();toast('Aufgabenübersicht exportiert.');}
+function exportCsv(){const q=v=>`"${String(v??'').replaceAll('"','""')}"`;const rows=[['Name','Start','Ende','Fortschritt','Typ','Owner','Status','Risiko','Phase','Kosten','Vorgänger'].join(';'),...sortedProjectTasks(envelope.project,taskSortMode).map(t=>[t.name,t.start,t.end,t.progress,t.type,t.owner,t.status,t.risk,(envelope.project.planning.phases.find(p=>p.id===t.phaseId)?.name||''),t.costEur,(t.dependencies||[]).join(',')].map(q).join(';'))];download('\ufeff'+rows.join('\n'),`${slug(envelope.project.name)}-${todayIso()}.csv`,'text/csv;charset=utf-8');$('exportDialog').close();toast('Aufgabenübersicht exportiert.');}
 
 function buildSettings() {
   const labels={showToday:'Heute-Linie',showStatusLine:'Fortschrittslinie',showWeekends:'Wochenenden markieren',showHolidays:'Feiertage markieren',showPhaseBands:'Phasenbänder',showBaseline:'Baseline / Soll-Plan',showBuffer:'Pufferzeiten',showRisk:'Risikoindikatoren',showOwners:'Verantwortliche an Balken',showProgressLabels:'Fortschritt im Balkentext',showDateLabels:'Start- und Enddatum im Balkentext',showDependencies:'Abhängigkeiten'};
@@ -395,26 +431,38 @@ function toggleTaskDetails(){
 function renderTaskTable(){
   const table=$('taskOverviewTable'), body=$('taskTableBody'), toggle=$('taskDetailsToggle');
   if(!table||!body||!toggle)return;
+  cancelTaskDrag();
+  syncTaskSortControls();
   table.classList.toggle('task-details-collapsed',!taskDetailsExpanded);
   toggle.setAttribute('aria-expanded',String(taskDetailsExpanded));
   toggle.innerHTML=`<span aria-hidden="true">${taskDetailsExpanded?'▾':'▸'}</span> ${taskDetailsExpanded?'Details ausblenden':'Details anzeigen'}`;
 
-  const tasks=envelope.project.tasks;
+  const tasks=sortedProjectTasks(envelope.project,taskSortMode);
   if(!tasks.length){
     body.innerHTML='<tr><td colspan="11" class="task-table-empty">Noch keine Aufgaben vorhanden.</td></tr>';
     return;
   }
   const phaseMap=new Map((envelope.project.planning?.phases||[]).map(p=>[String(p.id),p.name]));
   const taskMap=new Map(tasks.map(t=>[String(t.id),t.name]));
+  let previousGroup=null;
+  const reorderEnabled=canReorderTasks();
   body.innerHTML=tasks.map(task=>{
+    const group=phaseKey(envelope.project,task);
+    const groupStart=group!==previousGroup;
+    previousGroup=group;
+    const phaseName=group?phaseMap.get(group):'Ohne Phase';
+    const phaseHeading=groupStart?`<span class="task-phase-label">${esc(phaseName)}</span>`:'';
+    const grip=reorderEnabled
+      ? `<button type="button" class="task-drag-handle" data-task-drag-handle data-task-id="${esc(task.id)}" aria-label="${esc(task.name)} innerhalb der Phase verschieben. Pfeiltasten nach oben oder unten." title="Ziehen oder Pfeiltasten ↑/↓ verwenden"><span aria-hidden="true">⠿</span></button>`
+      : '';
     const dependencies=(task.dependencies||[]).map(id=>taskMap.get(String(id))||id).join(', ');
     const phase=phaseMap.get(String(task.phaseId||''))||'–';
     const note=task.notes?`<small class="task-table-note">${esc(task.notes)}</small>`:'';
     const documentUrl=safeUrl(task.url);
     const link=documentUrl?`<a class="task-table-document" href="${esc(documentUrl)}" target="_blank" rel="noopener noreferrer">↗ Dokument</a>`:'';
     const baseline=task.baselineStart&&task.baselineEnd?`<small class="task-table-baseline">Soll: ${formatDate(task.baselineStart)} – ${formatDate(task.baselineEnd)}</small>`:'';
-    return `<tr data-task-row-id="${esc(task.id)}">
-      <td class="task-inline-cell" data-task-field="name" tabindex="0"><strong>${esc(task.name)}</strong>${note}${link}</td>
+    return `<tr data-task-row-id="${esc(task.id)}" data-task-phase-id="${esc(group)}" class="${groupStart?'task-phase-start':''}">
+      <td class="task-inline-cell task-name-cell" data-task-field="name" tabindex="0"><div class="task-name-layout">${grip}<div class="task-name-content">${phaseHeading}<strong>${esc(task.name)}</strong>${note}${link}</div></div></td>
       <td class="task-detail-column task-inline-cell" data-task-field="phaseId" tabindex="0">${esc(phase)}</td>
       <td class="task-detail-column task-inline-cell" data-task-field="type" tabindex="0"><span class="task-type-badge task-type-${esc(task.type)}">${esc(taskTypeLabel(task.type))}</span></td>
       <td class="task-inline-cell task-period-cell" data-task-field="period" tabindex="0">${formatDate(task.start)} – ${formatDate(task.end)}${baseline}</td>
@@ -437,7 +485,7 @@ function handleTaskTableClick(e){
     else if(action.dataset.taskAction==='delete')deleteTaskFromTable(row.dataset.taskRowId);
     return;
   }
-  if(e.target.closest('a,button,input,select,textarea,label'))return;
+  if(e.target.closest('a,button,input,select,textarea,label,[data-task-drag-handle]'))return;
   const cell=e.target.closest('td[data-task-field]');
   if(cell)openTaskInlineEditor(cell);
 }
@@ -447,8 +495,126 @@ function handleTaskTableKeydown(e){
     if(e.key==='Escape'){e.preventDefault();renderTaskTable();}
     return;
   }
+  const handle=e.target.closest('[data-task-drag-handle]');
+  if(handle && ['ArrowUp','ArrowDown'].includes(e.key)){
+    e.preventDefault();
+    if(canReorderTasks())void commitTaskMove(()=>nudgeTask(envelope.project,handle.dataset.taskId,e.key==='ArrowUp'?-1:1),handle.dataset.taskId);
+    return;
+  }
   const cell=e.target.closest('td[data-task-field]');
   if(cell&&(e.key==='Enter'||e.key==='F2')){e.preventDefault();openTaskInlineEditor(cell);}
+}
+
+function setTaskOrderStatus(message){$('taskReorderStatus').textContent=message;}
+
+function cancelTaskDrag(){
+  const state=taskDrag;
+  if(!state)return;
+  taskDrag=null;
+  state.row.style.transform='';
+  state.row.classList.remove('task-row-dragging');
+  state.handle.classList.remove('active');
+  state.body.querySelectorAll('.task-drop-before,.task-drop-after').forEach(row=>
+    row.classList.remove('task-drop-before','task-drop-after'));
+  window.removeEventListener('pointermove',moveTaskDrag);
+  window.removeEventListener('pointerup',finishTaskDrag);
+  window.removeEventListener('pointercancel',cancelTaskDrag);
+  window.removeEventListener('keydown',cancelTaskDragOnEscape,true);
+  window.removeEventListener('blur',cancelTaskDrag);
+  if(state.handle.hasPointerCapture?.(state.pointerId))
+    state.handle.releasePointerCapture(state.pointerId);
+}
+
+function cancelTaskDragOnEscape(event){
+  if(event.key!=='Escape')return;
+  event.preventDefault();
+  event.stopPropagation();
+  const handle=taskDrag?.handle;
+  cancelTaskDrag();
+  handle?.focus();
+  setTaskOrderStatus('Verschieben abgebrochen.');
+}
+
+function startTaskDrag(event){
+  if(!canReorderTasks() || event.button!==0 || taskDrag)return;
+  const handle=event.target.closest('[data-task-drag-handle]');
+  if(!handle)return;
+  const row=handle.closest('tr[data-task-row-id]'),body=$('taskTableBody');
+  if(!row)return;
+  event.preventDefault();
+  taskDrag={handle,row,body,pointerId:event.pointerId,startY:event.clientY,active:false,drop:null};
+  handle.setPointerCapture(event.pointerId);
+  window.addEventListener('pointermove',moveTaskDrag);
+  window.addEventListener('pointerup',finishTaskDrag);
+  window.addEventListener('pointercancel',cancelTaskDrag);
+  window.addEventListener('keydown',cancelTaskDragOnEscape,true);
+  window.addEventListener('blur',cancelTaskDrag);
+}
+
+function moveTaskDrag(event){
+  const drag=taskDrag;
+  if(!drag || event.pointerId!==drag.pointerId)return;
+  const delta=event.clientY-drag.startY;
+  if(!drag.active && Math.abs(delta)<6)return;
+  if(!drag.active){
+    drag.active=true;
+    drag.row.classList.add('task-row-dragging');
+    drag.handle.classList.add('active');
+  }
+  drag.row.style.transform=`translateY(${delta}px)`;
+  drag.body.querySelectorAll('.task-drop-before,.task-drop-after').forEach(row=>
+    row.classList.remove('task-drop-before','task-drop-after'));
+  drag.drop=null;
+  const rows=[...drag.body.querySelectorAll('tr[data-task-row-id]')].filter(row=>row!==drag.row);
+  const target=rows.find(row=>{
+    const rect=row.getBoundingClientRect();
+    return event.clientY>=rect.top && event.clientY<=rect.bottom;
+  });
+  if(!target || target.dataset.taskPhaseId!==drag.row.dataset.taskPhaseId)return;
+  const rect=target.getBoundingClientRect();
+  const place=event.clientY<rect.top+rect.height/2?'before':'after';
+  target.classList.add(place==='before'?'task-drop-before':'task-drop-after');
+  drag.drop={targetId:target.dataset.taskRowId,place};
+}
+
+async function commitTaskMove(reorder,taskId){
+  const original=envelope.project.tasks.map(task=>[task.id,task.displayOrder]);
+  const oldRevision=envelope.project.revision,oldUpdated=envelope.project.updatedAt;
+  if(!reorder()){
+    setTaskOrderStatus('Die Reihenfolge bleibt unverändert.');
+    return;
+  }
+  touch();
+  try{
+    await persist();
+    renderGanttOnly();
+    renderTaskTable();
+    const moved=$('taskTableBody').querySelectorAll('[data-task-drag-handle]');
+    for(const grip of moved)if(grip.dataset.taskId===taskId){grip.focus();break;}
+    setTaskOrderStatus('Aufgabenreihenfolge gespeichert.');
+  }catch(error){
+    const old=new Map(original);
+    envelope.project.tasks.forEach(task=>task.displayOrder=old.get(task.id));
+    envelope.project.revision=oldRevision;
+    envelope.project.updatedAt=oldUpdated;
+    renderGanttOnly();
+    renderTaskTable();
+    setTaskOrderStatus('Speichern fehlgeschlagen. Reihenfolge zurückgesetzt.');
+    toast('Die Aufgabenreihenfolge konnte nicht gespeichert werden.',true);
+  }
+}
+
+function finishTaskDrag(event){
+  const drag=taskDrag;
+  if(!drag || event.pointerId!==drag.pointerId)return;
+  moveTaskDrag(event);
+  const drop=drag.drop,sourceId=drag.row.dataset.taskRowId,wasActive=drag.active;
+  cancelTaskDrag();
+  if(wasActive && drop && canReorderTasks()){
+    void commitTaskMove(()=>reorderTask(envelope.project,sourceId,drop.targetId,drop.place),sourceId);
+  }else if(wasActive){
+    setTaskOrderStatus('Keine gültige Position innerhalb dieser Phase gewählt.');
+  }
 }
 
 function openTaskInlineEditor(cell){
@@ -507,14 +673,18 @@ async function saveTaskInlineEditor(editor){
 async function updateTaskFromTable(id,patch){
   const idx=envelope.project.tasks.findIndex(t=>String(t.id)===String(id));
   if(idx<0)return;
-  const next={...envelope.project.tasks[idx],...patch};
+  const previous=envelope.project.tasks[idx];
+  const next={...previous,...patch};
+  if(Object.prototype.hasOwnProperty.call(patch,'phaseId')
+     && phaseKey(envelope.project,previous)!==phaseKey(envelope.project,next))
+    next.displayOrder=nextDisplayOrder(envelope.project,next.phaseId);
   if(!next.name?.trim())return toast('Der Aufgabenname darf nicht leer sein.',true);
   if(!next.start||!next.end||next.end<next.start)return toast('Der Zeitraum ist ungültig.',true);
   if((next.dependencies||[]).includes(next.id))return toast('Eine Aufgabe kann nicht von sich selbst abhängen.',true);
   const copy=envelope.project.tasks.map((t,i)=>i===idx?next:t);
   try{validateGraph(copy);}catch(e){return toast(e.message,true);}
   envelope.project.tasks=copy;
-  sortTasks(); touch(); await persist(); await renderAll(); toast('Aufgabe aktualisiert.');
+  touch(); await persist(); await renderAll(); toast('Aufgabe aktualisiert.');
 }
 
 async function deleteTaskFromTable(id){
@@ -546,7 +716,6 @@ async function saveDesign(){const c=envelope.project.design.colors;c.primary=$('
 function applyDesign(){const c=envelope.project.design?.colors||{};const r=document.documentElement;const map={'--bg':c.pageBg,'--panel':c.panelBg,'--primary':c.primary||c.headerBg,'--accent':c.accent,'--workstream':c.workstream,'--critical':c.critical,'--milestone':c.milestone,'--gate':c.gate,'--ink':c.text,'--muted':c.mutedText,'--border':c.border,'--grid':c.grid};for(const [k,v] of Object.entries(map))if(v)r.style.setProperty(k,v);}
 
 function validateGraph(tasks){const ids=new Set(tasks.map(t=>t.id)),byId=new Map(tasks.map(t=>[t.id,t]));for(const t of tasks)for(const dep of t.dependencies||[]){if(!ids.has(dep))throw new Error(`Aufgabe „${t.name}“ verweist auf einen unbekannten Vorgänger.`);if(dep===t.id)throw new Error(`Aufgabe „${t.name}“ darf nicht von sich selbst abhängen.`);}const visiting=new Set(),visited=new Set();const visit=id=>{if(visited.has(id))return;if(visiting.has(id))throw new Error('Die Aufgabenabhängigkeiten enthalten einen Zyklus.');visiting.add(id);for(const dep of byId.get(id)?.dependencies||[])visit(dep);visiting.delete(id);visited.add(id);};ids.forEach(visit);}
-function sortTasks(){envelope.project.tasks.sort((a,b)=>(a.start||'').localeCompare(b.start||'')||(a.end||'').localeCompare(b.end||''));}
 function touch(){envelope.project.updatedAt=new Date().toISOString();envelope.project.revision=Math.max(1,Number(envelope.project.revision)||1)+1;setSaveStatus('saving','Änderungen werden lokal gesichert');}
 async function persist(){clearTimeout(saveTimer);try{await saveLocal(envelope.project);renderMeta();setSaveStatus('saved',`Lokal · ${new Intl.DateTimeFormat('de-DE',{hour:'2-digit',minute:'2-digit'}).format(new Date())}`);}catch(e){setSaveStatus('error','Browser-Speicherung fehlgeschlagen');throw e;}}
 function uniqueName(name,projects){const used=new Set(projects.map(p=>p.name.toLowerCase()));if(!used.has(name.toLowerCase()))return name;for(let i=2;i<1000;i++){const candidate=`${name} (${i})`;if(!used.has(candidate.toLowerCase()))return candidate;}return `${name} ${Date.now()}`;}

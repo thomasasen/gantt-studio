@@ -46,6 +46,15 @@ Keine macOS-Kopie, kein Funktionsverlust zugunsten des Minimalismus, keine Anima
 - Zeitleiste, linke Aufgabenliste, Pfeile, Baselines, Marker und Statuslinien müssen bei Zoom und Scroll konsistent bleiben. Bei responsiven Änderungen der linken Gantt-Spaltenbreite ist die Pixelgeometrie neu zu berechnen.
 - Keine vollständigen Gantt-Neurenderings oder Datenbank-Schreibvorgänge auf jedem Pointer-Move.
 
+## 4a. Manuelle Aufgabenreihenfolge
+- `displayOrder` ist eine per Aufgabe gespeicherte **Darstellungsreihenfolge** innerhalb der bestehenden Phase (oder der Gruppe ohne Phase), keine Terminfolge und keine Vorgängerbeziehung.
+- In der Aufgabentabelle und im Gantt müssen dieselben gefilterten Aufgaben in derselben phasenweisen Sortierung erscheinen. Phasen bleiben chronologisch nach ihrem Start sortiert.
+- Die manuelle Sortierung ist der Standard. Bei Bestandsprojekten wird eine chronologische Ausgangsreihenfolge migriert; ein Umschalten auf „Nach Datum“ ändert das gespeicherte `displayOrder` nicht.
+- Drag-and-drop nur am ausdrücklich gekennzeichneten Griff und nur innerhalb derselben Phase. Ein anderer Phasenbereich oder eine gefilterte Gantt-Ansicht darf kein unbeabsichtigtes Umordnen auslösen.
+- Das Verschieben einer Aufgabe darf weder `start`/`end`, `phaseId` noch `dependencies` verändern.
+- Eine Pfeiltasten-Alternative am Griff ist erforderlich. Escape und Pointer-Cancel verwerfen die Vorschau ohne Persistenz. Erst der gültige Drop speichert einmalig; Speicherfehler führen zum Rollback.
+- Der Order-Wert ist Teil der portablen Projektdatei und muss beim Import/Export und bei Projektwechseln erhalten bleiben.
+
 ## 5. Feedback, Animation und Raum
 - Sofort auf Interaktion reagieren und während Bewegung laufend Feedback geben; Erfolg erst nach tatsächlich erfolgreicher Aktion melden.
 - Menüs/Popover/Dialoge am Auslöser verankern, Öffnungs-/Schließrichtung konsistent halten und jederzeit unterbrechbar gestalten.
