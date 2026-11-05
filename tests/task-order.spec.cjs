@@ -45,9 +45,9 @@ test('manual reorder by pointer persists, synchronizes Gantt and preserves plann
   }
   await page.reload();
   await expect(page.locator('#taskTableBody tr[data-task-row-id]').nth(i)).toHaveAttribute('data-task-row-id',b.id);
-  await page.locator('[data-task-sort-mode="date"]').click();
+  await page.locator('.task-overview-actions [data-task-sort-mode="date"]').click();
   await expect(page.locator('#taskTableBody .task-drag-handle')).toHaveCount(0);
-  await page.locator('[data-task-sort-mode="manual"]').click();
+  await page.locator('.task-overview-actions [data-task-sort-mode="manual"]').click();
   await expect(page.locator('#taskTableBody tr[data-task-row-id]').nth(i)).toHaveAttribute('data-task-row-id',b.id);
 });
 
@@ -88,9 +88,9 @@ test('new and edited task keeps or appends its stable phase position',async({pag
   await page.locator('#saveTaskBtn').click();
   const groupRows=page.locator(`#taskTableBody tr[data-task-phase-id="${phase[0]}"]`);
   await expect(groupRows.last()).toContainText('Stable order QA');
-  await page.locator('[data-task-sort-mode="date"]').click();
+  await page.locator('.task-overview-actions [data-task-sort-mode="date"]').click();
   await expect(groupRows.first()).toContainText('Stable order QA');
-  await page.locator('[data-task-sort-mode="manual"]').click();
+  await page.locator('.task-overview-actions [data-task-sort-mode="manual"]').click();
   await expect(groupRows.last()).toContainText('Stable order QA');
 });
 
