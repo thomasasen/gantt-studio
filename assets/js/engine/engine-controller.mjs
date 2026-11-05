@@ -1,39 +1,73 @@
 import { assertEngineContract, immutableEngineProjection } from './engine-contract.mjs?v=2.8.0';
 
-/** Hosts exactly one adapter at a time. Swap does not reconstruct data from DOM. */
-export function createEngineController(factory) {
-  if (typeof factory !== 'function') throw new TypeError('Engine factory is required.');
-  let engine = null;
-  let mounted = false;
-
+/**
+ * Owns one replaceable adapter. The only state carried across engine switches
+ * is a copied, frozen project projection and explicit view state, never DOM.
+ */
+export function createEngineController(initialFactory) {
+  if(typeof initialFactory!=='function')throw new TypeError('Engine factory is required.');
+  let factory=initialFactory;
+  let engine=null;
+  let mounted=false;
+  let mountOptions=null;
+  let lastRequest=null;
   return {
-    mount({container,onIntent,onSelect=()=>{},onError=()=>{},onStatus=()=>{}}) {
-      if (mounted) throw new Error('Engine is already mounted.');
-      engine=assertEngineContract(factory());
-      engine.mount({container,onIntent,onSelect,onError,onStatus});
+    mount(options) {
+      if(mounted)throw new Error('Engine is already mounted.');
+      const candidate=assertEngineContract(factory());
+      candidate.mount(options);
+      engine=candidate;
+      mountOptions={...options};
       mounted=true;
     },
     render({project,view}) {
-      if (!mounted) throw new Error('Engine must be mounted before rendering.');
-      return engine.render({project:immutableEngineProjection(project),view:Object.freeze({...view})});
+      if(!mounted)throw new Error('Engine must be mounted before rendering.');
+      lastRequest={
+        project:immutableEngineProjection(project),
+        view:Object.freeze({...view})
+      };
+      return engine.render(lastRequest);
     },
     setViewport(viewport) {
-      if (!mounted) return;
-      engine.setViewport({...viewport});
+      if(mounted)engine.setViewport({...viewport});
     },
     cancelInteraction() {
-      if (mounted) engine.cancelInteraction();
+      if(mounted)engine.cancelInteraction();
     },
     locateMarker(kind) {
-      return mounted ? engine.locateMarker(kind) : null;
+      return mounted?engine.locateMarker(kind):null;
     },
     getCapabilities() {
-      return assertEngineContract(engine || factory()).getCapabilities();
+      return assertEngineContract(engine||factory()).getCapabilities();
+    },
+    switchEngine(nextFactory) {
+      if(typeof nextFactory!=='function')throw new TypeError('Engine factory required.');
+      const next=assertEngineContract(nextFactory());
+      if(!mounted){
+        factory=nextFactory;
+        return;
+      }
+      const old=engine;
+      old.destroy();
+      try {
+        next.mount(mountOptions);
+        if(lastRequest)next.render(lastRequest);
+        engine=next;
+        factory=nextFactory;
+      } catch(error) {
+        try{next.destroy();}catch{}
+        // A failed adapter must not destroy the user's current view.
+        old.mount(mountOptions);
+        if(lastRequest)old.render(lastRequest);
+        engine=old;
+        throw error;
+      }
     },
     destroy() {
-      if (!mounted) return;
+      if(!mounted)return;
       mounted=false;
-      try { engine.destroy(); } finally { engine=null; }
+      try{engine.destroy();}
+      finally{engine=null;lastRequest=null;mountOptions=null;}
     }
   };
 }
