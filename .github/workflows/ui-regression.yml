@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - main
-      - feat/design-system-redesign-2026-11
   pull_request:
     branches: [main]
   workflow_dispatch:
