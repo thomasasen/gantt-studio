@@ -1626,7 +1626,16 @@ button:disabled, input:disabled, select:disabled { opacity: .52; cursor: not-all
 }
 :root[data-theme-mode="dark"] .relative-skip-row,
 :root[data-theme-mode="dark"] .switch-label{
-  color:var(--ui-muted) !important;border-color:var(--ui-outline);
+  background:var(--dark-raised);
+  color:var(--ui-ink) !important;
+  border-color:var(--ui-outline);
+}
+/* Disabled date controls are identified by their disabled state, not by fading
+   their explanatory text below WCAG contrast. */
+:root[data-theme-mode="dark"] .relative-editor.inactive .relative-editor-grid,
+:root[data-theme-mode="dark"] .relative-editor.inactive .relative-skip-row,
+:root[data-theme-mode="dark"] .relative-editor.inactive .relative-result-row{
+  opacity:1;
 }
 :root[data-theme-mode="dark"] .relative-result-row strong,
 :root[data-theme-mode="dark"] .planning-cost-card strong{
