@@ -13,6 +13,7 @@ function stubEngine(log) {
     setViewport(v){log.push(['viewport',v]);},
     cancelInteraction(){log.push(['cancel']);},
     locateMarker(kind){return kind==='relative-target'?{x:88}:null;},
+    focusTask(id){log.push(['focus',id]);return true;},
     destroy(){log.push(['destroy']);},
     getCapabilities(){return caps;}
   };
@@ -23,7 +24,7 @@ test('contract rejects missing lifecycle and mutable capability declarations',as
   expect(()=>assertEngineContract({})).toThrow(/missing mount/);
   expect(()=>assertEngineContract({
     mount(){},render(){},setViewport(){},cancelInteraction(){},locateMarker(){},
-    destroy(){},getCapabilities(){return {taskMove:true};}
+    focusTask(){},destroy(){},getCapabilities(){return {taskMove:true};}
   })).toThrow(/frozen object/);
 });
 
@@ -47,6 +48,7 @@ test('controller sends immutable independent project projections and emits inten
   controller.setViewport({scrollLeft:42});
   expect(log.find(entry=>entry[0]==='viewport')[1]).toEqual({scrollLeft:42});
   expect(controller.locateMarker('relative-target')).toEqual({x:88});
+  expect(controller.focusTask('t1')).toBe(true);
   controller.cancelInteraction();
   controller.destroy();
   controller.destroy();
