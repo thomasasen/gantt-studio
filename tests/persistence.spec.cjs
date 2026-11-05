@@ -151,3 +151,33 @@ test('Gantt save failure keeps table and IndexedDB unchanged; retry persists onc
   await page.reload();
   await expect(page.locator('#taskTableBody tr').first()).toContainText('11.11.2026');
 });
+
+test('stale tab cannot overwrite a newer IndexedDB project revision', async ({page}) => {
+  await page.goto('/');
+  await page.locator('#addTaskBtn').click();
+  await page.locator('#taskName').fill('Original from two tabs');
+  await page.locator('#taskStart').fill('2026-11-10');
+  await page.locator('#taskEnd').fill('2026-11-13');
+  await page.locator('#saveTaskBtn').click();
+  await expect(page.locator('#taskDialog')).toBeHidden();
+
+  const stale = await page.context().newPage();
+  await stale.goto('/');
+  await expect(stale.locator('#taskTableBody')).toContainText('Original from two tabs');
+
+  await page.locator('#ganttStage .gantt-bar.workstream').click();
+  await page.locator('#taskName').fill('Newer change in first tab');
+  await page.locator('#saveTaskBtn').click();
+  await expect(page.locator('#taskDialog')).toBeHidden();
+
+  await stale.locator('#ganttStage .gantt-bar.workstream').click();
+  await stale.locator('#taskName').fill('Stale write from second tab');
+  await stale.locator('#saveTaskBtn').click();
+  await expect(stale.locator('#saveStatusText')).toHaveText('Nicht gespeichert');
+  await expect(stale.locator('#taskDialog')).toBeVisible();
+
+  await stale.reload();
+  await expect(stale.locator('#taskTableBody')).toContainText('Newer change in first tab');
+  await expect(stale.locator('#taskTableBody')).not.toContainText('Stale write from second tab');
+  await stale.close();
+});
