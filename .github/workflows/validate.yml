@@ -2,7 +2,7 @@ name: Validate Gantt Studio
 
 on:
   push:
-    branches: [main, refactor/engine-abstraction]
+    branches: [main, refactor/engine-abstraction, spike/frappe-gantt-adapter]
   workflow_dispatch:
 
 permissions:
@@ -28,7 +28,14 @@ jobs:
           node --check assets/js/engine/engine-controller.mjs
           node --check assets/js/engine/native/native-adapter.mjs
           node --check assets/js/engine/native/native-interactions.mjs
+          node --check assets/js/engine/frappe/frappe-task-mapper.mjs
+          node --check assets/js/engine/frappe/frappe-adapter.mjs
+          node --check tests/frappe-spike.spec.mjs
+          node --check spikes/frappe/spike.mjs
+          node --check spikes/frappe/build.mjs
           node --check assets/js/storage.js
+      - name: Run isolated Frappe adapter contract tests
+        run: node --test tests/frappe-spike.spec.mjs
       - name: Check required static files
         run: |
           test -s index.html
