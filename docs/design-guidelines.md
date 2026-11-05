@@ -76,6 +76,12 @@ Keine macOS-Kopie, kein Funktionsverlust zugunsten des Minimalismus, keine Anima
 - Gantt, Tabelle, Editoren und gespeichertes Projekt müssen denselben Datenstand repräsentieren. Enter/F2/Escape-Konventionen bestehender Inline-Editoren erhalten.
 - Destruktive Aktionen gegen Fehlbedienung schützen; Nutzerkontrolle und Abbruchmöglichkeit priorisieren. Natürliche Dialog-Abbruchaktionen müssen selbst bei ungültigen Pflichtfeldern funktionieren (z. B. `formnovalidate`).
 
+## 6a. JavaScript-Auslieferung und Caching
+- Bei Änderungen an einem ES-Modul, insbesondere neuen oder umbenannten **named exports**, müssen **sämtliche statischen Import-URLs** des Anwendungseinstiegspunkts `app.js` und dessen Versionskennung in `index.html` gemeinsam aktualisiert werden.
+- Unversionierte ESM-Abhängigkeiten im Produktiv-Einstiegspunkt sind unzulässig: Neue `app.js` plus altes `design-presets.mjs` darf die Bedienoberfläche nicht vollständig deaktivieren.
+- Ein Browser-Regressionstest simuliert einen Cache mit **veralteten Modulen für unversionierte URLs** und prüft, dass Navigation, Aufgaben- und Design-Buttons weiterhin reagieren.
+- Caching-Probleme ohne Löschen von IndexedDB, localStorage oder Projektdaten beheben.
+
 ## 7. Umsetzung und Qualitätssicherung
 
 Bestehende Architektur: `index.html`, `assets/js/app.js`, `assets/js/gantt.js`, `assets/js/storage.js`, `assets/css/`. Designänderungen zuerst über einheitliche Tokens und konsolidierte Komponenten; keine opportunistische Frameworkmigration.
