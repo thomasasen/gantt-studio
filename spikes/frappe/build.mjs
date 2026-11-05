@@ -11,5 +11,5 @@ await mkdir(vendor,{recursive:true});
 for(const filename of ['frappe-gantt.umd.js','frappe-gantt.css'])
   await copyFile(resolve(home,'node_modules/frappe-gantt/dist',filename),join(vendor,filename));
 const license=await readFile(resolve(home,'node_modules/frappe-gantt/license.txt'),'utf8');
-await writeFile(join(vendor,'LICENSE.frapp e.txt'.replace(' ','')),license);
+await writeFile(join(vendor,'LICENSE.frappe.txt'),license);
 console.log('Frappe 1.2.2 local UMD/CSS and MIT notice bundled. No runtime CDN.');
