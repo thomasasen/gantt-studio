@@ -180,6 +180,8 @@ Der analysierte Odin-Build `frappe-gantt-online-editor` v1.1.3 besitzt weiterhin
 
 ## Entwicklungs- und Designvorgaben
 
+Der [Apple-Design-QS-Bericht vom 05.11.2026](docs/apple-design-qa-2026-11-05.md) dokumentiert die vertiefte visuelle, funktionale und WCAG-basierte Qualitätssicherung samt behobenen Fehlern und offenen Prüfgrenzen.
+
 Bei UI-Arbeiten gelten die projektspezifischen [Agent-Anweisungen](AGENTS.md), der lokal auffindbare [Codex-Skill](.agents/skills/gantt-studio-design/SKILL.md) und die verbindlichen [Designrichtlinien](docs/design-guidelines.md). Ergänzend sichern [Chromium-Browser-Regressionstests](docs/ui-tests.md) Formularkonsistenz, Responsivität und zentrale Interaktionen ab.
 
 Die Grundlage ist [apple-design von Emil Kowalski](https://github.com/emilkowalski/skills/tree/main/skills/apple-design), angepasst auf Gantt Studio: präzise Planung, gute Lesbarkeit, einheitliche Feldgeometrie und sichere Interaktionen vor visuellen Effekten. Das Designsystem ist jetzt in der Anwendung eingebunden; spätere Erweiterungen bleiben an diese Regeln gebunden.
