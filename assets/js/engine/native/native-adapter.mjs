@@ -19,6 +19,7 @@ export function createNativeEngine() {
   let activeRender=null;
   let viewport=null;
   let interactions=null;
+  let lastRequest=null;
   return {
     getCapabilities:()=>CAPABILITIES,
     mount(options) {
@@ -31,6 +32,7 @@ export function createNativeEngine() {
     },
     render({project,view}) {
       if(!container)throw new Error('Native engine is not mounted.');
+      lastRequest={project,view:{...view}};
       this.cancelInteraction();
       interactions.update(project,view);
       activeRender=renderGantt(container,project,{
@@ -44,8 +46,13 @@ export function createNativeEngine() {
     setViewport(next) {
       viewport={...viewport,...next};
       if(!container)return;
-      if(Number.isFinite(next.scrollLeft)) container.parentElement.scrollLeft=next.scrollLeft;
-      if(Number.isFinite(next.scrollTop)) container.parentElement.scrollTop=next.scrollTop;
+      if(next.zoom && lastRequest && next.zoom!==lastRequest.view.zoom){
+        this.render({project:lastRequest.project,view:{...lastRequest.view,zoom:next.zoom}});
+        return;
+      }
+      const scroller=container.parentElement;
+      if(Number.isFinite(next.scrollLeft)&&scroller)scroller.scrollLeft=next.scrollLeft;
+      if(Number.isFinite(next.scrollTop)&&scroller)scroller.scrollTop=next.scrollTop;
     },
     cancelInteraction() {
       interactions?.cancel();
@@ -67,6 +74,7 @@ export function createNativeEngine() {
       container=null;
       onIntent=()=>{};
       viewport=null;
+      lastRequest=null;
     }
   };
 }
