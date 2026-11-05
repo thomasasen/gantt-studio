@@ -435,11 +435,35 @@ async function saveTask() {
   const task={id,name,start,end,progress:clamp(Number($('taskProgress').value)||0,0,100),type:$('taskType').value,dependencies:[...$('taskDependencies').selectedOptions].map(o=>o.value),phaseId,displayOrder:order,owner:$('taskOwner').value.trim().slice(0,80),status:$('taskStatus').value,risk:$('taskRisk').value,baselineStart,baselineEnd,bufferDays:clamp(Number($('taskBuffer').value)||0,0,365),costEur:Math.max(0,Number($('taskCost').value)||0),url:safeUrl($('taskUrl').value),notes:$('taskNotes').value.trim().slice(0,2000),showInGantt:true};
   const copy=envelope.project.tasks.map(t=>t.id===id?task:t); if(!copy.some(t=>t.id===id)) copy.push(task);
   try { validateGraph(copy); } catch(e) { return toast(e.message,true); }
-  const idx=envelope.project.tasks.findIndex(t=>t.id===id); if(idx>=0) envelope.project.tasks[idx]=task; else envelope.project.tasks.push(task);
-  touch(); await persist(); $('taskDialog').close(); await renderAll(); toast(idx>=0?'Aufgabe aktualisiert.':'Aufgabe erstellt.');
+  try {
+    const result=await commitProjectChange(project=>{
+      const previous=project.tasks.find(t=>String(t.id)===String(id));
+      const rank=previous&&phaseKey(project,previous)===phaseKey(project,{phaseId})
+        ? previous.displayOrder : nextDisplayOrder(project,phaseId);
+      const next={...task,displayOrder:rank};
+      const copy=project.tasks.map(t=>String(t.id)===String(id)?next:t);
+      if(!previous)copy.push(next);
+      validateGraph(copy);
+      project.tasks=copy;
+    });
+    if(!result.active)return;
+    $('taskDialog').close();await renderAll();toast(old?'Aufgabe aktualisiert.':'Aufgabe erstellt.');
+  } catch(error) { toast(error.message||'Aufgabe konnte nicht gespeichert werden.',true); }
 }
 
-async function deleteTask() {const id=$('taskId').value;if(!id)return;envelope.project.tasks=envelope.project.tasks.filter(t=>t.id!==id).map(t=>({...t,dependencies:(t.dependencies||[]).filter(dep=>dep!==id)}));touch();await persist();$('taskDialog').close();await renderAll();toast('Aufgabe gelöscht.');}
+async function deleteTask() {
+  const id=$('taskId').value;
+  if(!id)return;
+  try {
+    const result=await commitProjectChange(project=>{
+      if(!project.tasks.some(t=>String(t.id)===String(id)))return false;
+      project.tasks=project.tasks.filter(t=>String(t.id)!==String(id))
+        .map(t=>({...t,dependencies:(t.dependencies||[]).filter(dep=>String(dep)!==String(id))}));
+    });
+    if(!result.active)return;
+    $('taskDialog').close();await renderAll();toast('Aufgabe gelöscht.');
+  } catch {}
+}
 
 async function loadDemoProject() {
   const button = $('loadDemoBtn');
@@ -460,6 +484,8 @@ async function loadDemoProject() {
     demo.project.name = uniqueName(demo.project.name, await listProjects());
     await saveLocal(demo.project);
     envelope = demo;
+    projectCommitter.remember(demo.project);
+    setActiveProject(demo.project.id);
     loadViewState();
     switchTab('project');
     await renderAll();
@@ -474,11 +500,71 @@ async function loadDemoProject() {
   }
 }
 
-async function createProject() {const name=(prompt('Name des neuen Projekts:','Neues Projekt')||'').trim();if(!name)return;envelope=createEnvelope();envelope.project.name=uniqueName(name,await listProjects());await saveLocal(envelope.project);setActiveProject(envelope.project.id);loadViewState();await renderAll();toast('Projekt wurde angelegt.');}
-async function changeProject(e) {const p=await loadProject(e.target.value);if(!p)return;envelope=normalizeEnvelope({schema:'gantt-studio.project',schemaVersion:1,generator:'Gantt Studio',project:p});setActiveProject(p.id);loadViewState();await renderAll();}
-async function removeProject() {const projects=await listProjects();if(!envelope.project?.id)return;if(!confirm(`Projekt „${envelope.project.name}“ vollständig löschen?`))return;await deleteProject(envelope.project.id);const remaining=projects.filter(p=>p.id!==envelope.project.id);if(remaining.length){const p=await loadProject(remaining[0].id);envelope=normalizeEnvelope({schema:'gantt-studio.project',schemaVersion:1,generator:'Gantt Studio',project:p});setActiveProject(p.id);}else{envelope=createEnvelope();await saveLocal(envelope.project);}loadViewState();await renderAll();toast('Projekt wurde gelöscht.');}
+async function createProject() {
+  const name=(prompt('Name des neuen Projekts:','Neues Projekt')||'').trim();
+  if(!name)return;
+  const created=createEnvelope();
+  created.project.name=uniqueName(name,await listProjects());
+  try {
+    await saveLocal(created.project);
+    envelope=created;
+    projectCommitter.remember(created.project);
+    setActiveProject(created.project.id);
+    loadViewState();await renderAll();toast('Projekt wurde angelegt.');
+  } catch(error) { toast(`Projekt konnte nicht angelegt werden: ${error.message}`,true); }
+}
 
-async function importFile(event) {const file=event.target.files?.[0];if(!file)return;try{envelope=cloneForImport(normalizeEnvelope(JSON.parse(await file.text())));envelope.project.name=uniqueName(envelope.project.name,await listProjects());await saveLocal(envelope.project);loadViewState();await renderAll();toast('Projekt importiert.');}catch(e){toast(e.message||'Datei konnte nicht importiert werden.',true);}finally{event.target.value='';}}
+async function changeProject(e) {
+  const id=e.target.value;
+  try {
+    const p=await loadProject(id);
+    if(!p)return;
+    envelope=normalizeEnvelope({schema:'gantt-studio.project',schemaVersion:1,generator:'Gantt Studio',project:p});
+    projectCommitter.remember(envelope.project);
+    setActiveProject(p.id);
+    loadViewState();await renderAll();
+    if(pendingSaves.has(id))setSaveStatus('saving','Änderungen werden lokal gesichert');
+  } catch(error) { toast(`Projektwechsel fehlgeschlagen: ${error.message}`,true); }
+}
+
+async function removeProject() {
+  const id=envelope.project?.id;
+  if(!id||!confirm(`Projekt „${envelope.project.name}“ vollständig löschen?`))return;
+  try {
+    await projectCommitter.whenIdle(id);
+    const projects=await listProjects();
+    await deleteProject(id);
+    projectCommitter.forget(id);
+    const remaining=projects.filter(p=>p.id!==id);
+    if(remaining.length) {
+      const p=await loadProject(remaining[0].id);
+      envelope=normalizeEnvelope({schema:'gantt-studio.project',schemaVersion:1,generator:'Gantt Studio',project:p});
+    } else {
+      const fresh=createEnvelope();
+      await saveLocal(fresh.project);
+      envelope=fresh;
+    }
+    projectCommitter.remember(envelope.project);
+    setActiveProject(envelope.project.id);
+    loadViewState();await renderAll();toast('Projekt wurde gelöscht.');
+  } catch(error) { toast(`Projekt konnte nicht gelöscht werden: ${error.message}`,true); }
+}
+
+async function importFile(event) {
+  const file=event.target.files?.[0];
+  if(!file)return;
+  try {
+    const imported=cloneForImport(normalizeEnvelope(JSON.parse(await file.text())));
+    imported.project.name=uniqueName(imported.project.name,await listProjects());
+    await saveLocal(imported.project);
+    envelope=imported;
+    projectCommitter.remember(imported.project);
+    setActiveProject(imported.project.id);
+    loadViewState();await renderAll();toast('Projekt importiert.');
+  } catch(error) { toast(error.message||'Datei konnte nicht importiert werden.',true); }
+  finally { event.target.value=''; }
+}
+
 function cloneForImport(source) {const e=clone(source),map=new Map();e.project.tasks.forEach(t=>map.set(t.id,uuid()));e.project.tasks=e.project.tasks.map(t=>({...t,id:map.get(t.id),dependencies:(t.dependencies||[]).map(d=>map.get(d)).filter(Boolean)}));const now=new Date().toISOString();e.project.id=uuid();e.project.createdAt=now;e.project.updatedAt=now;e.project.revision=1;e.exportedAt=now;return e;}
 
 function exportProject() {const payload=clone(envelope);payload.exportedAt=new Date().toISOString();download(JSON.stringify(payload,null,2),`${slug(payload.project.name)}-${todayIso()}.gantt.json`,'application/json');$('exportDialog').close();toast('Projektdatei exportiert.');}
@@ -863,15 +949,37 @@ async function updateTaskFromTable(id,patch){
   if((next.dependencies||[]).includes(next.id))return toast('Eine Aufgabe kann nicht von sich selbst abhängen.',true);
   const copy=envelope.project.tasks.map((t,i)=>i===idx?next:t);
   try{validateGraph(copy);}catch(e){return toast(e.message,true);}
-  envelope.project.tasks=copy;
-  touch(); await persist(); await renderAll(); toast('Aufgabe aktualisiert.');
+  try {
+    const result=await commitProjectChange(project=>{
+      const index=project.tasks.findIndex(t=>String(t.id)===String(id));
+      if(index<0)return false;
+      const previous=project.tasks[index];
+      const next={...previous,...patch};
+      if(Object.prototype.hasOwnProperty.call(patch,'phaseId')
+         && phaseKey(project,previous)!==phaseKey(project,next))
+        next.displayOrder=nextDisplayOrder(project,next.phaseId);
+      if(!next.name?.trim()||!isValidIsoDate(next.start)||!isValidIsoDate(next.end)||next.end<next.start)
+        throw new Error('Aufgabenname oder Zeitraum ist ungültig.');
+      const copy=project.tasks.map((t,i)=>i===index?next:t);
+      validateGraph(copy);
+      project.tasks=copy;
+    });
+    if(result.active){await renderAll();toast('Aufgabe aktualisiert.');}
+  } catch(error) { toast(error.message||'Aufgabe konnte nicht gespeichert werden.',true); }
 }
 
 async function deleteTaskFromTable(id){
   const task=envelope.project.tasks.find(t=>String(t.id)===String(id)); if(!task)return;
   if(!confirm(`Aufgabe „${task.name}“ wirklich löschen?`))return;
-  envelope.project.tasks=envelope.project.tasks.filter(t=>String(t.id)!==String(id)).map(t=>({...t,dependencies:(t.dependencies||[]).filter(dep=>String(dep)!==String(id))}));
-  touch(); await persist(); await renderAll(); toast('Aufgabe gelöscht.');
+  try {
+    const result=await commitProjectChange(project=>{
+      if(!project.tasks.some(t=>String(t.id)===String(id)))return false;
+      project.tasks=project.tasks.filter(t=>String(t.id)!==String(id))
+        .map(t=>({...t,dependencies:(t.dependencies||[]).filter(dep=>String(dep)!==String(id))}));
+    });
+    if(result.active){await renderAll();toast('Aufgabe gelöscht.');}
+  } catch {}
+
 }
 
 function taskTypeLabel(type){return({workstream:'Arbeitspaket',critical:'Kritisch',milestone:'Meilenstein',gate:'Gate'})[type]||type||'–';}
