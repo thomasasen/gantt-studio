@@ -1,7 +1,8 @@
-import { renderGantt } from './gantt.js?v=2.5.0';
-import { saveLocal, loadActive, loadProject, listProjects, deleteProject, setActiveProject } from './storage.js?v=2.5.0';
-import { normalizeTaskOrder, nextDisplayOrder, sortedProjectTasks, phaseKey, reorderTask, nudgeTask } from './task-order.mjs?v=2.5.0';
-import { DESIGN_COLOR_FIELDS, DESIGN_PRESETS, findDesignPreset, matchDesignPreset, designThemeMode } from './design-presets.mjs?v=2.5.0';
+import { renderGantt } from './gantt.js?v=2.6.0';
+import { icon, hydrateIcons } from './icons.mjs?v=2.6.0';
+import { saveLocal, loadActive, loadProject, listProjects, deleteProject, setActiveProject } from './storage.js?v=2.6.0';
+import { normalizeTaskOrder, nextDisplayOrder, sortedProjectTasks, phaseKey, reorderTask, nudgeTask } from './task-order.mjs?v=2.6.0';
+import { DESIGN_COLOR_FIELDS, DESIGN_PRESETS, findDesignPreset, matchDesignPreset, designThemeMode } from './design-presets.mjs?v=2.6.0';
 
 const $ = (id) => document.getElementById(id);
 const clone = (x) => JSON.parse(JSON.stringify(x));
@@ -63,6 +64,7 @@ function normalizeEnvelope(raw) {
 }
 
 async function boot() {
+  hydrateIcons();
   bindEvents();
   buildSettings();
   let local = null;
@@ -178,7 +180,7 @@ function setSaveStatus(state, detail='Lokal im Browser') {
   box.className=`save-status ${state}`;
   $('saveStatusText').textContent=state==='saving'?'Speichert…':state==='error'?'Nicht gespeichert':'Gespeichert';
   $('saveStatusDetail').textContent=detail;
-  box.querySelector('.save-status-icon').textContent=state==='saving'?'…':state==='error'?'!':'✓';
+  box.querySelector('.save-status-icon').innerHTML=icon(state==='saving'?'loader-circle':state==='error'?'circle-alert':'check');
 }
 
 function renderMetrics() {
@@ -284,7 +286,7 @@ function renderPhaseToolbar(){
   const box=$('phaseCollapseToolbar');
   if(!phases.length){box.hidden=true;box.innerHTML='';return;} box.hidden=false;
   const counts=new Map(phases.map(p=>[p.id,envelope.project.tasks.filter(t=>t.phaseId===p.id).length]));
-  box.innerHTML=`<div class="phase-collapse-heading"><div><strong>Phasen</strong><span>Aufgaben im Zeitplan ein- oder ausblenden</span></div><div class="phase-collapse-actions"><button class="link-button" type="button" data-phase-action="expand-all">Alle ausklappen</button><button class="link-button" type="button" data-phase-action="collapse-all">Alle einklappen</button></div></div><div class="phase-collapse-list">${phases.map(p=>{const collapsed=collapsedPhases.has(String(p.id));return `<button type="button" class="phase-collapse-button ${collapsed?'collapsed':'expanded'}" data-phase-id="${esc(p.id)}" aria-expanded="${!collapsed}" style="--phase-control-color:${esc(p.color||'#DCE8EB')}"><span class="phase-collapse-icon">${collapsed?'▶':'▼'}</span><span class="phase-collapse-label">${esc(p.name||'Phase')}</span><span class="phase-collapse-count">${counts.get(p.id)||0}</span></button>`}).join('')}</div>`;
+  box.innerHTML=`<div class="phase-collapse-heading"><div><strong>Phasen</strong><span>Aufgaben im Zeitplan ein- oder ausblenden</span></div><div class="phase-collapse-actions"><button class="link-button" type="button" data-phase-action="expand-all">${icon('chevrons-down-up')} Alle ausklappen</button><button class="link-button" type="button" data-phase-action="collapse-all">${icon('chevrons-up-down')} Alle einklappen</button></div></div><div class="phase-collapse-list">${phases.map(p=>{const collapsed=collapsedPhases.has(String(p.id));return `<button type="button" class="phase-collapse-button ${collapsed?'collapsed':'expanded'}" data-phase-id="${esc(p.id)}" aria-expanded="${!collapsed}" style="--phase-control-color:${esc(p.color||'#DCE8EB')}"><span class="phase-collapse-icon">${icon(collapsed?'chevron-right':'chevron-down')}</span><span class="phase-collapse-label">${esc(p.name||'Phase')}</span><span class="phase-collapse-count">${counts.get(p.id)||0}</span></button>`}).join('')}</div>`;
 }
 
 function handlePhaseCollapseClick(e){
@@ -455,7 +457,7 @@ function renderTaskTable(){
   syncTaskSortControls();
   table.classList.toggle('task-details-collapsed',!taskDetailsExpanded);
   toggle.setAttribute('aria-expanded',String(taskDetailsExpanded));
-  toggle.innerHTML=`<span aria-hidden="true">${taskDetailsExpanded?'▾':'▸'}</span> ${taskDetailsExpanded?'Details ausblenden':'Details anzeigen'}`;
+  toggle.innerHTML=`${icon(taskDetailsExpanded?'chevron-down':'chevron-right')} ${taskDetailsExpanded?'Details ausblenden':'Details anzeigen'}`;
 
   const tasks=sortedProjectTasks(envelope.project,taskSortMode);
   if(!tasks.length){
@@ -473,13 +475,13 @@ function renderTaskTable(){
     const phaseName=group?phaseMap.get(group):'Ohne Phase';
     const phaseHeading=groupStart?`<span class="task-phase-label">${esc(phaseName)}</span>`:'';
     const grip=reorderEnabled
-      ? `<button type="button" class="task-drag-handle" data-task-drag-handle data-task-id="${esc(task.id)}" aria-label="${esc(task.name)} innerhalb der Phase verschieben. Pfeiltasten nach oben oder unten." title="Ziehen oder Pfeiltasten ↑/↓ verwenden"><span aria-hidden="true">⠿</span></button>`
+      ? `<button type="button" class="task-drag-handle" data-task-drag-handle data-task-id="${esc(task.id)}" aria-label="${esc(task.name)} innerhalb der Phase verschieben. Pfeiltasten nach oben oder unten." title="Ziehen oder Pfeiltasten ↑/↓ verwenden">${icon('grip-vertical')}</button>`
       : '';
     const dependencies=(task.dependencies||[]).map(id=>taskMap.get(String(id))||id).join(', ');
     const phase=phaseMap.get(String(task.phaseId||''))||'–';
     const note=task.notes?`<small class="task-table-note">${esc(task.notes)}</small>`:'';
     const documentUrl=safeUrl(task.url);
-    const link=documentUrl?`<a class="task-table-document" href="${esc(documentUrl)}" target="_blank" rel="noopener noreferrer">↗ Dokument</a>`:'';
+    const link=documentUrl?`<a class="task-table-document" href="${esc(documentUrl)}" target="_blank" rel="noopener noreferrer">${icon('external-link')} Dokument</a>`:'';
     const baseline=task.baselineStart&&task.baselineEnd?`<small class="task-table-baseline">Soll: ${formatDate(task.baselineStart)} – ${formatDate(task.baselineEnd)}</small>`:'';
     return `<tr data-task-row-id="${esc(task.id)}" data-task-phase-id="${esc(group)}" class="${groupStart?'task-phase-start':''}">
       <td class="task-inline-cell task-name-cell" data-task-field="name" tabindex="0"><div class="task-name-layout">${grip}<div class="task-name-content">${phaseHeading}<strong>${esc(task.name)}</strong>${note}${link}</div></div></td>
@@ -492,7 +494,7 @@ function renderTaskTable(){
       <td class="task-detail-column task-inline-cell" data-task-field="risk" tabindex="0"><span class="task-risk task-risk-${esc(task.risk||'none')}">${esc(taskRiskLabel(task.risk))}</span></td>
       <td class="task-detail-column task-inline-cell" data-task-field="costEur" tabindex="0">${formatMoney(task.costEur||0)}</td>
       <td class="task-detail-column task-inline-cell" data-task-field="dependencies" tabindex="0">${dependencies?esc(dependencies):'<span class="muted">Keine</span>'}</td>
-      <td class="task-table-actions"><button type="button" class="task-link-button" data-task-action="edit">Bearbeiten</button><button type="button" class="task-link-button delete" data-task-action="delete">Löschen</button></td>
+      <td class="task-table-actions"><button type="button" class="task-link-button" data-task-action="edit">${icon('pencil')} Bearbeiten</button><button type="button" class="task-link-button delete" data-task-action="delete">${icon('trash-2')} Löschen</button></td>
     </tr>`;
   }).join('');
 }
@@ -763,7 +765,7 @@ function openTaskInlineEditor(cell){
   const field=fresh.dataset.taskField;
   fresh.classList.add('editing');
   fresh.removeAttribute('tabindex');
-  fresh.innerHTML=`<div class="task-inline-editor" data-inline-task-id="${esc(task.id)}" data-inline-field="${esc(field)}">${taskInlineControl(field,task)}<span class="task-inline-actions"><button type="button" class="task-inline-save">✓</button><button type="button" class="task-inline-cancel">×</button></span></div>`;
+  fresh.innerHTML=`<div class="task-inline-editor" data-inline-task-id="${esc(task.id)}" data-inline-field="${esc(field)}">${taskInlineControl(field,task)}<span class="task-inline-actions"><button type="button" class="task-inline-save" aria-label="Änderung übernehmen" title="Änderung übernehmen">${icon('check')}</button><button type="button" class="task-inline-cancel" aria-label="Bearbeitung abbrechen" title="Bearbeitung abbrechen">${icon('x')}</button></span></div>`;
   const editor=fresh.querySelector('.task-inline-editor');
   editor.querySelector('.task-inline-save').addEventListener('click',()=>saveTaskInlineEditor(editor));
   editor.querySelector('.task-inline-cancel').addEventListener('click',renderTaskTable);
@@ -837,7 +839,7 @@ function cssEscape(value){return String(value).replace(/(["\\])/g,'\\$1');}
 
 function renderPlanningLists(){const planning=envelope.project.planning,cost=envelope.project.tasks.reduce((sum,t)=>sum+(Number(t.costEur)||0),0);if($('planningCost'))$('planningCost').textContent=formatMoney(cost);if($('phaseCountBadge'))$('phaseCountBadge').textContent=`${planning.phases.length} ${planning.phases.length===1?'Phase':'Phasen'}`;const gates=envelope.project.tasks.filter(t=>t.type==='gate').length,markerTotal=planning.markers.length;if($('markerCountBadge'))$('markerCountBadge').textContent=`${markerTotal} ${markerTotal===1?'Stichtag':'Stichtage'}${gates?` · ${gates} ${gates===1?'Gate':'Gates'}`:''}`;if($('holidayCountBadge'))$('holidayCountBadge').textContent=`${planning.holidays.length} ${planning.holidays.length===1?'Sondertag':'Sondertage'}`;$('phaseList').innerHTML=entityRows('phase',planning.phases,p=>`${formatDate(p.start)} – ${formatDate(p.end)}`);$('markerList').innerHTML=entityRows('marker',planning.markers,p=>`${formatDate(p.date)} · ${p.style==='dashed'?'gestrichelt':p.style==='dotted'?'gepunktet':'durchgezogen'}`);$('holidayList').innerHTML=entityRows('holiday',planning.holidays,p=>`${formatDate(p.date)}${p.source?` · ${esc(p.source)}`:''}`);syncRelativeEditor();syncSettings();}
 
-function entityRows(kind,items,detail){return items.length?items.slice().sort((a,b)=>(a.start||a.date||'').localeCompare(b.start||b.date||'')).map(x=>`<button type="button" class="entity-row" data-entity-kind="${kind}" data-entity-id="${esc(x.id)}"><span><strong>${esc(x.name)}</strong><small>${detail(x)}</small></span><i style="background:${esc(x.color||'#DCE8EB')}"></i></button>`).join(''):'<div class="muted-empty">Noch keine Einträge.</div>';}
+function entityRows(kind,items,detail){return items.length?items.slice().sort((a,b)=>(a.start||a.date||'').localeCompare(b.start||b.date||'')).map(x=>`<button type="button" class="entity-row" data-entity-kind="${kind}" data-entity-id="${esc(x.id)}"><span><strong>${esc(x.name)}</strong><small>${detail(x)}</small></span><i style="background:${esc(x.color||'#DCE8EB')}"></i><span class="entity-row-edit">${icon('pencil')}</span></button>`).join(''):'<div class="muted-empty">Noch keine Einträge.</div>';}
 
 function openEntity(kind,id=''){const list=kind==='phase'?envelope.project.planning.phases:kind==='marker'?envelope.project.planning.markers:envelope.project.planning.holidays;const item=list.find(x=>x.id===id)||{};$('entityKind').value=kind;$('entityId').value=id;$('deleteEntityBtn').style.visibility=id?'visible':'hidden';const cfg={phase:['PHASE','Phase bearbeiten'],marker:['STICHTAG','Stichtag bearbeiten'],holiday:['SONDERTAG','Sondertag bearbeiten']}[kind];$('entityEyebrow').textContent=cfg[0];$('entityTitle').textContent=id?cfg[1]:cfg[1].replace('bearbeiten','anlegen');if(kind==='phase')$('entityFields').innerHTML=`<label class="span-2">Name<input id="entityName" maxlength="120" required value="${esc(item.name||'')}"></label><label>Start<input id="entityStart" type="date" required value="${esc(item.start||todayIso())}"></label><label>Ende<input id="entityEnd" type="date" required value="${esc(item.end||todayIso())}"></label><label>Farbe<input id="entityColor" type="color" value="${esc(item.color||'#DCE8EB')}"></label>`;if(kind==='marker')$('entityFields').innerHTML=`<label class="span-2">Name<input id="entityName" maxlength="120" required value="${esc(item.name||'')}"></label><label>Datum<input id="entityDate" type="date" required value="${esc(item.date||todayIso())}"></label><label>Farbe<input id="entityColor" type="color" value="${esc(item.color||'#607A00')}"></label><label>Linie<select id="entityStyle"><option value="solid">Durchgezogen</option><option value="dashed">Gestrichelt</option><option value="dotted">Gepunktet</option></select></label>`;if(kind==='holiday')$('entityFields').innerHTML=`<label class="span-2">Name<input id="entityName" maxlength="120" required value="${esc(item.name||'')}"></label><label>Datum<input id="entityDate" type="date" required value="${esc(item.date||todayIso())}"></label>`;if(kind==='marker')$('entityStyle').value=item.style||'solid';$('entityDialog').showModal();}
 async function saveEntity(){const kind=$('entityKind').value,id=$('entityId').value||uuid(),name=$('entityName').value.trim();if(!name)return toast('Name darf nicht leer sein.',true);const p=envelope.project.planning;const list=kind==='phase'?p.phases:kind==='marker'?p.markers:p.holidays;let item;if(kind==='phase'){const start=$('entityStart').value,end=$('entityEnd').value;if(!start||!end||end<start)return toast('Bitte einen gültigen Phasenzeitraum angeben.',true);item={id,name,start,end,color:$('entityColor').value};}else if(kind==='marker'){item={id,name,date:$('entityDate').value,color:$('entityColor').value,style:$('entityStyle').value};}else{item={id,name,date:$('entityDate').value,source:'manual',country:'',subdivision:'',imported:false,importedAt:''};}const idx=list.findIndex(x=>x.id===id);if(idx>=0)list[idx]=item;else list.push(item);touch();await persist();$('entityDialog').close();renderPlanningLists();populateTaskPhases();renderPhaseToolbar();renderGanttOnly();toast('Planungselement gespeichert.');}

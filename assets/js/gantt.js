@@ -1,3 +1,5 @@
+import { icon } from './icons.mjs?v=2.6.0';
+
 const DAY = 86400000;
 const toDate = (s) => new Date(`${s}T00:00:00Z`);
 const iso = (d) => d.toISOString().slice(0, 10);
@@ -94,13 +96,14 @@ export function renderGantt(container, project, options={}) {
   rowL.setAttribute('aria-label',`Aufgabe ${task.name} bearbeiten`);
   if(!options.reorderable)rowL.tabIndex=0;
 }const title=el('div','task-title');
-    if(synthetic){title.innerHTML=`<strong><span class="phase-summary-arrow">${task.collapsed?'▶':'▼'}</span>${escapeHtml(task.name)} <span class="phase-summary-count">${task.taskCount}</span></strong><small>${fmtDate(toDate(task.start),{day:'2-digit',month:'2-digit',year:'2-digit'})} – ${fmtDate(toDate(task.end),{day:'2-digit',month:'2-digit',year:'2-digit'})} · ${clamp(Number(task.progress)||0,0,100)} %</small>`;}
+    if(synthetic){title.innerHTML=`<strong><span class="phase-summary-arrow">${icon(task.collapsed?'chevron-right':'chevron-down')}</span>${escapeHtml(task.name)} <span class="phase-summary-count">${task.taskCount}</span></strong><small>${fmtDate(toDate(task.start),{day:'2-digit',month:'2-digit',year:'2-digit'})} – ${fmtDate(toDate(task.end),{day:'2-digit',month:'2-digit',year:'2-digit'})} · ${clamp(Number(task.progress)||0,0,100)} %</small>`;}
     else{const risk=settings.showRisk!==false&&task.risk&&task.risk!=='none'?`<span class="risk-dot ${task.risk}"></span>`:'';title.innerHTML=`<strong>${risk}${escapeHtml(task.name)}</strong><small>${fmtDate(toDate(task.start),{day:'2-digit',month:'2-digit',year:'2-digit'})} – ${fmtDate(toDate(task.end),{day:'2-digit',month:'2-digit',year:'2-digit'})}${settings.showProgressLabels?` · ${clamp(Number(task.progress)||0,0,100)} %`:''}</small>`;}
     if(!synthetic && options.reorderable){
       // Two separate focus targets: the drag grip and the task editor.
       // Do not nest a native button inside a role=button row.
       const group=el('div','gantt-task-content');
-      const handle=el('button','gantt-order-handle','⠿');
+      const handle=el('button','gantt-order-handle');
+       handle.innerHTML=icon('grip-vertical');
       handle.type='button';
       handle.dataset.ganttOrderHandle='';
       handle.dataset.taskId=task.id;
