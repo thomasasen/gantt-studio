@@ -7,7 +7,7 @@ export function localTodayIso(now = new Date()) {
 }
 
 export function isValidIsoDate(value) {
-  if (typeof value !== 'string' || !/^\\d{4}-(0[1-9]|1[0-2])-([0-2]\\d|3[01])$/.test(value)) return false;
+  if (typeof value !== 'string' || !/^\d{4}-(0[1-9]|1[0-2])-([0-2]\d|3[01])$/.test(value)) return false;
   const [year, month, day] = value.split('-').map(Number);
   if (day < 1) return false;
   const date = new Date(0);
