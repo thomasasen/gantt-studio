@@ -15,15 +15,39 @@ function openDb() {
   });
 }
 
-export async function saveLocal(project) {
+export async function saveLocal(project, expectedRevision = null) {
   const db = await openDb();
   return new Promise((resolve, reject) => {
     const tx = db.transaction(STORE, 'readwrite');
+    let revisionError = null;
     tx.oncomplete = () => { db.close(); resolve(); };
-    tx.onabort = () => { const error = tx.error || new Error('IndexedDB transaction aborted.'); db.close(); reject(error); };
-    tx.onerror = () => { const error = tx.error || new Error('IndexedDB write failed.'); reject(error); };
-    try { tx.objectStore(STORE).put(structuredClone(project)); }
-    catch (error) { try { tx.abort(); } catch {} reject(error); }
+    tx.onabort = () => {
+      const error = revisionError || tx.error || new Error('IndexedDB transaction aborted.');
+      db.close();
+      reject(error);
+    };
+    tx.onerror = () => { if (!revisionError) reject(tx.error || new Error('IndexedDB write failed.')); };
+    const store = tx.objectStore(STORE);
+    const put = () => {
+      try { store.put(structuredClone(project)); }
+      catch (error) { revisionError = error; try { tx.abort(); } catch {} reject(error); }
+    };
+    if (expectedRevision === null) {
+      put();
+    } else {
+      // Read and write in the SAME readwrite transaction. A second browser tab
+      // cannot silently overwrite a project with a more recent revision.
+      const request = store.get(project.id);
+      request.onsuccess = () => {
+        if (!request.result || Number(request.result.revision) !== Number(expectedRevision)) {
+          revisionError = new Error('Projekt wurde zwischenzeitlich geändert. Bitte neu laden und erneut versuchen.');
+          revisionError.name = 'ConcurrentModificationError';
+          tx.abort();
+          return;
+        }
+        put();
+      };
+    }
   });
 }
 
