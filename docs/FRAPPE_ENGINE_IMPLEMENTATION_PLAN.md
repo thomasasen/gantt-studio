@@ -136,12 +136,12 @@ engine.getCapabilities();       // objektive Unterstützung statt Annahmen
 
 ### Phase B – Engine-Abstraktion mit Native Engine (P1)
 
-- [ ] **B-01 – Verantwortlichkeiten kartieren:** In `app.js` und `gantt.js` Anwendungs-/Planungslogik, DOM-Rendering, Interaktion und Speichern einzeln zuordnen; dokumentieren, welche bestehende Regel in welches Modul wandert.
-- [ ] **B-02 – Minimalen Engine-Vertrag definieren:** Mount/Render/Update/Destroy, einheitliche Intents, Capabilities und View-State. JSDoc + Unit-/Contract-Tests; ausschließlich öffentliche Schnittstellen.
-- [ ] **B-03 – Native-Adapter erstellen:** Vorhandenen Renderer zunächst weitgehend unverändert kapseln; korrektes Mounting, Re-Rendering und idempotentes Teardown. Nicht gleichzeitig visuell redesignen.
-- [ ] **B-04 – Anwendung entkoppeln:** `app.js` spricht nur Controller/Vertrag; keine direkten Native-Gantt-Aufrufe außerhalb des Adapters. Projektzustand, Filter, Phasenprojektion und Befehle liegen außerhalb des Renderers.
-- [ ] **B-05 – Cache-/Build-Konsistenz:** Statische ESM-Importpfade und Versionsparameter in `index.html`/`app.js`/abhängigen Modulen atomar aktualisieren. Bestehenden „alte ESM-Module“-Regressionstest erhalten.
-- [ ] **B-06 – Technische Tests:** Vertrag für Empty State, Mount/Destroy, Zoom, Projektwechsel, mehrfaches Rendern, Event-Duplikate, Filter, Phasen sowie Klick/Drag/Resize/Progress/Reorder.
+- [x] **B-01 – Verantwortlichkeiten kartieren:** In `app.js` und `gantt.js` Anwendungs-/Planungslogik, DOM-Rendering, Interaktion und Speichern einzeln zuordnen; dokumentieren, welche bestehende Regel in welches Modul wandert.
+- [x] **B-02 – Minimalen Engine-Vertrag definieren:** Mount/Render/Update/Destroy, einheitliche Intents, Capabilities und View-State. JSDoc + Unit-/Contract-Tests; ausschließlich öffentliche Schnittstellen.
+- [x] **B-03 – Native-Adapter erstellen:** Vorhandenen Renderer zunächst weitgehend unverändert kapseln; korrektes Mounting, Re-Rendering und idempotentes Teardown. Nicht gleichzeitig visuell redesignen.
+- [x] **B-04 – Anwendung entkoppeln:** `app.js` spricht nur Controller/Vertrag; keine direkten Native-Gantt-Aufrufe außerhalb des Adapters. Projektzustand, Filter, Phasenprojektion und Befehle liegen außerhalb des Renderers.
+- [x] **B-05 – Cache-/Build-Konsistenz:** Statische ESM-Importpfade und Versionsparameter in `index.html`/`app.js`/abhängigen Modulen atomar aktualisieren. Bestehenden „alte ESM-Module“-Regressionstest erhalten.
+- [x] **B-06 – Technische Tests:** Vertrag für Empty State, Mount/Destroy, Zoom, Projektwechsel, mehrfaches Rendern, Event-Duplikate, Filter, Phasen sowie Klick/Drag/Resize/Progress/Reorder.
 - [ ] **B-07 – Visuelle Regression:** Native Engine bleibt in allen elf Designs, 390/768/1024/1440px, 200-%-Zoom, Tastatur, Reduced Motion und Druck gleichwertig.
 
 **Gate B (mergefähiger Zustand):** Native Engine ist vollständig kompatibel; Auslieferung ohne Frappe-Dependency möglich. Erst dann darf der reine Architektur-PR für `main` zur Freigabe vorbereitet werden. **Nicht selbstständig mergen.**
@@ -264,6 +264,20 @@ Erst nach Gate B den separaten Branch `spike/frappe-gantt-adapter` von einem **f
 | `design-presets.mjs`, CSS, Icons | Elf Themen, Print, Accessibility, v2.x ESM-Cache | Engineübergreifendes Design-/Auslieferungssystem |
 
 **Red-Team-Risiken vor B:** Ein direkter Rendererwechsel darf keine Stage-Handler doppelt registrieren, Pointer-Listener beim Destroy zurücklassen oder den DOM der Native-Engine auslesen, um Projektzustände zu rekonstruieren. Die Revisionsprüfung verhindert stille Mehrtab-Überschreibung, aber die UI muss einen Konflikt verständlich anzeigen. Die Cache-Regression muss mit jedem neuen ESM-Knoten erweitert werden.
+
+### Umsetzungssitzung 05.11.2026: Phase B / Native-Abstraktion (laufend)
+
+**Engine-Vertrag:** `assets/js/engine/engine-contract.mjs` definiert den Lifecycle `mount`, `render`, `setViewport`, `cancelInteraction`, `locateMarker`, `destroy` und `getCapabilities`. Controller/Adapter erhalten eine isolierte, rekursiv eingefrorene Projektion; der kanonische Projektstand wird nie an einen Renderer übergeben. Fachliche Intents sind `task-change`, `reorder` und `nudge` (kein Speichern in der Engine). Zustandsfeedback zum abgebrochenen/ungültigen Drag wird separat ohne Commit zugestellt.
+
+**Adapterstruktur:** `engine-controller.mjs` stellt eine austauschbare Factory mit wiederherstellbarem View-State, Zoom-/Scrollzustand und Rückfall bei fehlgeschlagenem Adapterwechsel bereit. `native/native-adapter.mjs` kapselt den existierenden `gantt.js`-Renderer, `native/native-interactions.mjs` die native DOM-spezifischen Selektions-, Pointer- und Keyboard-Handler. Die Anwendung `app.js` behält nur Projektprojektion, fachliches Validieren/Committen, Phasenstatus und Engine-Intent-Verarbeitung. `gantt.js` räumt aktive Pointer-Listener durch den expliziten `destroy`-Rückgabevertrag ab. Native ist weiterhin die **einzige** Engine; Frappe ist keine Dependency. Keine Schema- oder CSS-Änderung.
+
+**Cache/CI:** Die vollständige ESM-Importkette ist versioniert mit `v=2.8.0`; verschachtelte Module werden durch `tests/module-cache.spec.cjs` geprüft. Die beiden bestehenden Workflows prüfen die neuen Engine-Dateien. Der Betrieb bleibt statisch ohne Build, Node-Laufzeit im Browser oder Fremd-CDN.
+
+**Testnachweise:** [Run #42124584311](https://github.com/thomasasen/gantt-studio/actions/runs/42124584311) **53/53 Browser-/Contract-Tests erfolgreich**, einschließlich Native-Interaktionen, Lifecycle (12 × Mount/Destroy), Adapterwechsel und Rückfall. [Run #42124953256](https://github.com/thomasasen/gantt-studio/actions/runs/42124953256) **54/54 erfolgreich**, inklusive JSON-v1-Roundtrip; das ergänzte 200-%-Zoom-Szenario und die vollständige CI auf dem neuesten Commit stehen noch aus. Bestehende Design-, A11y-, Dark-/Hybrid-, Print-, Responsive-, Drag-/Resize- und Reorder-Tests bleiben aktiv und sind nicht abgeschwächt worden.
+
+**Red-Team-Befunde und Korrekturen:** (1) Native-DOM-spezifische Stage-Handler in `app.js` hätten andere Engines blockiert; in den Native-Adapter verlegt. (2) Aus einem Teardown während laufendem Pointer-Drag konnten Listener verbleiben; explizites Cancel-Register implementiert. (3) Nach Handler-Extraktion fehlte die verständliche Abbruch-Statusmeldung; nach Browser-Gegenprobe wiederhergestellt. (4) Contract-Tests dürfen das strikte JS-Verhalten bei mutierten `Object.freeze`-Objekten nicht falsch bewerten; Prüfung korrigiert. (5) ESM-Importe über mehrere verschachtelte Module überprüfbar versioniert. Restrisiko: keine manuell durchgeführte vollständige visuelle Vorher/Nachher-Pixelprüfung aller elf Themen; diese ist unabhängig von der erfolgreichen Browser-Suite zu behandeln.
+
+**Nächster Schritt:** 200-%-Zoom und letzte CI-Suite auswerten. Danach B-07/Gate B nur bei grünem Teststand prüfen; PR ausschließlich als Draft für Review vorbereiten, niemals automatisch mergen. Frappe-Spike erst von **freigegebenem** Abstraktionsstand und in separatem Branch.
 
 ## 9. Optimaler Umsetzungs-Prompt für einen neuen Codex-/ChatGPT-Arbeitslauf
 
