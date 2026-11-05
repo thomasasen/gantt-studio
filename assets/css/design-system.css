@@ -1045,7 +1045,8 @@ button:disabled, input:disabled, select:disabled { opacity: .52; cursor: not-all
   background:linear-gradient(
     180deg,
     var(--preview-primary,#20374E) 0 34px,
-    var(--preview-page,#F3F6F8) 34px 100%
+    var(--preview-page,#F3F6F8) 34px 47px,
+    var(--preview-panel,#FFFFFF) 47px 100%
   );
 }
 @media(max-width:760px){
