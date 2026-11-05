@@ -15,7 +15,11 @@ test('manual reorder by pointer persists, synchronizes Gantt and preserves plann
   const b=originalRows[i+1];
   const grip=page.locator(`#taskTableBody tr[data-task-row-id="${a.id}"] .task-drag-handle`);
   const target=page.locator(`#taskTableBody tr[data-task-row-id="${b.id}"]`);
+  await grip.scrollIntoViewIfNeeded();
+  await target.scrollIntoViewIfNeeded();
   const from=await grip.boundingBox(),to=await target.boundingBox();
+  expect(from.y).toBeGreaterThanOrEqual(0);
+  expect(to.y+to.height).toBeLessThanOrEqual(900);
   await page.mouse.move(from.x+from.width/2,from.y+from.height/2);
   await page.mouse.down();
   await page.mouse.move(to.x+55,to.y+to.height*.83,{steps:8});
@@ -59,6 +63,7 @@ test('keyboard reorder, Escape cancellation, other-phase rejection',async({page}
   await expect(page.locator('#taskTableBody tr[data-task-row-id]').nth(idx)).toHaveAttribute('data-task-row-id',second.id);
   const handle2=page.locator(`tr[data-task-row-id="${second.id}"] .task-drag-handle`);
   const target=page.locator(`tr[data-task-row-id="${first.id}"]`);
+  await handle2.scrollIntoViewIfNeeded();
   const from=await handle2.boundingBox(),to=await target.boundingBox();
   await page.mouse.move(from.x+10,from.y+12);await page.mouse.down();
   await page.mouse.move(to.x+40,to.y+to.height*.84,{steps:6});
