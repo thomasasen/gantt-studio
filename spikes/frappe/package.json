@@ -1,0 +1,13 @@
+{
+  "name": "gantt-studio-frappe-spike",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Isolated Frappe Gantt 1.2.2 feasibility experiment. Not loaded by production.",
+  "scripts": {
+    "build": "node ./build.mjs"
+  },
+  "dependencies": {
+    "frappe-gantt": "1.2.2"
+  }
+}
