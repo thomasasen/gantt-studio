@@ -88,7 +88,7 @@ export function renderGantt(container, project, options={}) {
   const holidays=new Set((project.planning?.holidays||[]).map(h=>h.date)),settings=project.planning?.settings||{},phases=project.planning?.phases||[];
 
   tasks.forEach((task,index)=>{
-    const synthetic=task.syntheticPhase===true,rowL=el('div',`task-row-left${synthetic?' phase-summary-row':''}`);if(synthetic){rowL.dataset.phaseId=String(task.phaseId);rowL.setAttribute('role','button');rowL.tabIndex=0;rowL.setAttribute('aria-expanded',String(!task.collapsed));rowL.title='Phase ein- oder ausklappen';}else rowL.dataset.taskId=task.id;const title=el('div','task-title');
+    const synthetic=task.syntheticPhase===true,rowL=el('div',`task-row-left${synthetic?' phase-summary-row':''}`);if(synthetic){rowL.dataset.phaseId=String(task.phaseId);rowL.setAttribute('role','button');rowL.tabIndex=0;rowL.setAttribute('aria-expanded',String(!task.collapsed));rowL.title='Phase ein- oder ausklappen';}else{rowL.dataset.taskId=task.id;rowL.setAttribute('role','button');rowL.tabIndex=0;rowL.setAttribute('aria-label',`Aufgabe ${task.name} bearbeiten`);}const title=el('div','task-title');
     if(synthetic){title.innerHTML=`<strong><span class="phase-summary-arrow">${task.collapsed?'▶':'▼'}</span>${escapeHtml(task.name)} <span class="phase-summary-count">${task.taskCount}</span></strong><small>${fmtDate(toDate(task.start),{day:'2-digit',month:'2-digit',year:'2-digit'})} – ${fmtDate(toDate(task.end),{day:'2-digit',month:'2-digit',year:'2-digit'})} · ${clamp(Number(task.progress)||0,0,100)} %</small>`;}
     else{const risk=settings.showRisk!==false&&task.risk&&task.risk!=='none'?`<span class="risk-dot ${task.risk}"></span>`:'';title.innerHTML=`<strong>${risk}${escapeHtml(task.name)}</strong><small>${fmtDate(toDate(task.start),{day:'2-digit',month:'2-digit',year:'2-digit'})} – ${fmtDate(toDate(task.end),{day:'2-digit',month:'2-digit',year:'2-digit'})}${settings.showProgressLabels?` · ${clamp(Number(task.progress)||0,0,100)} %`:''}</small>`;}
     rowL.append(title,el('div','owner',synthetic?`${task.taskCount} Aufgaben`:(settings.showOwners===false?'':(task.owner||'—'))));rowL.appendChild(synthetic?el('span','status-pill phase-pill','Phase'):el('span',`status-pill ${task.status||'neutral'}`,statusLabel(task.status)));left.appendChild(rowL);
@@ -96,7 +96,7 @@ export function renderGantt(container, project, options={}) {
     const rowR=el('div',`task-row-right${synthetic?' phase-summary-row':''}`);if(!synthetic)rowR.dataset.taskId=task.id;rowR.style.width=`${timelineWidth}px`;
     for(let d=0;d<totalDays;d++){const date=addDays(start,d),weekend=[0,6].includes(date.getUTCDay()),holiday=holidays.has(iso(date));if((settings.showWeekends!==false&&weekend)||(settings.showHolidays!==false&&holiday)){const band=el('div',`day-band${weekend?' weekend':''}${holiday?' holiday':''}`);band.style.left=`${d*cfg.px}px`;band.style.width=`${cfg.px}px`;rowR.appendChild(band);}}
     if(settings.showPhaseBands!==false&&task.phaseId&&!synthetic){const phase=phases.find(p=>p.id===task.phaseId);if(phase){const p=el('div','phase-band');p.style.left='0';p.style.right='0';p.style.background=phase.color||'#dde7f0';rowR.appendChild(p);}}
-    const leftPx=daysBetween(iso(start),task.start)*cfg.px,widthPx=Math.max(cfg.px,(daysBetween(task.start,task.end)+1)*cfg.px),bar=el('div',`gantt-bar ${synthetic?'phase-summary':(task.type||'workstream')}`);if(!synthetic)bar.dataset.taskId=task.id;bar.style.left=`${leftPx}px`;bar.style.width=`${widthPx}px`;if(synthetic){bar.style.background=task.phaseColor||'#DCE8EB';bar.appendChild(el('span','bar-label',`${task.name} · ${task.taskCount} Aufgaben`));}
+    const leftPx=daysBetween(iso(start),task.start)*cfg.px,widthPx=Math.max(cfg.px,(daysBetween(task.start,task.end)+1)*cfg.px),bar=el('div',`gantt-bar ${synthetic?'phase-summary':(task.type||'workstream')}`);if(!synthetic){bar.dataset.taskId=task.id;bar.setAttribute('role','button');bar.tabIndex=0;bar.setAttribute('aria-label',`Aufgabe ${task.name} bearbeiten`);}bar.style.left=`${leftPx}px`;bar.style.width=`${widthPx}px`;if(synthetic){bar.style.background=task.phaseColor||'#DCE8EB';bar.appendChild(el('span','bar-label',`${task.name} · ${task.taskCount} Aufgaben`));}
     else{if(settings.showProgressLabels!==false&&!['milestone','gate'].includes(task.type)){const prog=el('div','progress-fill');prog.style.width=`${clamp(Number(task.progress)||0,0,100)}%`;bar.appendChild(prog);}if(!['milestone','gate'].includes(task.type)){const parts=[task.name];if(settings.showProgressLabels!==false)parts.push(`${clamp(Number(task.progress)||0,0,100)} %`);if(settings.showOwners!==false&&task.owner)parts.push(task.owner);if(settings.showDateLabels!==false)parts.push(`${fmtDate(toDate(task.start),{day:'2-digit',month:'2-digit'})}–${fmtDate(toDate(task.end),{day:'2-digit',month:'2-digit'})}`);bar.appendChild(el('span','bar-label',parts.join(' · ')));}addInteractionHandles(bar,task,settings);}
     rowR.appendChild(bar);
     if(!synthetic&&settings.showBaseline!==false&&task.baselineStart&&task.baselineEnd){const b=el('div','baseline');b.style.left=`${daysBetween(iso(start),task.baselineStart)*cfg.px}px`;b.style.width=`${Math.max(cfg.px,(daysBetween(task.baselineStart,task.baselineEnd)+1)*cfg.px)}px`;rowR.appendChild(b);}
@@ -124,11 +124,120 @@ lineItems.sort((a,b)=>a.date-b.date).forEach(item=>{
 }
 
 function addInteractionHandles(bar,task,settings){if(['milestone','gate'].includes(task.type))return;const l=el('span','bar-handle left'),r=el('span','bar-handle right');l.title='Start verschieben';r.title='Ende verschieben';bar.append(l,r);if(settings.showProgressLabels!==false){const h=el('span','progress-handle');h.style.left=`${clamp(Number(task.progress)||0,0,100)}%`;h.title='Fortschritt anpassen';bar.appendChild(h);}}
-function attachInteraction(bar,task,cfg,options){if(typeof options.onTaskChange!=='function')return;bar.addEventListener('pointerdown',e=>{if(e.button!==0)return;const target=e.target,mode=target.classList.contains('progress-handle')?'progress':target.classList.contains('left')?'resize-left':target.classList.contains('right')?'resize-right':'move';e.preventDefault();e.stopPropagation();const startX=e.clientX,origLeft=parseFloat(bar.style.left)||0,origWidth=parseFloat(bar.style.width)||cfg.px;bar.setPointerCapture(e.pointerId);bar.classList.add('dragging');let moved=false;
-    const onMove=ev=>{const dx=ev.clientX-startX;if(Math.abs(dx)>2)moved=true;if(mode==='move')bar.style.left=`${origLeft+dx}px`;else if(mode==='resize-left'){const max=origWidth-cfg.px,used=clamp(dx,-999999,max);bar.style.left=`${origLeft+used}px`;bar.style.width=`${origWidth-used}px`;}else if(mode==='resize-right'){bar.style.width=`${Math.max(cfg.px,origWidth+dx)}px`;}else{const rect=bar.getBoundingClientRect(),pct=clamp((ev.clientX-rect.left)/rect.width*100,0,100);target.style.left=`${pct}%`;const fill=bar.querySelector('.progress-fill');if(fill)fill.style.width=`${pct}%`;}};
-    const onUp=async ev=>{bar.removeEventListener('pointermove',onMove);bar.removeEventListener('pointerup',onUp);bar.removeEventListener('pointercancel',onUp);bar.classList.remove('dragging');if(!moved&&mode!=='progress')return;window.__ganttDragUntil=Date.now()+350;const change={id:task.id};if(mode==='move'){const delta=Math.round(((parseFloat(bar.style.left)||origLeft)-origLeft)/cfg.px);change.start=iso(addDays(toDate(task.start),delta));change.end=iso(addDays(toDate(task.end),delta));}else if(mode==='resize-left'){const delta=Math.round(((parseFloat(bar.style.left)||origLeft)-origLeft)/cfg.px);const candidate=iso(addDays(toDate(task.start),delta));change.start=candidate>task.end?task.end:candidate;}else if(mode==='resize-right'){const days=Math.max(1,Math.round((parseFloat(bar.style.width)||origWidth)/cfg.px));change.end=iso(addDays(toDate(task.start),days-1));}else{const rect=bar.getBoundingClientRect();change.progress=clamp((ev.clientX-rect.left)/rect.width*100,0,100);}await options.onTaskChange(change);};
-    bar.addEventListener('pointermove',onMove);bar.addEventListener('pointerup',onUp);bar.addEventListener('pointercancel',onUp);
-  });}
+function attachInteraction(bar, task, cfg, options) {
+  if (typeof options.onTaskChange !== 'function') return;
+  bar.addEventListener('pointerdown', event => {
+    if (event.button !== 0 || !event.isPrimary) return;
+    const target = event.target;
+    const mode = target.classList.contains('progress-handle') ? 'progress'
+      : target.classList.contains('left') ? 'resize-left'
+      : target.classList.contains('right') ? 'resize-right' : 'move';
+    event.preventDefault();
+    event.stopPropagation();
+
+    const pointerId = event.pointerId;
+    const startX = event.clientX;
+    const origLeft = Number.parseFloat(bar.style.left) || 0;
+    const origWidth = Number.parseFloat(bar.style.width) || cfg.px;
+    const handle = bar.querySelector('.progress-handle');
+    const fill = bar.querySelector('.progress-fill');
+    const origProgress = clamp(Number(task.progress) || 0, 0, 100);
+    let previewProgress = origProgress;
+    let moved = false;
+    let active = true;
+
+    const restore = () => {
+      bar.style.left = `${origLeft}px`;
+      bar.style.width = `${origWidth}px`;
+      if (handle) handle.style.left = `${origProgress}%`;
+      if (fill) fill.style.width = `${origProgress}%`;
+    };
+    const cleanup = () => {
+      if (!active) return false;
+      active = false;
+      bar.removeEventListener('pointermove', onMove);
+      bar.removeEventListener('pointerup', onUp);
+      bar.removeEventListener('pointercancel', onCancel);
+      bar.removeEventListener('lostpointercapture', onCancel);
+      window.removeEventListener('keydown', onKeyDown, true);
+      bar.classList.remove('dragging');
+      if (bar.hasPointerCapture(pointerId)) bar.releasePointerCapture(pointerId);
+      return true;
+    };
+    const suppressClick = () => { window.__ganttDragUntil = Date.now() + 350; };
+    const onMove = e => {
+      if (!active || e.pointerId !== pointerId) return;
+      const dx = e.clientX - startX;
+      if (Math.abs(dx) > 2) moved = true;
+      if (!moved) return;
+      if (mode === 'move') {
+        bar.style.left = `${origLeft + dx}px`;
+      } else if (mode === 'resize-left') {
+        const used = Math.min(dx, origWidth - cfg.px);
+        bar.style.left = `${origLeft + used}px`;
+        bar.style.width = `${origWidth - used}px`;
+      } else if (mode === 'resize-right') {
+        bar.style.width = `${Math.max(cfg.px, origWidth + dx)}px`;
+      } else {
+        const rect = bar.getBoundingClientRect();
+        previewProgress = clamp((e.clientX - rect.left) / rect.width * 100, 0, 100);
+        if (handle) handle.style.left = `${previewProgress}%`;
+        if (fill) fill.style.width = `${previewProgress}%`;
+      }
+    };
+    const onCancel = e => {
+      if (e && e.pointerId !== undefined && e.pointerId !== pointerId) return;
+      if (!cleanup()) return;
+      restore();
+      suppressClick();
+    };
+    const onKeyDown = e => {
+      if (e.key !== 'Escape') return;
+      e.preventDefault();
+      e.stopPropagation();
+      onCancel();
+    };
+    const onUp = async e => {
+      if (e.pointerId !== pointerId || !cleanup()) return;
+      if (!moved) return;
+      suppressClick();
+      const change = { id: task.id };
+      if (mode === 'move' || mode === 'resize-left') {
+        const currentLeft = Number.parseFloat(bar.style.left);
+        const delta = Math.round((currentLeft - origLeft) / cfg.px);
+        if (!delta) { restore(); return; }
+        if (mode === 'move') {
+          change.start = iso(addDays(toDate(task.start), delta));
+          change.end = iso(addDays(toDate(task.end), delta));
+        } else {
+          const candidate = iso(addDays(toDate(task.start), delta));
+          change.start = candidate > task.end ? task.end : candidate;
+          if (change.start === task.start) { restore(); return; }
+        }
+      } else if (mode === 'resize-right') {
+        const days = Math.max(1, Math.round(Number.parseFloat(bar.style.width) / cfg.px));
+        change.end = iso(addDays(toDate(task.start), days - 1));
+        if (change.end === task.end) { restore(); return; }
+      } else {
+        change.progress = clamp(Math.round(previewProgress), 0, 100);
+        if (change.progress === origProgress) { restore(); return; }
+      }
+      try {
+        await options.onTaskChange(change);
+      } catch (error) {
+        restore();
+        console.error('Gantt-Änderung konnte nicht gespeichert werden:', error);
+      }
+    };
+    bar.addEventListener('pointermove', onMove);
+    bar.addEventListener('pointerup', onUp);
+    bar.addEventListener('pointercancel', onCancel);
+    bar.addEventListener('lostpointercapture', onCancel);
+    window.addEventListener('keydown', onKeyDown, true);
+    bar.classList.add('dragging');
+    bar.setPointerCapture(pointerId);
+  });
+}
 
 function makeDependencies(tasks,start,px,width,height){const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.setAttribute('class','dependency-layer');svg.setAttribute('width',width);svg.setAttribute('height',height-56);svg.setAttribute('viewBox',`0 0 ${width} ${height-56}`);svg.innerHTML='<defs><marker id="arrowhead" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 z" fill="#657983"/></marker></defs>';const map=new Map(tasks.map((t,i)=>[t.id,{task:t,index:i}]));tasks.forEach((task,index)=>{if(task.syntheticPhase)return;(task.dependencies||[]).forEach(depId=>{const dep=map.get(depId);if(!dep||dep.task.syntheticPhase)return;const x1=(daysBetween(iso(start),dep.task.end)+1)*px,y1=dep.index*48+24,x2=daysBetween(iso(start),task.start)*px,y2=index*48+24,mid=Math.max(x1+10,x1+(x2-x1)/2),path=document.createElementNS('http://www.w3.org/2000/svg','path');path.setAttribute('class','dependency-line');path.setAttribute('d',`M ${x1} ${y1} H ${mid} V ${y2} H ${Math.max(mid,x2-5)}`);svg.appendChild(path);});});return svg;}
 function addVerticalLine(parent,start,px,date,lineClass,labelClass,label,width,height,color,labelLanes=[]){
