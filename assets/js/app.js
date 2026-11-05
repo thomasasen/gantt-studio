@@ -693,7 +693,7 @@ function handleTaskTableKeydown(e){
   const handle=e.target.closest('[data-task-drag-handle]');
   if(handle && ['ArrowUp','ArrowDown'].includes(e.key)){
     e.preventDefault();
-    if(canReorderTasks())void commitTaskMove(()=>nudgeTask(envelope.project,handle.dataset.taskId,e.key==='ArrowUp'?-1:1),handle.dataset.taskId);
+    if(canReorderTasks())void commitTaskMove(project=>nudgeTask(project,handle.dataset.taskId,e.key==='ArrowUp'?-1:1),handle.dataset.taskId);
     return;
   }
   const cell=e.target.closest('td[data-task-field]');
