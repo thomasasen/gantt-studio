@@ -2,7 +2,7 @@
  * Native-only task-list interactions. This module depends on the native DOM,
  * not on the project's storage, scheduler or canonical model.
  */
-export function createNativeInteractions({container,onIntent,onSelect,onError}) {
+export function createNativeInteractions({container,onIntent,onSelect,onError,onStatus=()=>{}}) {
   let project=null,view=null,drag=null,suppressClickUntil=0;
 
   const emit=intent=>{
@@ -45,6 +45,7 @@ export function createNativeInteractions({container,onIntent,onSelect,onError}) 
     handle?.focus({preventScroll:true});
     suppressClickUntil=Date.now()+350;
     window.__ganttDragUntil=suppressClickUntil;
+    onStatus('Verschieben im Gantt abgebrochen.');
   }
   function start(event){
     if(!view?.reorderable||event.button!==0||!event.isPrimary||drag)return;
@@ -103,6 +104,7 @@ export function createNativeInteractions({container,onIntent,onSelect,onError}) 
     if(!active)return;
     suppressClickUntil=Date.now()+350;
     window.__ganttDragUntil=suppressClickUntil;
+    if(!drop)onStatus('Keine gültige Position innerhalb dieser Phase gewählt.');
     if(drop&&view?.reorderable)
       emit({type:'reorder',taskId:sourceId,targetId:drop.targetId,place:drop.place,surface:'gantt'});
   }
