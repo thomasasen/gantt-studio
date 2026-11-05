@@ -28,7 +28,8 @@
 | Darstellung und Optionen | `sliders-horizontal` | Einstellungen |
 | Farbvorlagen | `palette` | Design |
 | Hilfe | `help-circle` | Hilfe und Legende |
-| Ein-/Ausklappen | `chevron-up`, `chevron-down`, `chevron-right` | Zustandsabhängig |
+| Einzelne Phase ein-/ausklappen | `chevron-up`, `chevron-down`, `chevron-right` | Zustandsabhängig |
+| Alle Phasen auf-/zuklappen | `chevrons-down`, `chevrons-up` | Eindeutige Richtungszeichen |
 | Manuelle Reihenfolge | `grip-vertical` | Ausschließlich Drag-Griff |
 | Externer Dokumentlink | `external-link` | Link + Text |
 | Bestätigen/Abbrechen | `check` / `x` | Icon-only nur mit `aria-label` |

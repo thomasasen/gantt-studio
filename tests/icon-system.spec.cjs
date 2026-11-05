@@ -92,6 +92,7 @@ test('keyboard controls, narrow screens and baseline comparison screenshots', as
     await page.goto('https://thomasasen.github.io/gantt-studio/',{waitUntil:'domcontentloaded',timeout:14000});
     await page.locator('#loadDemoBtn').click({timeout:6000});
     await expect(page.locator('#taskTableBody [data-task-row-id]')).toHaveCount(10,{timeout:9000});
+    await page.locator('#toast').evaluate(node => node.classList.remove('show'));
     await page.screenshot({path:'visual-review/icon-before-desktop.png',fullPage:true});
   } catch {
     test.info().annotations.push({type:'baseline',description:'Public pre-change screenshot unavailable'});
@@ -100,6 +101,9 @@ test('keyboard controls, narrow screens and baseline comparison screenshots', as
   await expect(page.locator('#projectSelect')).not.toHaveValue('');
   await page.locator('#loadDemoBtn').click();
   await expect(page.locator('#taskTableBody [data-task-row-id]')).toHaveCount(10);
+  await page.locator('#toast').evaluate(node => node.classList.remove('show'));
+  const toolbarRows=await page.evaluate(() => ({settings:document.querySelector('#moreSettingsDetails').getBoundingClientRect().y,zoom:document.querySelector('.zoom-cluster').getBoundingClientRect().y}));
+  expect(Math.abs(toolbarRows.settings-toolbarRows.zoom),'Settings must share the first toolbar row on desktop').toBeLessThanOrEqual(6);
   await page.screenshot({path:'visual-review/icon-after-desktop.png',fullPage:true});
   await page.locator('#planningTabBtn').click();
   await page.screenshot({path:'visual-review/icon-after-planning.png',fullPage:true});
