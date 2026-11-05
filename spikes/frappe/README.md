@@ -45,3 +45,13 @@ GitHub-Action baut die Assets vor den Browserprüfungen neu.
 
 Der Masterplan `docs/FRAPPE_ENGINE_IMPLEMENTATION_PLAN.md` dokumentiert Gate C,
 Testbelege, Risiken, Feature-Lücken und die spätere Go/No-Go-Entscheidung.
+
+## Verifizierter Befund (06.11.2026)
+
+Die bestehenden GitHub-Actions-Läufe `42128331295` (7/7 Adapter-Tests) und
+`42128331083` (60/60 Playwright-Tests) waren erfolgreich. Dies ist noch keine
+Lifecycle-Abnahme: Frappe 1.2.2 registriert im Konstruktor über
+`bind_bar_events()` einen globalen `document.addEventListener('mouseup', ...)`
+ohne passende öffentliche Dispose-API. Der bisherige Adapter konstruiert bei
+jedem `render()` neu. DOM-Bereinigung allein löst das Listener-Risiko nicht.
+Deshalb ist Gate C bis zum Nachweis einer sauberen Isolation gesperrt.
