@@ -14,10 +14,10 @@ function contrast(foreground,background='#FFFFFF'){
   return (Math.max(a,b)+.05)/(Math.min(a,b)+.05);
 }
 
-test('nine design presets preserve the original six palettes and keep bar label contrast',async()=>{
-  const {DESIGN_PRESETS,DESIGN_COLOR_FIELDS,findDesignPreset,matchDesignPreset,isDarkDesignColors}
+test('eleven design presets preserve the originals and keep readable bar labels',async()=>{
+  const {DESIGN_PRESETS,DESIGN_COLOR_FIELDS,findDesignPreset,matchDesignPreset,isDarkDesignColors,isHybridDesignColors,designThemeMode}
     =await import('../assets/js/design-presets.mjs');
-  expect(DESIGN_PRESETS.map(p=>p.id)).toEqual(['odin','neutral',...newPresets,'mitternacht','graphit','waldnacht']);
+  expect(DESIGN_PRESETS.map(p=>p.id)).toEqual(['odin','neutral',...newPresets,'mitternacht','graphit','waldnacht','fjordlicht','kupferatelier']);
   expect(findDesignPreset('odin').colors.primary).toBe('#20374E');
   expect(findDesignPreset('neutral').colors.primary).toBe('#334155');
   expect(findDesignPreset('unknown')).toBeNull();
@@ -29,7 +29,7 @@ test('nine design presets preserve the original six palettes and keep bar label 
     expect(match?.id).toBe(p.id);
     combos.add(DESIGN_COLOR_FIELDS.map(key=>p.colors[key]).join('|'));
   }
-  expect(combos.size).toBe(9);
+  expect(combos.size).toBe(11);
   expect(matchDesignPreset({...DESIGN_PRESETS[0].colors,accent:'#112233'})).toBeNull();
   for(const id of newPresets){
     const p=findDesignPreset(id);
@@ -48,9 +48,22 @@ test('nine design presets preserve the original six palettes and keep bar label 
     expect(contrast('#CED9E3',p.colors.panelBg),id+' primary body text').toBeGreaterThanOrEqual(7);
     expect(contrast('#A9B9C7',p.colors.panelBg),id+' secondary body text').toBeGreaterThanOrEqual(4.5);
   }
+  for(const id of ['fjordlicht','kupferatelier']){
+    const p=findDesignPreset(id);
+    expect(isHybridDesignColors(p.colors),id+' has intentional dark shell/light work canvas').toBe(true);
+    expect(designThemeMode(p.colors)).toBe('hybrid');
+    expect(contrast(p.colors.pageBg,p.colors.panelBg)).toBeGreaterThan(7);
+    expect(contrast(p.colors.pageBg,p.colors.panelBg)).toBeLessThan(11);
+    for(const key of ['primary','accent','workstream','critical','milestone','gate']){
+      expect(contrast(p.colors[key],'#FFFFFF'),id+' '+key+' keeps white labels readable').toBeGreaterThanOrEqual(4.5);
+    }
+    expect(contrast(p.colors.primary,p.colors.panelBg),id+' dark data text on light canvas').toBeGreaterThanOrEqual(6);
+    const custom={...p.colors,accent:'#466566'};
+    expect(designThemeMode(custom)).toBe('hybrid');
+  }
 });
 
-test('design gallery presents nine selectable miniature palettes and keeps cancel non-destructive',async({page})=>{
+test('design gallery presents eleven selectable miniature palettes and keeps cancel non-destructive',async({page})=>{
   await page.goto('/');
   await expect(page.locator('#projectSelect')).not.toHaveValue('');
   const startingPrimary=await page.locator('html').evaluate(el=>getComputedStyle(el).getPropertyValue('--primary').trim().toLowerCase());
@@ -59,7 +72,7 @@ test('design gallery presents nine selectable miniature palettes and keeps cance
   await expect(page.locator('#designDialog')).toBeVisible();
   await expect(page.locator('#saveDesignBtn')).toBeInViewport();
   const grid=page.locator('#designPresetGrid');
-  await expect(grid.locator('button')).toHaveCount(9);
+  await expect(grid.locator('button')).toHaveCount(11);
   await expect(page.locator('#designPresetOdin')).toBeVisible();
   await expect(page.locator('#designPresetNeutral')).toBeVisible();
   mkdirSync('visual-review',{recursive:true});
@@ -142,7 +155,7 @@ test('mobile design gallery remains usable without overflow, checked with access
   await page.locator('#designBtn').click();
   await expect(page.locator('#designDialog')).toBeVisible();
   await expect(page.locator('#saveDesignBtn')).toBeInViewport();
-  await expect(page.locator('#designPresetGrid button')).toHaveCount(9);
+  await expect(page.locator('#designPresetGrid button')).toHaveCount(11);
   await expect(page.locator('#designPresetGrid')).toBeInViewport();
   await expect(page.locator('#designPresetGrid [data-design-preset="marine"]')).toBeVisible();
   mkdirSync('visual-review',{recursive:true});
