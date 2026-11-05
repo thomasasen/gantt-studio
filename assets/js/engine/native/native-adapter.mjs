@@ -1,4 +1,5 @@
 import { renderGantt } from '../../gantt.js?v=2.8.0';
+import { createNativeInteractions } from './native-interactions.mjs?v=2.8.0';
 
 const CAPABILITIES=Object.freeze({
   id:'native', zoom:Object.freeze(['day','week','month']),
@@ -17,6 +18,7 @@ export function createNativeEngine() {
   let onIntent=()=>{};
   let activeRender=null;
   let viewport=null;
+  let interactions=null;
   return {
     getCapabilities:()=>CAPABILITIES,
     mount(options) {
@@ -24,10 +26,13 @@ export function createNativeEngine() {
       if(!options?.container)throw new TypeError('Mount container required.');
       container=options.container;
       onIntent=options.onIntent;
+      interactions=createNativeInteractions({container,onIntent:options.onIntent,
+        onSelect:options.onSelect,onError:options.onError});
     },
     render({project,view}) {
       if(!container)throw new Error('Native engine is not mounted.');
       this.cancelInteraction();
+      interactions.update(project,view);
       activeRender=renderGantt(container,project,{
         zoom:view.zoom,
         reorderable:view.reorderable,
@@ -43,11 +48,21 @@ export function createNativeEngine() {
       if(Number.isFinite(next.scrollTop)) container.parentElement.scrollTop=next.scrollTop;
     },
     cancelInteraction() {
+      interactions?.cancel();
       activeRender?.destroy?.();
       activeRender=null;
     },
+    locateMarker(kind) {
+      if(!container || kind!=='relative-target')return null;
+      const line=container.querySelector('.relative-today-line');
+      if(!line)return null;
+      const leftWidth=parseInt(getComputedStyle(document.documentElement)
+        .getPropertyValue('--left-width'))||430;
+      return {x:leftWidth+line.offsetLeft};
+    },
     destroy() {
       this.cancelInteraction();
+      interactions?.destroy();interactions=null;
       if(container)container.replaceChildren();
       container=null;
       onIntent=()=>{};
