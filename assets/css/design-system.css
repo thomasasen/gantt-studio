@@ -889,6 +889,22 @@ button:disabled, input:disabled, select:disabled { opacity: .52; cursor: not-all
 }
 .toast.error { background: #9b3942; }
 
+/* WCAG 2.1 AA: secondary text must be legible on both white and tinted rows.
+   The legacy project --muted color (#687d87) only reaches 4.19–4.31:1 on
+   several actual Gantt/table backgrounds. Use the stronger UI text token. */
+.empty-state,
+.task-title small,
+.task-row-left .owner,
+.task-table-note,
+.task-table-baseline,
+.relative-editor-head p,
+.relative-result-row span,
+.dialog .eyebrow {
+  color: var(--ui-muted);
+}
+.task-table-empty { color: var(--ui-muted) !important; }
+.time-minor { color: var(--ui-muted); }
+
 /* Responsive layouts */
 @media (max-width: 1320px) {
   .topbar { align-items: flex-start; }

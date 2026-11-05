@@ -74,6 +74,7 @@ test('Apple Design QA: responsive metrics and Gantt demo visual layout', async (
     expect(stats.docOverflow,`Unexpected page overflow at ${width}`).toBeLessThanOrEqual(2);
     expect(stats.metrics).toHaveLength(4);
     if(width<=600){
+      expect(stats.ganttLeftWidth, 'The mobile Gantt list must not hide the timeline').toBeLessThanOrEqual(195);
       expect(Math.abs(stats.metrics[3].width-stats.metrics[0].width),
         'All four KPI cards should form a balanced 2x2 grid').toBeLessThanOrEqual(2);
     }
