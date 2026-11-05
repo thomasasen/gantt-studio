@@ -59,7 +59,7 @@ test('design gallery presents six selectable miniature palettes and keeps cancel
   await expect(page.locator('#designPrimary')).toHaveValue('#184e67');
   await expect(grid.locator('[data-design-preset="nordlicht"]')).toHaveAttribute('aria-pressed','true');
   await expect(page.locator('#designPresetSelection')).toContainText('Nordlicht');
-  await expect(page.locator('html').evaluate(el=>getComputedStyle(el).getPropertyValue('--primary').trim().toLowerCase())).resolves.toBe(startingPrimary);
+  expect(await page.locator('html').evaluate(el=>getComputedStyle(el).getPropertyValue('--primary').trim().toLowerCase())).toBe(startingPrimary);
   await page.locator('#designAccent').fill('#124455');
   await expect(page.locator('#designPresetSelection')).toContainText('Individuelle');
   await expect(grid.locator('[aria-pressed="true"]')).toHaveCount(0);
@@ -104,7 +104,6 @@ test('all new designs can be saved, restored and selected after reload',async({p
     await expect(page.locator(`#designPresetGrid [data-design-preset="${id}"]`)).toHaveAttribute('aria-pressed','true');
     await page.locator('#designDialog button[value="cancel"]').last().click();
   }
-  await page.locator('#exportJsonBtn').count(); // Export/import contract remains unchanged.
 });
 
 test('mobile design gallery remains usable without overflow, checked with accessibility audit',async({page})=>{
