@@ -7,10 +7,10 @@ export function createEngineController(factory) {
   let mounted = false;
 
   return {
-    mount({container,onIntent,onSelect=()=>{},onError=()=>{}}) {
+    mount({container,onIntent,onSelect=()=>{},onError=()=>{},onStatus=()=>{}}) {
       if (mounted) throw new Error('Engine is already mounted.');
       engine=assertEngineContract(factory());
-      engine.mount({container,onIntent,onSelect,onError});
+      engine.mount({container,onIntent,onSelect,onError,onStatus});
       mounted=true;
     },
     render({project,view}) {
