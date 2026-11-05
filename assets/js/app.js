@@ -71,7 +71,8 @@ function normalizeEnvelope(raw) {
 async function boot() {
   hydrateIcons();
   engineController.mount({container:$('ganttStage'),onIntent:handleEngineIntent,
-    onSelect:handleEngineSelection,onError:error=>console.error('Gantt-Engine:',error)});
+    onSelect:handleEngineSelection,onError:error=>console.error('Gantt-Engine:',error),
+    onStatus:setTaskOrderStatus});
   window.addEventListener('beforeunload',()=>engineController.destroy(),{once:true});
   bindEvents();
   buildSettings();
