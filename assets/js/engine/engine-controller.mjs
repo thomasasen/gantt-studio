@@ -39,6 +39,9 @@ export function createEngineController(initialFactory) {
     locateMarker(kind) {
       return mounted?engine.locateMarker(kind):null;
     },
+    focusTask(id,control='reorder') {
+      return mounted?engine.focusTask(id,control):false;
+    },
     getCapabilities() {
       return assertEngineContract(engine||factory()).getCapabilities();
     },
