@@ -1248,6 +1248,453 @@ button:disabled, input:disabled, select:disabled { opacity: .52; cursor: not-all
   :where(input, select, textarea) { border-color: #637987; }
 }
 
+
+/* HYBRID DESIGN SYSTEM
+   Design review: place user controls in muted dark chrome, data on light paper.
+   Shared across Fjordlicht and Kupferatelier; no theme-name-specific selectors.
+   Intentional boundaries: shell, command bars, KPIs dark; Gantt/table/forms light. */
+@media screen {
+  :root[data-theme-mode="hybrid"]{
+    color-scheme:light;
+    --ui-canvas:var(--bg);
+    --ui-surface:var(--panel);
+    --ui-subtle:color-mix(in srgb,var(--panel) 91%,#fff);
+    --ui-ink:#243744;
+    --ui-muted:#425766;
+    --ui-outline:color-mix(in srgb,var(--panel) 78%,var(--bg));
+    --ui-shadow:0 6px 22px rgba(8,17,25,.11);
+    --hybrid-raised:color-mix(in srgb,var(--bg) 88%,var(--panel));
+    --hybrid-hover:color-mix(in srgb,var(--bg) 80%,var(--panel));
+    --hybrid-line:color-mix(in srgb,var(--bg) 69%,var(--panel));
+    --hybrid-text:color-mix(in srgb,var(--panel) 91%,var(--bg));
+    --hybrid-muted:color-mix(in srgb,var(--panel) 78%,var(--bg));
+    --hybrid-dark-ink:var(--bg);
+  }
+  :root[data-theme-mode="hybrid"] body{
+    background:var(--bg);
+    color:var(--hybrid-text);
+  }
+  :root[data-theme-mode="hybrid"] .panel{
+    background:var(--panel);
+    color:var(--ui-ink);
+    border-color:var(--ui-outline);
+    box-shadow:var(--ui-shadow);
+  }
+
+  /* Dark application frame */
+  :root[data-theme-mode="hybrid"] .topbar{
+    background:var(--bg);
+    color:var(--hybrid-text);
+    border-color:var(--hybrid-line);
+    box-shadow:0 3px 15px rgba(4,10,14,.15);
+    backdrop-filter:none;
+  }
+  :root[data-theme-mode="hybrid"] .brand strong,
+  :root[data-theme-mode="hybrid"] .topbar .brand strong{
+    color:var(--hybrid-text);
+  }
+  :root[data-theme-mode="hybrid"] .brand small{
+    color:var(--hybrid-muted);
+  }
+  :root[data-theme-mode="hybrid"] .brand-mark{
+    background:var(--hybrid-hover);
+    box-shadow:none;
+  }
+  :root[data-theme-mode="hybrid"] .local-badge,
+  :root[data-theme-mode="hybrid"] .project-local-chip{
+    background:#29483E;
+    color:#BFDFD1;
+    border-color:#45695C;
+  }
+  :root[data-theme-mode="hybrid"] .project-select,
+  :root[data-theme-mode="hybrid"] .topbar .btn{
+    background:var(--hybrid-raised);
+    border-color:var(--hybrid-line);
+    color:var(--hybrid-text);
+    box-shadow:none;
+  }
+  :root[data-theme-mode="hybrid"] .topbar .btn:hover{
+    background:var(--hybrid-hover);
+    border-color:var(--hybrid-muted);
+  }
+  :root[data-theme-mode="hybrid"] .topbar .btn.primary{
+    background:var(--accent);
+    border-color:var(--accent);
+    color:#fff;
+  }
+  :root[data-theme-mode="hybrid"] .topbar .btn.primary:hover{
+    background:color-mix(in srgb,var(--accent) 88%,var(--panel));
+    border-color:var(--accent);
+  }
+  :root[data-theme-mode="hybrid"] .topbar .danger-top{
+    background:#4A3435;
+    color:#F0C0B9;
+    border-color:#765152;
+  }
+  :root[data-theme-mode="hybrid"] .topbar .danger-top:hover{
+    background:#5A4142;
+  }
+  :root[data-theme-mode="hybrid"] .topbar .btn.demo-btn,
+  :root[data-theme-mode="hybrid"] .empty-actions .btn.demo-btn{
+    background:#2A4845;
+    color:#C5E0D7;
+    border-color:#486B65;
+  }
+  :root[data-theme-mode="hybrid"] .topbar .btn.demo-btn:hover{
+    background:#375752;
+  }
+  /* Project identification and KPIs are a dark information rail. */
+  :root[data-theme-mode="hybrid"] .project-head{
+    background:linear-gradient(110deg,var(--bg),var(--hybrid-raised));
+    border-color:var(--hybrid-line);
+    color:var(--hybrid-text);
+  }
+  :root[data-theme-mode="hybrid"] .project-head .eyebrow,
+  :root[data-theme-mode="hybrid"] .project-meta,
+  :root[data-theme-mode="hybrid"] .project-head-side{
+    color:var(--hybrid-muted);
+  }
+  :root[data-theme-mode="hybrid"] .project-name{
+    background:transparent;
+    border-color:transparent;
+    color:var(--hybrid-text);
+  }
+  :root[data-theme-mode="hybrid"] .project-name:hover,
+  :root[data-theme-mode="hybrid"] .project-name:focus-visible{
+    background:var(--hybrid-hover);
+    border-color:var(--hybrid-line);
+    color:var(--hybrid-text);
+  }
+  :root[data-theme-mode="hybrid"] .metric{
+    background:var(--hybrid-raised);
+    border-color:var(--hybrid-line);
+    color:var(--hybrid-text);
+    box-shadow:none;
+  }
+  :root[data-theme-mode="hybrid"] .metric::before{
+    background:var(--accent);
+  }
+  :root[data-theme-mode="hybrid"] .metric span{
+    color:var(--hybrid-muted);
+  }
+  :root[data-theme-mode="hybrid"] .metric strong{
+    color:var(--hybrid-text);
+  }
+  :root[data-theme-mode="hybrid"] .metric.warn strong{
+    color:#DFCAA1;
+  }
+  :root[data-theme-mode="hybrid"] .storage-notice{
+    background:var(--hybrid-raised);
+    border-color:var(--hybrid-line);
+    border-left:3px solid var(--accent);
+    color:var(--hybrid-text);
+  }
+  :root[data-theme-mode="hybrid"] .storage-notice__copy strong{
+    color:var(--hybrid-text);
+  }
+  :root[data-theme-mode="hybrid"] .storage-notice__copy p,
+  :root[data-theme-mode="hybrid"] .storage-notice__details{
+    color:var(--hybrid-muted);
+  }
+  :root[data-theme-mode="hybrid"] .storage-notice__mark{
+    background:#2A4841;
+    color:#CCE4D6;
+  }
+
+  /* Navigation and action bars: distinct from the lighter work canvas. */
+  :root[data-theme-mode="hybrid"] .studio-nav,
+  :root[data-theme-mode="hybrid"] .studio-tabs,
+  :root[data-theme-mode="hybrid"] .timeline-panel-head,
+  :root[data-theme-mode="hybrid"] .task-overview-header,
+  :root[data-theme-mode="hybrid"] .phase-collapse-toolbar,
+  :root[data-theme-mode="hybrid"] .planning-page-head{
+    background:var(--hybrid-raised);
+    border-color:var(--hybrid-line);
+    color:var(--hybrid-text);
+  }
+  :root[data-theme-mode="hybrid"] .studio-tab,
+  :root[data-theme-mode="hybrid"] .seg-btn,
+  :root[data-theme-mode="hybrid"] .task-order-mode{
+    color:var(--hybrid-muted);
+  }
+  :root[data-theme-mode="hybrid"] .studio-tab:hover,
+  :root[data-theme-mode="hybrid"] .seg-btn:hover,
+  :root[data-theme-mode="hybrid"] .task-order-mode:hover:not(.active){
+    background:var(--hybrid-hover);
+    color:var(--hybrid-text);
+  }
+  :root[data-theme-mode="hybrid"] .studio-tab.active,
+  :root[data-theme-mode="hybrid"] .seg-btn.active,
+  :root[data-theme-mode="hybrid"] .task-order-mode.active{
+    background:var(--bg);
+    border-color:var(--hybrid-line);
+    color:var(--hybrid-text);
+    box-shadow:0 1px 3px rgba(0,0,0,.12);
+  }
+  :root[data-theme-mode="hybrid"] .timeline-panel-head .timeline-title h1,
+  :root[data-theme-mode="hybrid"] .task-overview-header h2,
+  :root[data-theme-mode="hybrid"] .planning-page-head h1{
+    color:var(--hybrid-text);
+  }
+  :root[data-theme-mode="hybrid"] .timeline-title p,
+  :root[data-theme-mode="hybrid"] .task-overview-header p,
+  :root[data-theme-mode="hybrid"] .planning-page-head p,
+  :root[data-theme-mode="hybrid"] .control-caption{
+    color:var(--hybrid-muted);
+  }
+  :root[data-theme-mode="hybrid"] .control-cluster,
+  :root[data-theme-mode="hybrid"] .task-overview-header .task-order-switch,
+  :root[data-theme-mode="hybrid"] .timeline-panel-head .task-order-switch{
+    background:var(--bg);
+    border-color:var(--hybrid-line);
+  }
+  :root[data-theme-mode="hybrid"] .studio-nav .btn,
+  :root[data-theme-mode="hybrid"] .timeline-panel-head .btn,
+  :root[data-theme-mode="hybrid"] .task-overview-header .btn,
+  :root[data-theme-mode="hybrid"] .phase-collapse-toolbar .btn,
+  :root[data-theme-mode="hybrid"] .phase-collapse-button{
+    background:var(--hybrid-raised);
+    border-color:var(--hybrid-line);
+    color:var(--hybrid-text);
+    box-shadow:none;
+  }
+  :root[data-theme-mode="hybrid"] .studio-nav .btn:hover,
+  :root[data-theme-mode="hybrid"] .timeline-panel-head .btn:hover,
+  :root[data-theme-mode="hybrid"] .task-overview-header .btn:hover,
+  :root[data-theme-mode="hybrid"] .phase-collapse-toolbar .btn:hover,
+  :root[data-theme-mode="hybrid"] .phase-collapse-button:hover{
+    background:var(--hybrid-hover);
+    border-color:var(--hybrid-muted);
+  }
+  :root[data-theme-mode="hybrid"] .timeline-panel-head .btn.primary,
+  :root[data-theme-mode="hybrid"] .task-overview-header .btn.primary{
+    background:var(--accent);
+    border-color:var(--accent);
+    color:#fff;
+  }
+  :root[data-theme-mode="hybrid"] .dropdown-control > summary,
+  :root[data-theme-mode="hybrid"] .dropdown-panel{
+    background:var(--hybrid-raised);
+    color:var(--hybrid-text);
+    border-color:var(--hybrid-line);
+  }
+  :root[data-theme-mode="hybrid"] .dropdown-control > summary:hover,
+  :root[data-theme-mode="hybrid"] .dropdown-control[open] > summary{
+    background:var(--hybrid-hover);
+  }
+  :root[data-theme-mode="hybrid"] .dropdown-panel strong,
+  :root[data-theme-mode="hybrid"] .dropdown-panel label{
+    color:var(--hybrid-text);
+  }
+  :root[data-theme-mode="hybrid"] .save-status{
+    background:#2A483D;
+    border-color:#48695A;
+    color:#C6E4D2;
+  }
+  :root[data-theme-mode="hybrid"] .save-status-detail{
+    color:#B5D0BF;
+  }
+  :root[data-theme-mode="hybrid"] .save-status.saving{
+    background:#4E4430;
+    border-color:#7C6846;
+    color:#E6CFA0;
+  }
+  :root[data-theme-mode="hybrid"] .save-status.error{
+    background:#51343A;
+    border-color:#815660;
+    color:#F0C0C5;
+  }
+  :root[data-theme-mode="hybrid"] .text-action,
+  :root[data-theme-mode="hybrid"] .studio-nav .text-action{
+    color:var(--hybrid-text);
+  }
+  :root[data-theme-mode="hybrid"] .text-action:hover{
+    background:var(--hybrid-hover);
+  }
+  :root[data-theme-mode="hybrid"] .design-btn{
+    background:var(--hybrid-raised) !important;
+    color:var(--hybrid-text) !important;
+    border-color:var(--hybrid-line) !important;
+  }
+  :root[data-theme-mode="hybrid"] .design-btn:hover{
+    background:var(--hybrid-hover) !important;
+  }
+
+  /* Dark command bars require explicit light foregrounds: legacy selectors
+     otherwise inherit the data-canvas ink and become unreadable. */
+  :root[data-theme-mode="hybrid"] .storage-notice summary,
+  :root[data-theme-mode="hybrid"] .storage-notice summary:hover,
+  :root[data-theme-mode="hybrid"] #visibleTaskCount,
+  :root[data-theme-mode="hybrid"] .phase-collapse-heading strong,
+  :root[data-theme-mode="hybrid"] .phase-collapse-toolbar button[data-phase-action]{
+    color:var(--hybrid-text);
+  }
+  :root[data-theme-mode="hybrid"] .phase-collapse-heading span{
+    color:var(--hybrid-muted);
+  }
+  :root[data-theme-mode="hybrid"] .phase-collapse-toolbar button[data-phase-action]{
+    background:var(--hybrid-raised);
+    border-color:var(--hybrid-line);
+  }
+  :root[data-theme-mode="hybrid"] .phase-collapse-toolbar button[data-phase-action]:hover{
+    background:var(--hybrid-hover);
+  }
+
+  /* Native form fields explicitly use dark ink on the light editing canvas.
+     Project name and project selector live outside these surfaces and keep
+     their contrasting light-on-dark treatment. */
+  :root[data-theme-mode="hybrid"] .dialog :is(input:not([type="checkbox"]):not([type="radio"]),select,textarea),
+  :root[data-theme-mode="hybrid"] .planning-page :is(input:not([type="checkbox"]):not([type="radio"]),select,textarea),
+  :root[data-theme-mode="hybrid"] .task-overview-panel :is(input:not([type="checkbox"]):not([type="radio"]),select,textarea){
+    background:var(--panel);
+    color:var(--ui-ink);
+    border-color:var(--ui-outline);
+  }
+  :root[data-theme-mode="hybrid"] .dialog :is(input,textarea)::placeholder,
+  :root[data-theme-mode="hybrid"] .planning-page :is(input,textarea)::placeholder{
+    color:var(--ui-muted);
+    opacity:1;
+  }
+  /* Planning toggles are on the light content surface. Legacy styles use
+     var(--ink), which is intentionally light for the outer shell. */
+  :root[data-theme-mode="hybrid"] .planning-page .switch-label,
+  :root[data-theme-mode="hybrid"] .planning-page .relative-skip-row{
+    color:var(--ui-ink) !important;
+    background:var(--panel);
+    border-color:var(--ui-outline);
+  }
+  :root[data-theme-mode="hybrid"] .relative-editor.inactive .relative-editor-grid,
+  :root[data-theme-mode="hybrid"] .relative-editor.inactive .relative-skip-row,
+  :root[data-theme-mode="hybrid"] .relative-editor.inactive .relative-result-row{
+    opacity:1;
+  }
+  /* The actual data/editing surfaces remain on a muted light material. */
+  :root[data-theme-mode="hybrid"] .gantt-stage,
+  :root[data-theme-mode="hybrid"] .gantt-left,
+  :root[data-theme-mode="hybrid"] .gantt-right,
+  :root[data-theme-mode="hybrid"] .gantt-grid,
+  :root[data-theme-mode="hybrid"] .task-overview-table,
+  :root[data-theme-mode="hybrid"] .planning-accordion-stack{
+    background:var(--panel);
+    color:var(--ui-ink);
+  }
+  :root[data-theme-mode="hybrid"] .gantt-head-left,
+  :root[data-theme-mode="hybrid"] .gantt-head-right,
+  :root[data-theme-mode="hybrid"] .task-overview-table th{
+    background:color-mix(in srgb,var(--panel) 90%,var(--bg));
+    color:var(--ui-ink);
+    border-color:var(--ui-outline);
+  }
+  :root[data-theme-mode="hybrid"] .task-row-left,
+  :root[data-theme-mode="hybrid"] .task-row-right{
+    background:var(--panel);
+    border-color:var(--ui-outline);
+  }
+  :root[data-theme-mode="hybrid"] .task-row-left:nth-child(even),
+  :root[data-theme-mode="hybrid"] .task-row-right:nth-child(even),
+  :root[data-theme-mode="hybrid"] .task-overview-table tbody tr:nth-child(even){
+    background:var(--ui-subtle);
+  }
+  :root[data-theme-mode="hybrid"] .task-overview-table tbody tr:hover,
+  :root[data-theme-mode="hybrid"] .task-row-left:hover{
+    background:color-mix(in srgb,var(--panel) 84%,var(--accent));
+  }
+  :root[data-theme-mode="hybrid"] .task-title strong,
+  :root[data-theme-mode="hybrid"] .task-name-content > strong,
+  :root[data-theme-mode="hybrid"] .task-overview-table td{
+    color:var(--ui-ink);
+  }
+  :root[data-theme-mode="hybrid"] .time-major,
+  :root[data-theme-mode="hybrid"] .time-minor{
+    color:var(--ui-muted);
+    border-color:var(--ui-outline);
+  }
+  :root[data-theme-mode="hybrid"] .day-band.weekend{
+    background:rgba(76,103,114,.085);
+  }
+  :root[data-theme-mode="hybrid"] .day-band.holiday{
+    background:rgba(166,114,105,.115);
+  }
+  /* Imported near-white phase colors are never left with white-on-pale labels. */
+  :root[data-theme-mode="hybrid"] .gantt-bar.phase-summary{
+    background:color-mix(in srgb,var(--phase-source,#DCE8EB) 18%,var(--primary)) !important;
+    color:#fff;
+    border-color:var(--primary);
+  }
+  :root[data-theme-mode="hybrid"] .gantt-bar.phase-summary .bar-label{
+    color:#F8FAFB;
+  }
+  :root[data-theme-mode="hybrid"] .task-overview-table td{
+    border-color:var(--ui-outline);
+  }
+  :root[data-theme-mode="hybrid"] .task-overview-table .task-phase-label{
+    background:color-mix(in srgb,var(--panel) 83%,var(--accent));
+    color:var(--primary);
+  }
+  :root[data-theme-mode="hybrid"] .task-table-wrap,
+  :root[data-theme-mode="hybrid"] .gantt-scroller{
+    scrollbar-color:#9BAEB8 var(--panel);
+  }
+  :root[data-theme-mode="hybrid"] .planning-page-head .planning-cost-card{
+    background:var(--bg);
+    border-color:var(--hybrid-line);
+    color:var(--hybrid-text);
+  }
+  :root[data-theme-mode="hybrid"] .planning-page-head .planning-cost-card span,
+  :root[data-theme-mode="hybrid"] .planning-page-head .planning-cost-card strong{
+    color:var(--hybrid-text);
+  }
+  :root[data-theme-mode="hybrid"] .planning-accordion > summary,
+  :root[data-theme-mode="hybrid"] .planning-accordion[open] > summary{
+    color:var(--ui-ink);
+    background:var(--panel);
+    border-color:var(--ui-outline);
+  }
+  :root[data-theme-mode="hybrid"] .planning-accordion > summary:hover{
+    background:var(--ui-subtle);
+  }
+  /* Forms and dialogs intentionally stay light, including the whole design
+     selection dialog: a reliable neutral environment for comparing palettes. */
+  :root[data-theme-mode="hybrid"] .dialog{
+    color:var(--ui-ink);
+    background:var(--panel);
+    border-color:var(--ui-outline);
+  }
+  :root[data-theme-mode="hybrid"] #designDialog .dialog-actions{
+    background:var(--panel);
+  }
+  :root[data-theme-mode="hybrid"] .toast{
+    background:var(--bg);
+    color:var(--hybrid-text);
+    border:1px solid var(--hybrid-line);
+  }
+  :root[data-theme-mode="hybrid"] .toast.error{
+    background:#77454C;
+    color:#F6E5E5;
+  }
+  :root[data-theme-mode="hybrid"] .empty-state{
+    color:var(--ui-ink);
+  }
+  @media (prefers-contrast: more){
+    :root[data-theme-mode="hybrid"]{
+      --hybrid-muted:#E5EDF0;
+      --ui-outline:#798F9C;
+    }
+  }
+}
+@media print {
+  :root[data-theme-mode="hybrid"]{
+    color-scheme:light;
+    --bg:#fff !important;
+    --panel:#fff !important;
+    --ink:#273C4A !important;
+    --muted:#526778 !important;
+    --primary:#234557 !important;
+    --ui-ink:#273C4A;
+    --ui-muted:#526778;
+  }
+}
+
 /* Dark project themes. This layer adapts the entire interface, not just the
    project bar colors. Non-black surfaces and non-white text limit glare.
    Project colors remain portable; the mode is derived from panel luminance. */

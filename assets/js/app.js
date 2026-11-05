@@ -1,7 +1,7 @@
-import { renderGantt } from './gantt.js?v=2.4.1';
-import { saveLocal, loadActive, loadProject, listProjects, deleteProject, setActiveProject } from './storage.js?v=2.4.1';
-import { normalizeTaskOrder, nextDisplayOrder, sortedProjectTasks, phaseKey, reorderTask, nudgeTask } from './task-order.mjs?v=2.4.1';
-import { DESIGN_COLOR_FIELDS, DESIGN_PRESETS, findDesignPreset, matchDesignPreset, isDarkDesignColors } from './design-presets.mjs?v=2.4.1';
+import { renderGantt } from './gantt.js?v=2.5.0';
+import { saveLocal, loadActive, loadProject, listProjects, deleteProject, setActiveProject } from './storage.js?v=2.5.0';
+import { normalizeTaskOrder, nextDisplayOrder, sortedProjectTasks, phaseKey, reorderTask, nudgeTask } from './task-order.mjs?v=2.5.0';
+import { DESIGN_COLOR_FIELDS, DESIGN_PRESETS, findDesignPreset, matchDesignPreset, designThemeMode } from './design-presets.mjs?v=2.5.0';
 
 const $ = (id) => document.getElementById(id);
 const clone = (x) => JSON.parse(JSON.stringify(x));
@@ -905,9 +905,10 @@ function updateDesignPreview(){
     button.classList.toggle('selected',selected);
     button.setAttribute('aria-pressed',String(selected));
   }
-  const mode=isDarkDesignColors(colors)?'Dunkles':'Helles';
-  $('designPreviewMode').textContent=`${mode} Design · Vorschau`;
-  $('designPreviewCard').dataset.previewMode=isDarkDesignColors(colors)?'dark':'light';
+  const themeMode=designThemeMode(colors);
+  const label=themeMode==='hybrid'?'Hybrid':themeMode==='dark'?'Dunkles':'Helles';
+  $('designPreviewMode').textContent=`${label} Design · Vorschau`;
+  $('designPreviewCard').dataset.previewMode=themeMode;
   $('designPresetSelection').textContent=matched
     ? `Vorschau: ${matched.label}. Erst „Design speichern“ übernimmt diese Farben.`
     : 'Individuelle Farbauswahl. Erst „Design speichern“ übernimmt diese Farben.';
@@ -916,16 +917,18 @@ async function saveDesign(){const c=envelope.project.design.colors;c.primary=$('
 function applyDesign(){
   const c=envelope.project.design?.colors||{};
   const root=document.documentElement;
-  root.dataset.themeMode=isDarkDesignColors(c)?'dark':'light';
+  root.dataset.themeMode=designThemeMode(c);
+  const dark=root.dataset.themeMode==='dark';
+  const hybrid=root.dataset.themeMode==='hybrid';
   const map={
     '--bg':c.pageBg,'--panel':c.panelBg,
     '--primary':c.primary||c.headerBg,'--accent':c.accent,
     '--workstream':c.workstream,'--critical':c.critical,
     '--milestone':c.milestone,'--gate':c.gate,
-    '--ink':root.dataset.themeMode==='dark'?'#CDD9E2':c.text,
-    '--muted':root.dataset.themeMode==='dark'?'#AABAC8':c.mutedText,
-    '--border':root.dataset.themeMode==='dark'?'#3A4A56':c.border,
-    '--grid':root.dataset.themeMode==='dark'?'#334451':c.grid
+    '--ink':dark?'#CDD9E2':hybrid?'#DCE5E8':c.text,
+    '--muted':dark?'#AABAC8':hybrid?'#B6C6CD':c.mutedText,
+    '--border':dark?'#3A4A56':hybrid?'#B8C8CD':c.border,
+    '--grid':dark?'#334451':hybrid?'#CED9DD':c.grid
   };
   // Do not leak stale project color overrides into another project.
   for(const [key,value] of Object.entries(map)){
