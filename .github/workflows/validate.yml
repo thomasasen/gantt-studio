@@ -44,7 +44,10 @@ jobs:
           grep -q 'assets/css/design-system.css?v=2.4.1' index.html
           grep -q 'Readability scale v1.4.2' assets/css/odin.css
           grep -q 'Clickable phase rows v1.4.3' assets/css/odin.css
-          grep -q "gantt.js?v=1.4.4" assets/js/app.js
+          grep -q "gantt.js?v=2.4.1" assets/js/app.js
+          grep -q "storage.js?v=2.4.1" assets/js/app.js
+          grep -q "task-order.mjs?v=2.4.1" assets/js/app.js
+          grep -q "design-presets.mjs?v=2.4.1" assets/js/app.js
           grep -q 'function periodWidth' assets/js/gantt.js
           grep -q 'const labelLanes=\[\]' assets/js/gantt.js
           grep -q 'text-overflow: ellipsis' assets/css/app.css
