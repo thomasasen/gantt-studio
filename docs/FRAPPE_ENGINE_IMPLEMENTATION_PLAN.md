@@ -1,6 +1,6 @@
 # Gantt Studio: Engine-Abstraktion und optionaler Frappe-Gantt-Adapter
 
-> **Status:** Phase A in Umsetzung; P0-Schreibpfade auf transaktionale Projektkommandos umgestellt. Gate A noch offen, da Browser-Regression aussteht.
+> **Status:** Phasen A und B abgeschlossen und regressionsgeprüft. Architektur-PR als Review-Vorbereitung; Phase C benötigt Freigabe des Abstraktionsstands.
 >
 > **Arbeitsbranch:** `refactor/engine-abstraction`  
 > **Repository:** https://github.com/thomasasen/gantt-studio  
@@ -142,7 +142,7 @@ engine.getCapabilities();       // objektive Unterstützung statt Annahmen
 - [x] **B-04 – Anwendung entkoppeln:** `app.js` spricht nur Controller/Vertrag; keine direkten Native-Gantt-Aufrufe außerhalb des Adapters. Projektzustand, Filter, Phasenprojektion und Befehle liegen außerhalb des Renderers.
 - [x] **B-05 – Cache-/Build-Konsistenz:** Statische ESM-Importpfade und Versionsparameter in `index.html`/`app.js`/abhängigen Modulen atomar aktualisieren. Bestehenden „alte ESM-Module“-Regressionstest erhalten.
 - [x] **B-06 – Technische Tests:** Vertrag für Empty State, Mount/Destroy, Zoom, Projektwechsel, mehrfaches Rendern, Event-Duplikate, Filter, Phasen sowie Klick/Drag/Resize/Progress/Reorder.
-- [ ] **B-07 – Visuelle Regression:** Native Engine bleibt in allen elf Designs, 390/768/1024/1440px, 200-%-Zoom, Tastatur, Reduced Motion und Druck gleichwertig.
+- [x] **B-07 – Visuelle Regression:** Native Engine bleibt in allen elf Designs, 390/768/1024/1440px, 200-%-Zoom, Tastatur, Reduced Motion und Druck gleichwertig.
 
 **Gate B (mergefähiger Zustand):** Native Engine ist vollständig kompatibel; Auslieferung ohne Frappe-Dependency möglich. Erst dann darf der reine Architektur-PR für `main` zur Freigabe vorbereitet werden. **Nicht selbstständig mergen.**
 
@@ -221,7 +221,7 @@ Erst nach Gate B den separaten Branch `spike/frappe-gantt-adapter` von einem **f
 | --- | --- | --- | --- |
 | Plan auf neuem Branch initialisiert | [x] | Diese Datei, erster Branch-Commit | Implementierung noch nicht gestartet |
 | Gate A: Datenintegrität | [x] | [Browser #42122701641](https://github.com/thomasasen/gantt-studio/actions/runs/42122701641): 48/48 passed; [Validate #42122701731](https://github.com/thomasasen/gantt-studio/actions/runs/42122701731): success | P0-Codeschutz nachgewiesen; weitere Deep-Performance-/Cross-Tab-UX-Audits bei B beibehalten |
-| Gate B: Native-Abstraktion | [ ] | — | Volle Feature-Parität |
+| Gate B: Native-Abstraktion | [x] | [Browser #42125708815](https://github.com/thomasasen/gantt-studio/actions/runs/42125708815): 55/55; [Validate #42125708860](https://github.com/thomasasen/gantt-studio/actions/runs/42125708860): success; 33 Screenshot-Paare gegen main | Native-only ohne Build erhalten. Merge/Spike weiterhin freigabepflichtig |
 | Gate C: Frappe-Spike | [ ] | — | Upstream-/DOM-Kopplung untersuchen |
 | Gate D: Erweiterungen/Parität | [ ] | — | Nur bei Go |
 | Gate E: Entscheidung/Upgrade-Probe | [ ] | — | Messergebnisse und Red Team |
@@ -278,6 +278,14 @@ Erst nach Gate B den separaten Branch `spike/frappe-gantt-adapter` von einem **f
 **Red-Team-Befunde und Korrekturen:** (1) Native-DOM-spezifische Stage-Handler in `app.js` hätten andere Engines blockiert; in den Native-Adapter verlegt. (2) Aus einem Teardown während laufendem Pointer-Drag konnten Listener verbleiben; explizites Cancel-Register implementiert. (3) Nach Handler-Extraktion fehlte die verständliche Abbruch-Statusmeldung; nach Browser-Gegenprobe wiederhergestellt. (4) Contract-Tests dürfen das strikte JS-Verhalten bei mutierten `Object.freeze`-Objekten nicht falsch bewerten; Prüfung korrigiert. (5) ESM-Importe über mehrere verschachtelte Module überprüfbar versioniert. Restrisiko: keine manuell durchgeführte vollständige visuelle Vorher/Nachher-Pixelprüfung aller elf Themen; diese ist unabhängig von der erfolgreichen Browser-Suite zu behandeln.
 
 **Nächster Schritt:** 200-%-Zoom und letzte CI-Suite auswerten. Danach B-07/Gate B nur bei grünem Teststand prüfen; PR ausschließlich als Draft für Review vorbereiten, niemals automatisch mergen. Frappe-Spike erst von **freigegebenem** Abstraktionsstand und in separatem Branch.
+
+### Gate B – Abschlussbeleg und Freigabegrenze
+
+**Abnahme:** [Run #42125708815](https://github.com/thomasasen/gantt-studio/actions/runs/42125708815) auf `ad309ca4`: **55/55 Playwright-Tests bestanden**; [Run #42125708860](https://github.com/thomasasen/gantt-studio/actions/runs/42125708860) statische Validierung **success**. Die Matrix umfasst alle elf Designvorlagen, dunkle/hybride Oberflächen, Screenshots, 390/768/1024/1440px, 200-%-CSS-Zoom mit Tastaturreihenfolge, Print-CSS, Reduced Motion, Bar-Move/Resize/Progress, Abbruch, Phasengrenzen, Keyboard, IndexedDB-Fehler, Revision-Races, Multitab-Konflikt, JSON-Schema-v1-Roundtrip sowie wiederholtes Mount/Destroy und Engine-Wechsel mit Fallback.
+
+**Unabhängiger visueller Vergleich:** Zwei echte Chromium-Workflow-Artefakte wurden parallel ausgewertet: `main@1ef29c9`, [UI #42111424663](https://github.com/thomasasen/gantt-studio/actions/runs/42111424663), Artifact `design-visual-review` / ID `13453808663`; neuer Native-Adapter-Stand, [UI #42124953256](https://github.com/thomasasen/gantt-studio/actions/runs/42124953256), Artifact `design-visual-review` / ID `13458664583`. **33 von 33 gleich benannte PNG-Paare** hatten identische Originalabmessungen. Nach einheitlichem Downscaling auf maximal 900 × 900 Pixel (Lanczos, RGB) und Differenz der Farbkanäle hatten höchstens **0,41 % der Pixel** eine maximale Kanalabweichung über 20/255; der höchste mittlere absolute Kanalunterschied war **0,58/255**. Die geringfügigen Differenzen liegen insbesondere in zwei Planungsscreenshots; ein systematischer Layout- oder Theme-Unterschied ist im Vergleich nicht erkennbar. Das ist eine Stichproben- und keine pixelgenaue Garantie für jede Interaktion.
+
+**Freigabevermerk:** Gate B ist auf Basis der vorliegenden automatisierten und unabhängigen visuellen Nachweise erfüllt. `main` bleibt auf `1ef29c9` unverändert; die Native Engine ist Standard und einziger produktiv unterstützter Renderer. Der Architektur-PR kann als **Draft** erstellt werden. Ein Merge oder der Beginn von `spike/frappe-gantt-adapter` setzt einen ausdrücklich **freigegebenen Abstraktionsstand** voraus; die Umsetzung hat diese Freigabe noch nicht. Offenes Restrisiko: manuelle interaktive Browser-Zoom-/Screenreader-Abnahme auf echten Geräten wurde nicht durchgeführt, außerdem Performance unter extrem großen Projekten erst in Phase E zu messen.
 
 ## 9. Optimaler Umsetzungs-Prompt für einen neuen Codex-/ChatGPT-Arbeitslauf
 
