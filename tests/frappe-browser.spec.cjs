@@ -47,3 +47,61 @@ test.describe('isolated Frappe 1.2.2 feasibility page', () => {
     });
   }
 });
+
+/*
+ * Red-team regression. PASS means the upstream disposal defect has been
+ * reproduced, not that the Frappe engine passes the lifecycle acceptance gate.
+ */
+test('upstream document mouseup listeners remain registered after rerenders and destroy', async ({page}) => {
+  await page.addInitScript(() => {
+    const added = [], removed = [];
+    const add = document.addEventListener.bind(document);
+    const remove = document.removeEventListener.bind(document);
+    document.addEventListener = function(type, listener, options) {
+      if (type === 'mouseup') added.push(listener);
+      return add(type, listener, options);
+    };
+    document.removeEventListener = function(type, listener, options) {
+      if (type === 'mouseup') removed.push(listener);
+      return remove(type, listener, options);
+    };
+    window.__frappeListenerAudit = {added, removed};
+  });
+
+  await page.goto('/spikes/frappe/index.html');
+  await expect(page.locator('#status')).toContainText('Frappe: gerendert');
+  const initial = await page.evaluate(() => window.__frappeListenerAudit.added.length);
+  expect(initial).toBeGreaterThanOrEqual(1);
+  for (let i = 0; i < 5; i++) {
+    await page.locator('#reloadBtn').click();
+    await expect(page.locator('#status')).toContainText('Frappe: gerendert');
+  }
+  const afterRerender = await page.evaluate(() => window.__frappeListenerAudit.added.length);
+  expect(afterRerender - initial).toBeGreaterThanOrEqual(5);
+
+  const result = await page.evaluate(async () => {
+    const {createFrappeEngine} = await import(
+      '/assets/js/engine/frappe/frappe-adapter.mjs?v=2.8.0'
+    );
+    const container = document.createElement('div');
+    document.body.append(container);
+    const engine = createFrappeEngine();
+    engine.mount({container});
+    engine.render({project:{tasks:[
+      {id:'teardown-check',name:'Cleanup',start:'2026-11-01',end:'2026-11-02',progress:0}
+    ]},view:{zoom:'day'}});
+    const afterMount = window.__frappeListenerAudit.added.length;
+    engine.destroy();
+    container.remove();
+    return {
+      afterMount,
+      added:window.__frappeListenerAudit.added.length,
+      removed:window.__frappeListenerAudit.removed.length,
+      unpaired:window.__frappeListenerAudit.added.filter(listener =>
+        !window.__frappeListenerAudit.removed.includes(listener)).length
+    };
+  });
+  expect(result.afterMount).toBeGreaterThan(afterRerender);
+  expect(result.unpaired).toBeGreaterThanOrEqual(6);
+  console.log('FRAPPE_LIFECYCLE_BLOCKER', JSON.stringify(result));
+});
