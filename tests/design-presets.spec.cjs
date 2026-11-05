@@ -171,9 +171,16 @@ test('mobile design gallery remains usable without overflow, checked with access
 });
 
 function cssRGB(value){
-  const match=value.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
-  if(!match)throw Error('Unsupported CSS color: '+value);
-  return '#'+match.slice(1,4).map(v=>Number(v).toString(16).padStart(2,'0')).join('').toUpperCase();
+  // color-mix() is returned as modern "color(srgb r g b)" in Chromium.
+  let components;
+  if(value.startsWith('color(srgb ')){
+    components=value.slice(11).replace(')','').split(/\s+/).slice(0,3).map(v=>Math.round(Number(v)*255));
+  }else{
+    const match=value.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+    if(!match)throw Error('Unsupported CSS color: '+value);
+    components=match.slice(1,4).map(Number);
+  }
+  return '#'+components.map(v=>v.toString(16).padStart(2,'0')).join('').toUpperCase();
 }
 
 test('dark themes update every major UI surface and revert cleanly across projects',async({page})=>{
@@ -204,8 +211,17 @@ test('dark themes update every major UI surface and revert cleanly across projec
       const style=selector=>{
         const element=document.querySelector(selector);
         if(!element)throw Error('Missing '+selector);
-        const s=getComputedStyle(element);
-        return {background:s.backgroundColor,color:s.color};
+        const computed=getComputedStyle(element);
+        let bgNode=element,background='transparent';
+        while(bgNode){
+          const candidate=getComputedStyle(bgNode).backgroundColor;
+          if(candidate!=='transparent'&&candidate!=='rgba(0, 0, 0, 0)'){
+            background=candidate;
+            break;
+          }
+          bgNode=bgNode.parentElement;
+        }
+        return {background,color:computed.color};
       };
       return {
         body:style('body'),topbar:style('.topbar'),
@@ -290,7 +306,7 @@ test('dark preset supports custom colors, mobile controls, and light print rende
   await expect(page.locator('#taskTableBody tr[data-task-row-id]')).toHaveCount(10);
   await page.locator('#designBtn').click();
   await page.locator('#designPresetGrid [data-design-preset="graphit"]').click();
-  await page.locator('#designAccent').fill('#A89BC1');
+  await page.locator('#designAccent').fill('#a89bc1');
   await expect(page.locator('#designPresetSelection')).toContainText('Individuelle');
   await page.locator('#saveDesignBtn').click();
   await expect(page.locator('html')).toHaveAttribute('data-theme-mode','dark');
