@@ -24,6 +24,9 @@ export function createEngineController(factory) {
     cancelInteraction() {
       if (mounted) engine.cancelInteraction();
     },
+    locateMarker(kind) {
+      return mounted ? engine.locateMarker(kind) : null;
+    },
     getCapabilities() {
       return assertEngineContract(engine || factory()).getCapabilities();
     },
