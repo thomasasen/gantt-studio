@@ -21,7 +21,8 @@ test('production entrypoint versions every static ESM dependency',()=>{
   const {dirname,join,resolve}=require('node:path');
   const graph=['assets/js/app.js','assets/js/gantt.js',
     'assets/js/engine/engine-controller.mjs','assets/js/engine/engine-contract.mjs',
-    'assets/js/engine/native/native-adapter.mjs'];
+    'assets/js/engine/native/native-adapter.mjs',
+    'assets/js/engine/native/native-interactions.mjs'];
   for(const moduleFile of graph){
     const source=readFileSync(moduleFile,'utf8');
     const imports=[...source.matchAll(/^import\\s+[^;]+?\\s+from\\s+['"]([^'"]+)['"]/gm)];
