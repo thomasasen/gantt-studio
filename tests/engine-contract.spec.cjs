@@ -113,3 +113,21 @@ test('native mount/render/destroy can repeat without leftover grid DOM',async({p
   expect(state).toHaveLength(12);
   expect(state.every(s=>!s.empty&&s.rows===1&&s.remaining===0)).toBe(true);
 });
+
+test('native engine remains operable at 200% CSS zoom',async({page})=>{
+  await page.goto('/');
+  await page.locator('#loadDemoBtn').click();
+  await expect(page.locator('#taskTableBody tr[data-task-row-id]')).toHaveCount(10);
+  await page.evaluate(()=>{document.documentElement.style.zoom='200%';});
+  await expect(page.locator('#ganttStage .gantt-grid')).toBeVisible();
+  expect(await page.locator('#ganttStage .gantt-bar').count()).toBeGreaterThanOrEqual(10);
+  const rows=page.locator('#ganttStage .task-row-left[data-task-id]');
+  const ids=await rows.evaluateAll(elements=>elements.map(element=>element.dataset.taskId));
+  const grip=page.locator('#ganttStage [data-gantt-order-handle][data-task-id="'+ids[1]+'"]');
+  await grip.focus();
+  await page.keyboard.press('ArrowUp');
+  await expect(rows.first()).toHaveAttribute('data-task-id',ids[1]);
+  await expect(page.locator('#taskTableBody tr[data-task-row-id]').first())
+    .toHaveAttribute('data-task-row-id',ids[1]);
+  await page.screenshot({path:'visual-review/native-zoom-200.png',fullPage:true});
+});
