@@ -181,3 +181,40 @@ test('stale tab cannot overwrite a newer IndexedDB project revision', async ({pa
   await expect(stale.locator('#taskTableBody')).not.toContainText('Stale write from second tab');
   await stale.close();
 });
+
+test('JSON export matches committed IndexedDB project and retains schema v1',async({page})=>{
+  const {readFileSync}=require('node:fs');
+  await page.goto('/');
+  await page.locator('#loadDemoBtn').click();
+  await expect(page.locator('#taskTableBody tr[data-task-row-id]')).toHaveCount(10);
+  const persisted=await page.evaluate(async()=>{
+    const id=document.querySelector('#projectSelect').value;
+    const db=await new Promise((resolve,reject)=>{
+      const r=indexedDB.open('gantt-studio');
+      r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);
+    });
+    const project=await new Promise((resolve,reject)=>{
+      const r=db.transaction('projects','readonly').objectStore('projects').get(id);
+      r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);
+    });
+    db.close();
+    return project;
+  });
+  const downloading=page.waitForEvent('download');
+  await page.locator('#centralExportBtn').click();
+  await page.locator('#exportJsonBtn').click();
+  const download=await downloading;
+  const file=JSON.parse(readFileSync(await download.path(),'utf8'));
+  expect(file.schema).toBe('gantt-studio.project');
+  expect(file.schemaVersion).toBe(1);
+  expect(file.project).toEqual(persisted);
+  expect(file.project.engine).toBeUndefined();
+  expect(file.project.tasks.every(task=>task.displayOrder!==undefined)).toBe(true);
+  await page.locator('#fileInput').setInputFiles({
+    name:'roundtrip.gantt.json',mimeType:'application/json',
+    buffer:Buffer.from(JSON.stringify(file))
+  });
+  await expect(page.locator('#taskTableBody tr[data-task-row-id]')).toHaveCount(10);
+  const importedId=await page.locator('#projectSelect').inputValue();
+  expect(importedId).not.toBe(persisted.id);
+});
