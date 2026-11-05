@@ -806,9 +806,8 @@ async function commitTaskMove(reorder,taskId,focusSurface='table') {
     const scroller=$('ganttScroller'),scrollX=scroller.scrollLeft,scrollY=scroller.scrollTop;
     renderGanttOnly();renderTaskTable();
     scroller.scrollLeft=scrollX;scroller.scrollTop=scrollY;
-    const surface=focusSurface==='gantt' ? $('ganttStage') : $('taskTableBody');
-    const selector=focusSurface==='gantt'?'[data-gantt-order-handle]':'[data-task-drag-handle]';
-    for(const grip of surface.querySelectorAll(selector)) {
+    if(focusSurface==='gantt')engineController.focusTask(taskId,'reorder');
+    else for(const grip of $('taskTableBody').querySelectorAll('[data-task-drag-handle]')){
       if(grip.dataset.taskId===String(taskId)){grip.focus({preventScroll:true});break;}
     }
     setTaskOrderStatus('Aufgabenreihenfolge gespeichert.');
