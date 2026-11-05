@@ -175,6 +175,25 @@ function cssRGB(value){
   let components;
   if(value.startsWith('color(srgb ')){
     components=value.slice(11).replace(')','').split(/\s+/).slice(0,3).map(v=>Math.round(Number(v)*255));
+  }else if(value.startsWith('oklab(')){
+    // CSS color-mix() can be serialized in Oklab; convert it to sRGB for
+    // objective contrast checks instead of assuming opaque RGB strings.
+    const match=value.match(/^oklab\(([-.\d]+)\s+([-.\d]+)\s+([-.\d]+)/);
+    if(!match)throw Error('Malformed Oklab color: '+value);
+    const [L,a,b]=match.slice(1,4).map(Number);
+    const l=(L+.3963377774*a+.2158037573*b)**3;
+    const m=(L-.1055613458*a-.0638541728*b)**3;
+    const sn=(L-.0894841775*a-1.2914855480*b)**3;
+    const linear=[
+      4.0767416621*l-3.3077115913*m+.2309699292*sn,
+      -1.2684380046*l+2.6097574011*m-.3413193965*sn,
+      -.0041960863*l-.7034186147*m+1.7076147010*sn
+    ];
+    components=linear.map(v=>{
+      const linearSafe=Math.max(0,Math.min(1,v));
+      const gamma=linearSafe<=.0031308?12.92*linearSafe:1.055*linearSafe**(1/2.4)-.055;
+      return Math.round(gamma*255);
+    });
   }else{
     const match=value.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
     if(!match)throw Error('Unsupported CSS color: '+value);
