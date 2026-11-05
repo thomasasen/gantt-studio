@@ -81,6 +81,7 @@ button:disabled, input:disabled, select:disabled { opacity: .52; cursor: not-all
 .brand-mark {
   width: 42px;
   height: 42px;
+  grid-template-columns: 24px;
   gap: 5px;
   place-content: center;
   padding: 9px;
@@ -89,7 +90,7 @@ button:disabled, input:disabled, select:disabled { opacity: .52; cursor: not-all
   background: var(--primary);
   box-shadow: 0 4px 12px rgba(20, 42, 59, .12);
 }
-.brand-mark span { height: 4px; border-radius: 6px; background: #f6f9fa; }
+.brand-mark span { width: 24px; height: 4px; border-radius: 6px; background: #f6f9fa; }
 .brand-mark span:nth-child(2) { background: #9ed3ca; }
 .brand-mark span:nth-child(3) { background: #cfdee4; }
 .local-badge {
@@ -343,8 +344,11 @@ button:disabled, input:disabled, select:disabled { opacity: .52; cursor: not-all
 }
 .design-btn:hover { background: #edf7f4 !important; }
 .timeline-panel-head {
+  display: flex;
+  align-items: stretch;
+  flex-direction: column;
   padding: 21px 23px 20px;
-  gap: 20px;
+  gap: 14px;
   background: var(--panel);
   border-color: var(--ui-outline);
 }
@@ -363,7 +367,7 @@ button:disabled, input:disabled, select:disabled { opacity: .52; cursor: not-all
   line-height: 1.55;
   margin-top: 5px;
 }
-.timeline-actions { gap: 9px; align-items: center; }
+.timeline-actions { width: 100%; gap: 9px; align-items: center; justify-content: flex-start; }
 .control-cluster {
   border: 1px solid #dee6eb;
   background: #f6f8fa;
@@ -434,7 +438,7 @@ button:disabled, input:disabled, select:disabled { opacity: .52; cursor: not-all
 }
 .filter-panel input, .quick-settings input { width: 18px; height: 18px; }
 .more-settings .dropdown-panel { width: min(280px, calc(100vw - 34px)); }
-.central-export { min-height: 40px; padding: 10px 16px !important; }
+.central-export { min-height: 40px; padding: 10px 16px !important; margin-left: auto; }
 .phase-collapse-toolbar {
   padding: 15px 20px;
   background: #f9fbfc;
@@ -459,8 +463,8 @@ button:disabled, input:disabled, select:disabled { opacity: .52; cursor: not-all
 
 /* Gantt: keep fixed 56px header + 48px data rows, matching JS coordinate geometry */
 .gantt-scroller {
-  max-height: max(420px, calc(100vh - 355px));
-  min-height: 420px;
+  max-height: max(360px, calc(100vh - 355px));
+  min-height: 170px;
   overflow: auto;
   overscroll-behavior: contain;
   scrollbar-color: #b7c7d0 #edf2f5;
@@ -901,10 +905,13 @@ button:disabled, input:disabled, select:disabled { opacity: .52; cursor: not-all
   .planning-cost-card { width: 100%; }
   .planning-accordion-stack { padding: 14px; }
   .dialog.wide-dialog { width: min(760px, calc(100vw - 24px)); }
-  .gantt-scroller { min-height: 350px; }
+  .gantt-scroller { min-height: 170px; }
 }
 @media (max-width: 600px) {
-  :root { --left-width: 300px; }
+  :root { --left-width: 190px; }
+  .gantt-head-left, .task-row-left { grid-template-columns: minmax(0, 1fr); padding-inline: 12px; }
+  .gantt-head-left span:not(:first-child), .task-row-left > .owner, .task-row-left > .status-pill { display: none; }
+  .central-export { margin-left: 0; }
   .topbar { gap: 12px; }
   .brand strong { font-size: 17px; }
   .brand small { display: block; font-size: 11px; }
@@ -934,7 +941,7 @@ button:disabled, input:disabled, select:disabled { opacity: .52; cursor: not-all
   .seg-btn { padding: 8px 9px; font-size: 11px; }
   .dropdown-panel { left: 0; right: auto; }
   .phase-collapse-heading { align-items: flex-start; flex-direction: column; }
-  .gantt-scroller { min-height: 330px; max-height: 540px; }
+  .gantt-scroller { min-height: 160px; max-height: 540px; }
   .task-overview-actions .btn { flex: 1; }
   .planning-page-head { padding: 20px 17px; }
   .planning-accordion-stack { padding: 11px; }
