@@ -1041,6 +1041,22 @@ button:disabled, input:disabled, select:disabled { opacity: .52; cursor: not-all
   color:var(--ui-muted);font-size:12px;line-height:1.5;
   margin:10px 0 15px;
 }
+/* Keep save/cancel reachable while scrolling the longer preset gallery.
+   The dialog itself is the scroll container, not an inner nested panel. */
+#designDialog .dialog-actions{
+  position:sticky;bottom:0;z-index:3;
+  margin:20px -27px -23px;
+  padding:14px 27px 19px;
+  background:#fff;
+  border-top:1px solid #e5ecf0;
+  box-shadow:0 -7px 20px rgba(20,44,57,.06);
+}
+@media(max-width:600px){
+  #designDialog .dialog-actions{
+    margin-right:-17px;margin-left:-17px;margin-bottom:-19px;
+    padding:12px 17px 17px;
+  }
+}
 .design-preview-card{
   background:linear-gradient(
     180deg,

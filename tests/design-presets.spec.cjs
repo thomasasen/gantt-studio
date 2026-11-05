@@ -46,6 +46,7 @@ test('design gallery presents six selectable miniature palettes and keeps cancel
   const startingName=await page.locator('#projectName').inputValue();
   await page.locator('#designBtn').click();
   await expect(page.locator('#designDialog')).toBeVisible();
+  await expect(page.locator('#saveDesignBtn')).toBeInViewport();
   const grid=page.locator('#designPresetGrid');
   await expect(grid.locator('button')).toHaveCount(6);
   await expect(page.locator('#designPresetOdin')).toBeVisible();
@@ -129,6 +130,7 @@ test('mobile design gallery remains usable without overflow, checked with access
   await page.setViewportSize({width:390,height:844});
   await page.locator('#designBtn').click();
   await expect(page.locator('#designDialog')).toBeVisible();
+  await expect(page.locator('#saveDesignBtn')).toBeInViewport();
   await expect(page.locator('#designPresetGrid button')).toHaveCount(6);
   await expect(page.locator('#designPresetGrid')).toBeInViewport();
   await expect(page.locator('#designPresetGrid [data-design-preset="marine"]')).toBeVisible();
