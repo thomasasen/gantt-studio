@@ -88,10 +88,34 @@ export function renderGantt(container, project, options={}) {
   const holidays=new Set((project.planning?.holidays||[]).map(h=>h.date)),settings=project.planning?.settings||{},phases=project.planning?.phases||[];
 
   tasks.forEach((task,index)=>{
-    const synthetic=task.syntheticPhase===true,rowL=el('div',`task-row-left${synthetic?' phase-summary-row':''}`);if(synthetic){rowL.dataset.phaseId=String(task.phaseId);rowL.setAttribute('role','button');rowL.tabIndex=0;rowL.setAttribute('aria-expanded',String(!task.collapsed));rowL.title='Phase ein- oder ausklappen';}else{rowL.dataset.taskId=task.id;rowL.setAttribute('role','button');rowL.tabIndex=0;rowL.setAttribute('aria-label',`Aufgabe ${task.name} bearbeiten`);}const title=el('div','task-title');
+    const synthetic=task.syntheticPhase===true,rowL=el('div',`task-row-left${synthetic?' phase-summary-row':''}`);if(synthetic){rowL.dataset.phaseId=String(task.phaseId);rowL.setAttribute('role','button');rowL.tabIndex=0;rowL.setAttribute('aria-expanded',String(!task.collapsed));rowL.title='Phase ein- oder ausklappen';}else{
+  rowL.dataset.taskId=task.id;
+  rowL.setAttribute('role',options.reorderable?'group':'button');
+  rowL.setAttribute('aria-label',`Aufgabe ${task.name} bearbeiten`);
+  if(!options.reorderable)rowL.tabIndex=0;
+}const title=el('div','task-title');
     if(synthetic){title.innerHTML=`<strong><span class="phase-summary-arrow">${task.collapsed?'▶':'▼'}</span>${escapeHtml(task.name)} <span class="phase-summary-count">${task.taskCount}</span></strong><small>${fmtDate(toDate(task.start),{day:'2-digit',month:'2-digit',year:'2-digit'})} – ${fmtDate(toDate(task.end),{day:'2-digit',month:'2-digit',year:'2-digit'})} · ${clamp(Number(task.progress)||0,0,100)} %</small>`;}
     else{const risk=settings.showRisk!==false&&task.risk&&task.risk!=='none'?`<span class="risk-dot ${task.risk}"></span>`:'';title.innerHTML=`<strong>${risk}${escapeHtml(task.name)}</strong><small>${fmtDate(toDate(task.start),{day:'2-digit',month:'2-digit',year:'2-digit'})} – ${fmtDate(toDate(task.end),{day:'2-digit',month:'2-digit',year:'2-digit'})}${settings.showProgressLabels?` · ${clamp(Number(task.progress)||0,0,100)} %`:''}</small>`;}
-    rowL.append(title,el('div','owner',synthetic?`${task.taskCount} Aufgaben`:(settings.showOwners===false?'':(task.owner||'—'))));rowL.appendChild(synthetic?el('span','status-pill phase-pill','Phase'):el('span',`status-pill ${task.status||'neutral'}`,statusLabel(task.status)));left.appendChild(rowL);
+    if(!synthetic && options.reorderable){
+      // Two separate focus targets: the drag grip and the task editor.
+      // Do not nest a native button inside a role=button row.
+      const group=el('div','gantt-task-content');
+      const handle=el('button','gantt-order-handle','⠿');
+      handle.type='button';
+      handle.dataset.ganttOrderHandle='';
+      handle.dataset.taskId=task.id;
+      handle.title='Aufgabe innerhalb der Phase verschieben';
+      handle.setAttribute('aria-label',`Aufgabe ${task.name} innerhalb der Phase verschieben. Pfeiltasten nach oben oder unten.`);
+      handle.setAttribute('aria-keyshortcuts','ArrowUp ArrowDown');
+      title.setAttribute('role','button');
+      title.tabIndex=0;
+      title.setAttribute('aria-label',`Aufgabe ${task.name} bearbeiten`);
+      group.append(handle,title);
+      rowL.appendChild(group);
+    }else rowL.appendChild(title);
+    rowL.appendChild(el('div','owner',synthetic?`${task.taskCount} Aufgaben`:(settings.showOwners===false?'':(task.owner||'—'))));
+    rowL.appendChild(synthetic?el('span','status-pill phase-pill','Phase'):el('span',`status-pill ${task.status||'neutral'}`,statusLabel(task.status)));
+    left.appendChild(rowL);
 
     const rowR=el('div',`task-row-right${synthetic?' phase-summary-row':''}`);if(!synthetic)rowR.dataset.taskId=task.id;rowR.style.width=`${timelineWidth}px`;
     for(let d=0;d<totalDays;d++){const date=addDays(start,d),weekend=[0,6].includes(date.getUTCDay()),holiday=holidays.has(iso(date));if((settings.showWeekends!==false&&weekend)||(settings.showHolidays!==false&&holiday)){const band=el('div',`day-band${weekend?' weekend':''}${holiday?' holiday':''}`);band.style.left=`${d*cfg.px}px`;band.style.width=`${cfg.px}px`;rowR.appendChild(band);}}

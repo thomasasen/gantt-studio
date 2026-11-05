@@ -682,6 +682,59 @@ button:disabled, input:disabled, select:disabled { opacity: .52; cursor: not-all
   .task-drag-handle{width:44px;min-height:44px;flex-basis:44px;}
 }
 
+/* Task order in the frozen Gantt list. The right-hand bars retain their
+   existing horizontal scheduling gestures without added drag listeners. */
+.gantt-order-control{
+  display:inline-flex;align-items:center;gap:8px;
+  min-width:0;
+}
+.gantt-order-control .control-caption{
+  width:auto;white-space:nowrap;color:var(--ui-muted);
+  font-size:11px;font-weight:680;
+}
+.gantt-task-content{
+  display:flex;align-items:center;gap:4px;min-width:0;width:100%;
+}
+.gantt-task-content .task-title{
+  min-width:0;flex:1;cursor:pointer;
+  padding-block:2px;border-radius:4px;
+}
+.gantt-task-content .task-title:focus-visible{
+  outline:2px solid var(--accent);outline-offset:2px;
+}
+.gantt-order-handle{
+  flex:0 0 30px;width:30px;height:38px;
+  display:inline-flex;align-items:center;justify-content:center;
+  padding:0;border:1px solid transparent;border-radius:8px;
+  background:transparent;color:#526778;
+  cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none;
+  font-size:21px;line-height:1;
+}
+.gantt-order-handle:hover,.gantt-order-handle:focus-visible{
+  background:#e9f2f5;border-color:#bdd5de;color:#1b5367;
+}
+.gantt-order-handle:focus-visible{
+  outline:2px solid var(--accent);outline-offset:2px;
+}
+.gantt-order-handle.active{cursor:grabbing;}
+.task-row-left.gantt-row-dragging{
+  position:relative;z-index:33;opacity:.92;
+  background:#e8f4f3 !important;
+  box-shadow:0 6px 16px rgba(26,60,78,.17);
+  will-change:transform;
+}
+.task-row-left.gantt-order-drop-before,
+.task-row-right.gantt-order-drop-before{
+  box-shadow:inset 0 3px 0 #087e75;
+}
+.task-row-left.gantt-order-drop-after,
+.task-row-right.gantt-order-drop-after{
+  box-shadow:inset 0 -3px 0 #087e75;
+}
+@media (pointer:coarse){
+  .gantt-order-handle{flex-basis:42px;width:42px;height:44px;}
+}
+
 /* Planning overview and settings */
 .planning-page { border-radius: var(--ui-radius-lg); }
 .planning-page-head {
@@ -1008,6 +1061,8 @@ button:disabled, input:disabled, select:disabled { opacity: .52; cursor: not-all
   .planning-accordion-stack { padding: 14px; }
   .dialog.wide-dialog { width: min(760px, calc(100vw - 24px)); }
   .gantt-scroller { min-height: 170px; }
+  .gantt-order-control { flex-wrap:wrap; }
+  .gantt-order-control .control-caption { flex-basis:100%; }
 }
 @media (max-width: 600px) {
   :root { --left-width: 190px; }
@@ -1045,6 +1100,11 @@ button:disabled, input:disabled, select:disabled { opacity: .52; cursor: not-all
   .dropdown-panel { left: 0; right: auto; }
   .phase-collapse-heading { align-items: flex-start; flex-direction: column; }
   .gantt-scroller { min-height: 160px; max-height: 540px; }
+  .gantt-order-control { width:100%; }
+  .gantt-order-control .gantt-order-switch { width:100%; }
+  .gantt-order-control .task-order-mode { flex:1; }
+  .gantt-task-content { gap:2px; }
+  .gantt-order-handle { flex-basis:30px;width:30px;min-width:30px; }
   .task-overview-actions .btn { flex: 1; }
   .task-order-switch { flex: 1 1 100%; }
   .task-order-mode { flex: 1; }
