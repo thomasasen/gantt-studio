@@ -36,6 +36,19 @@ jobs:
           node --check assets/js/storage.js
       - name: Run isolated Frappe adapter contract tests
         run: node --test tests/frappe-spike.spec.mjs
+      - name: Audit locked npm tarball integrity
+        run: |
+          node --input-type=module <<'JS'
+          import {readFileSync} from 'node:fs';
+          const manifest=JSON.parse(readFileSync('spikes/frappe/package.json','utf8'));
+          const lock=JSON.parse(readFileSync('spikes/frappe/package-lock.json','utf8'));
+          const item=lock.packages?.['node_modules/frappe-gantt'];
+          if(manifest.dependencies?.['frappe-gantt']!=='1.2.2'||item?.version!=='1.2.2')
+            throw new Error('Frappe version drift detected.');
+          if(!/^sha512-[A-Za-z0-9+/]+={0,2}$/.test(item.integrity||''))
+            throw new Error('Missing official npm tarball SHA-512 integrity.');
+          console.log('Pinned npm integrity entry present.');
+          JS
       - name: Check required static files
         run: |
           test -s index.html
@@ -106,36 +119,3 @@ jobs:
           grep -q 'const documentUrl=safeUrl(task.url)' assets/js/app.js
           grep -q 'font-size:13px' assets/css/task-table.css
           grep -q 'font-size:11px' assets/css/task-table.css
-
-  refresh-frappe-lockfile:
-    if: github.ref == 'refs/heads/spike/frappe-gantt-adapter' && github.actor != 'github-actions[bot]'
-    permissions:
-      contents: write
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-      - name: Recreate npm-managed lockfile with registry integrity
-        run: |
-          rm spikes/frappe/package-lock.json
-          npm install --package-lock-only --prefix spikes/frappe --ignore-scripts --no-audit --no-fund
-          node --input-type=module <<'JS'
-          import {readFileSync} from 'node:fs';
-          const lock=JSON.parse(readFileSync('spikes/frappe/package-lock.json','utf8'));
-          const pkg=lock.packages?.['node_modules/frappe-gantt'];
-          if(pkg?.version!=='1.2.2'||!pkg.integrity?.startsWith('sha512-'))
-            throw new Error('npm integrity hash missing from generated lockfile.');
-          console.log('npm-generated SRI verified: '+pkg.integrity);
-          JS
-      - name: Commit generated lockfile only when changed
-        run: |
-          if ! git diff --quiet -- spikes/frappe/package-lock.json; then
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add spikes/frappe/package-lock.json
-            git commit -m "build(spike): regenerate npm lockfile with registry integrity"
-            git push origin HEAD:spike/frappe-gantt-adapter
-          fi
