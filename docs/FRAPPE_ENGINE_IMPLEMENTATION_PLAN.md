@@ -1,8 +1,9 @@
 # Gantt Studio: Engine-Abstraktion und optionaler Frappe-Gantt-Adapter
 
-> **Status:** Phasen A und B abgeschlossen und regressionsgeprüft. Architektur-PR als Review-Vorbereitung; Phase C benötigt Freigabe des Abstraktionsstands.
+> **Status:** Phasen A und B nachweislich abgeschlossen. Phase C nach ausdrücklicher Freigabe am 06.11.2026 als separater Read-only-Spike begonnen; Gate C nicht erreicht. Keine Aktivierung in Produktion.
 >
-> **Arbeitsbranch:** `refactor/engine-abstraction`  
+> **Arbeitsbranch Phase B:** `refactor/engine-abstraction`  
+> **Experimentbranch Phase C:** `spike/frappe-gantt-adapter` (ab Freigabe-SHA `86397dd762085e2042438802a364f1b71a37d637`)  
 > **Repository:** https://github.com/thomasasen/gantt-studio  
 > **Basis-Commit (main, 05.11.2026):** `1ef29c9388b555308242bb6174ff6ed60127ea5d`  
 > **Stand:** 05.11.2026  
@@ -150,7 +151,7 @@ engine.getCapabilities();       // objektive Unterstützung statt Annahmen
 
 Erst nach Gate B den separaten Branch `spike/frappe-gantt-adapter` von einem **freigegebenen** Abstraktionsstand erstellen; bis dahin diesen Folgeschritt nicht vorwegnehmen.
 
-- [ ] **C-01 – Upstream verifizieren:** Bei Start npm-Stable-Version, Tag/Release-Divergenz, Lockfile, Lizenz, dokumentierte öffentliche APIs, bekannte Bugs und Browser-Support erneut prüfen. Ausgangsannahme aus Voranalyse: npm `frappe-gantt@1.2.2` (Stand 05.11.2026), GitHub „Latest Release“ `v1.0.3`; **nicht** ohne erneute Prüfung als aktuell behaupten.
+- [x] **C-01 – Upstream verifizieren:** Bei Start npm-Stable-Version, Tag/Release-Divergenz, Lockfile, Lizenz, dokumentierte öffentliche APIs, bekannte Bugs und Browser-Support erneut prüfen. Ausgangsannahme aus Voranalyse: npm `frappe-gantt@1.2.2` (Stand 05.11.2026), GitHub „Latest Release“ `v1.0.3`; **nicht** ohne erneute Prüfung als aktuell behaupten.
 - [ ] **C-02 – Reproduzierbaren, minimalen Vendor-Build:** Frappe lokal aus npm beziehen und bundeln; keine dynamische Fremd-CDN-Quelle. Wenn dafür ein Build-Schritt nötig wird, dessen Nutzen/Kosten und GitHub-Pages-Deployment dokumentieren; Native-Betrieb muss weitergehen.
 - [ ] **C-03 – Task-Mapping:** IDs, Aufgabenreihenfolge, feste Datumssemantik, Progress, Meilensteine, Abhängigkeiten und Sondertypen eindeutig konvertieren. Keine Mutation des Originalprojekts; Frappe-Ende ↔ inklusives Projektende explizit lösen.
 - [ ] **C-04 – Read-only Rendering:** Gleiche Fixtures in beiden Engines rendern. Phase-Sammelzeilen und Layer, links/rechts synchronisierte Zeilen, Filter, Scroll-/Zoom-Position und Leerzustand untersuchen; fehlende Fähigkeiten dokumentieren.
@@ -288,6 +289,40 @@ Erst nach Gate B den separaten Branch `spike/frappe-gantt-adapter` von einem **f
 **Review-Paket:** [Draft-PR #13](https://github.com/thomasasen/gantt-studio/pull/13), erstellt von `refactor/engine-abstraction` auf `main@1ef29c9`. Die vollständige Umsetzung bis zum Review-Stand ist durch die Commit-Historie nachvollziehbar; letzter vor PR-Erstellung verifizierter Code-Commit `ad309ca4` (55/55), Planabschluss `d8bfaea`. Kein Merge ausgeführt.
 
 **Freigabevermerk:** Gate B ist auf Basis der vorliegenden automatisierten und unabhängigen visuellen Nachweise erfüllt. `main` bleibt auf `1ef29c9` unverändert; die Native Engine ist Standard und einziger produktiv unterstützter Renderer. Der Architektur-PR kann als **Draft** erstellt werden. Ein Merge oder der Beginn von `spike/frappe-gantt-adapter` setzt einen ausdrücklich **freigegebenen Abstraktionsstand** voraus; die Umsetzung hat diese Freigabe noch nicht. Offenes Restrisiko: manuelle interaktive Browser-Zoom-/Screenreader-Abnahme auf echten Geräten wurde nicht durchgeführt, außerdem Performance unter extrem großen Projekten erst in Phase E zu messen.
+
+### Umsetzungssitzung 06.11.2026: Phase C / autorisierter Frappe-Spike
+
+**Freigabe:** Die ausdrückliche Benutzerfreigabe vom 06.11.2026 gilt für den bestandenen Phase-B-Abstraktionsstand und den Start des separaten Spikes, **nicht** für Merge oder produktive Frappe-Aktivierung. Neuer Branch `spike/frappe-gantt-adapter` entstand genau aus `refactor/engine-abstraction@86397dd762085e2042438802a364f1b71a37d637`; `main` bleibt unverändert.
+
+**C-01 verifizierter Upstream:** Laut npm ist `frappe-gantt@1.2.2` aktuell als `latest` markiert, ohne Runtime-Abhängigkeiten und unter MIT-Lizenz (Abfrage am 06.11.2026). GitHub Releases listet separat `v1.0.3` als „Latest“, deshalb **npm** ist die maßgebliche Paketversion. Öffentliche Optionen: `readonly`, `readonly_dates`, `readonly_progress`, `move_dependencies: false`, `view_mode`, `on_click`; Methoden: `change_view_mode`, `update_options`, `update_task`. **Keine dokumentierte `destroy()`-Methode** und kein belastbarer öffentlicher Vertrag für Escape/Pointer-Cancel vor Commit. Event-Callbacks sind nicht ohne Weiteres eine Validierungs-/Transaktionsgrenze. Quellen: https://www.npmjs.com/package/frappe-gantt?activeTab=versions , https://docs.frappe.io/gantt/config , https://github.com/frappe/gantt/releases , https://github.com/frappe/gantt/issues/425 .
+
+**Implementierte Pakete / Commits (separater Spike, kein produktiver Umschalter):**
+- `4c5d2a9`: reiner Task-/Date-only-Mapper. Übernimmt IDs, Reihenfolge, inklusive Daten, Progress und nur sichtbare Vorgänger. Verwirft synthetische Phasenzeilen. Keine Mutation des Projektmodells.
+- `6db8b6b`: Engine-Contract-konformer Read-only-Frappe-Adapter. Ausschließlich öffentliche Constructor-Optionen, kein Frappe-Source-Patch, keine private DOM-API. Capability-Flags markieren nicht implementierte Features als `false`.
+- `162c79c`: Unit-/Contract-/DST-/Immutable-/Teardown-Tests mit injizierbarem Frappe-Testdouble.
+- `fe9179f`, `bed090e`, `d49cc29`: eigene Dependency-Definition, Frappe-Version 1.2.2 fest, lokaler UMD-/CSS-/Lizenz-Build; `npm ci` im Spike-Verzeichnis, die Hauptanwendung bleibt build-frei.
+- `172927e`, `310ed84`: nichtproduktive Vergleichsseite `spikes/frappe/index.html`, native und Frappe lesen dieselbe lokale Demo-Projektion. Keine IndexedDB-/localStorage-Speicherung.
+- `351d2df`, `ecda4de`, `99055a9`: Browser-Smoke-/Responsive-Tests sowie CI-Einbindung für den Spike-Branch.
+
+**Validierungsstatus dieser Sitzung:** Die Implementierung und Testdefinitionen sind in GitHub committed. Die automatisierten neuen Tests und der npm-Vendor-Build wurden hier **noch nicht nachweislich ausgeführt**; kein grünes Gate C wird behauptet. CI wurde für Branch-Pushes konfiguriert. Build-Artefakte und Laufzeit-Paket-Checks müssen überprüft werden. Der gesperrte lokale Container kann npm nicht über das Internet installieren. Das manuell erzeugte Lockfile fixiert den Paket-Tarball, enthält aber noch keinen npm-SRI-Integritätseintrag; vor einem reproduzierbar verifizierten Build ist dessen Ergänzung notwendig.
+
+**C-07 vorläufige Feature-Gaps (noch nicht durch echte Browsertests bestätigt):**
+
+| Kriterium | Native | Frappe-Spike | Bewertung |
+| --- | --- | --- | --- |
+| Tag/Woche/Monat und Grundbalken | Vollständig | Read-only vorgesehen | Browserabnahme offen |
+| Inklusive Kalender-Enddaten, DST | Projektvertrag | Mapper hält `YYYY-MM-DD` als String | Echte Laufzeitgeometrie und Callback-Konvertierung prüfen |
+| Phasen-Sammelzeilen, eingeklappte Phasen | Native unterstützt | Synthetische Phasenzeilen ausgeschlossen | Nicht gleichwertig |
+| Baselines, Puffer, Marker, individuelle Labels, Status/Risiko | Native unterstützt | Keine robusten öffentlichen Frappe-Overlays umgesetzt | Große Feature-Lücke |
+| Verschieben, Resize, Progress | Vollständig und transaktional | Im Read-only-Spike deaktiviert | Öffentliche Escape/Pointer-Cancel-Semantik unbewiesen |
+| Abhängigkeiten ohne automatisches Scheduling | Externe Fachlogik | `move_dependencies:false` | Tatsächlich beobachten |
+| Aufgabenreihenfolge per Drag/Tastatur | Beide Richtungen | Nicht verfügbar | Feature-Lücke |
+| Zoom/Scroll, Fokus, Themes, Druck | Vollständig | Zum Teil / nicht freigegeben | Keine Feature-Parität |
+| Destroy ohne Leaks | Native implementiert | Frappe ohne dokumentiertes Dispose | Risiko für wiederholte Mounts |
+
+**Red-Team-Prioritäten:** Paketintegrität nachtragen; reale Frappe-Date-only-Geometrie an DST und Monatsenden prüfen; mögliche globale Event-Listener nach wiederholtem Render/Destroy nachweisen oder isolieren; Frappe-Interaction nur mit verifizierbarem Cancel-Vertrag freigeben; Layout-/Rollen-/Phase-Parität ohne private DOM-Selektoren bewerten. Frappe darf weder Projektdaten schreiben noch `main` ersetzen.
+
+**Nächste Schritte:** (1) Build/Unit-/Chromium-Testläufe auf dem Spike-Branch überprüfen und Fehler beheben. (2) Detaillierte DOM-/Lifecycle-Profilierung mit tatsächlichem Frappe 1.2.2. (3) C-05-Interaktionen nur mit nachweisbarem fachlichem Intent-Commit testen, sonst negatives Gate-C-Signal dokumentieren. (4) Gate C nach echter Gegenprobe Go/No-Go entscheiden. `main`, `refactor/engine-abstraction` und PR #13 bleiben unverändert.
 
 ## 9. Optimaler Umsetzungs-Prompt für einen neuen Codex-/ChatGPT-Arbeitslauf
 
