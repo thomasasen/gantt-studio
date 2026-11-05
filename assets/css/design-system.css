@@ -549,6 +549,25 @@ button:disabled, input:disabled, select:disabled { opacity: .52; cursor: not-all
 .empty-state { padding: 35px; text-align: center; gap: 12px; font-size: 13px; }
 .empty-state strong { font-size: 20px; letter-spacing: -.03em; }
 
+/* Demo loader is a secondary action, never a replacement for an existing project. */
+.topbar .btn.demo-btn, .empty-actions .btn.demo-btn {
+  background: #eef8f5;
+  color: #246358;
+  border-color: #c4ded7;
+}
+.topbar .btn.demo-btn:hover, .empty-actions .btn.demo-btn:hover {
+  background: #e2f2ec;
+  border-color: #97bdb3;
+}
+.empty-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 5px;
+}
+
 /* Task table */
 .task-overview-panel { margin-top: 16px; border-radius: var(--ui-radius-lg); }
 .task-overview-header {
@@ -918,6 +937,7 @@ button:disabled, input:disabled, select:disabled { opacity: .52; cursor: not-all
   .toolbar { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); width: 100%; gap: 8px; }
   .toolbar .project-select { grid-column: 1 / -1; width: 100%; min-width: 0; max-width: none; }
   .toolbar .btn { min-width: 0; padding-inline: 7px; font-size: 12px; }
+  .toolbar #addTaskBtn { grid-column: 1 / -1; }
   .app-shell { padding: 12px; }
   .project-head { padding: 18px; }
   .project-name { font-size: 27px; }

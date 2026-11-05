@@ -38,6 +38,55 @@ async function checkAlignedFields(page, selector) {
   expect(data.length).toBeGreaterThan(0);
 }
 
+
+test('demonstration project loads without overwriting existing projects', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.locator('#loadDemoBtn')).toBeVisible();
+  await expect(page.locator('#emptyDemoBtn')).toBeVisible();
+  const originalId = await page.locator('#projectSelect').inputValue();
+  const originalName = await page.locator('#projectName').inputValue();
+
+  await page.locator('#emptyDemoBtn').click();
+  await expect(page.locator('#projectName')).toHaveValue('Dynamisches Demo-Projekt');
+  await expect(page.locator('#taskTableBody')).toContainText('Projekt-Kick-off');
+  const firstDemoId = await page.locator('#projectSelect').inputValue();
+  expect(firstDemoId).not.toBe(originalId);
+  const firstTaskId = await page.locator('#taskTableBody tr').first().getAttribute('data-task-row-id');
+
+  // Repeated loading creates a separate copy instead of overwriting the first.
+  await page.locator('#loadDemoBtn').click();
+  await expect(page.locator('#projectName')).toHaveValue('Dynamisches Demo-Projekt (2)');
+  const secondDemoId = await page.locator('#projectSelect').inputValue();
+  expect(secondDemoId).not.toBe(firstDemoId);
+  const secondTaskId = await page.locator('#taskTableBody tr').first().getAttribute('data-task-row-id');
+  expect(secondTaskId).not.toBe(firstTaskId);
+  await expect(page.locator('#projectSelect option')).toHaveCount(3);
+
+  // All projects must survive navigation and a full browser reload.
+  await page.reload();
+  await expect(page.locator('#projectName')).toHaveValue('Dynamisches Demo-Projekt (2)');
+  await page.locator('#projectSelect').selectOption(originalId);
+  await expect(page.locator('#projectName')).toHaveValue(originalName);
+  await expect(page.locator('#taskTableBody tr')).toHaveCount(1); // Empty placeholder, no imported demo task.
+  await page.locator('#projectSelect').selectOption(firstDemoId);
+  await expect(page.locator('#taskTableBody')).toContainText('Projekt-Kick-off');
+});
+
+test('demo fetch failure preserves current project and shows an error', async ({ page }) => {
+  await page.goto('/');
+  const originalId = await page.locator('#projectSelect').inputValue();
+  const originalName = await page.locator('#projectName').inputValue();
+  await page.route('**/examples/demo.gantt.json', route => route.fulfill({
+    status: 503, body: 'Unavailable', contentType: 'text/plain',
+  }));
+  await page.locator('#loadDemoBtn').click();
+  await expect(page.locator('#toast')).toContainText('Demoprojekt konnte nicht geladen werden');
+  await expect(page.locator('#loadDemoBtn')).toBeEnabled();
+  await expect(page.locator('#projectSelect')).toHaveValue(originalId);
+  await expect(page.locator('#projectName')).toHaveValue(originalName);
+  await expect(page.locator('#projectSelect option')).toHaveCount(1);
+});
+
 test('new visual system loads and has working top-level navigation', async ({ page }) => {
   await page.goto('/');
   await expect(page.locator('.brand strong')).toContainText('Gantt Studio');
