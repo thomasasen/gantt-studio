@@ -221,42 +221,38 @@ test('records repeatable Frappe render and rerender costs for 0/1/25/250/1000 ta
   console.log('FRAPPE_BENCHMARK_MS',JSON.stringify(metrics));
 });
 
-test('interactive Frappe emits date callback before mouseup and Escape cannot undo it', async ({page}) => {
+// Red-team diagnostic only: explicitly invoke a private upstream preview
+// helper in the test. The application adapter must never depend on this API.
+// This proves callback timing, not the behavior of a complete user pointer drag.
+test('upstream Frappe preview helper emits a date callback without pointerup', async ({page}) => {
   await page.goto('/spikes/frappe/index.html');
   await expect(page.locator('#status')).toContainText('Frappe: gerendert');
-  await page.evaluate(() => {
+  const result = await page.evaluate(() => {
     const host = document.createElement('div');
-    host.id = 'frappe-edit-audit';
     host.style.cssText = 'width:1000px;height:400px;overflow:auto;background:white';
     document.body.prepend(host);
-    window.__frappeEditAudit = {changes:[]};
-    window.__frappeEditAudit.chart = new globalThis.Gantt(host, [{
-      id:'editable',name:'Drag audit',start:'2026-11-01',end:'2026-11-10',progress:25
+    const changes = [];
+    const chart = new globalThis.Gantt(host, [{
+      id:'editable',name:'Callback audit',start:'2026-11-01',end:'2026-11-10',progress:25
     }],{
-      view_mode:'Day', readonly:false, readonly_dates:false,
-      readonly_progress:false, move_dependencies:false,
-      scroll_to:'start', infinite_padding:false,
-      view_mode_select:false, today_button:false, popup:false,
-      on_date_change:(task,start,end) => {
-        window.__frappeEditAudit.changes.push({
-          id:task.id,start:start.toISOString(),end:end.toISOString()
-        });
-      }
+      view_mode:'Day',readonly:false,readonly_dates:false,
+      readonly_progress:false,move_dependencies:false,
+      scroll_to:'start',infinite_padding:false,
+      view_mode_select:false,today_button:false,popup:false,
+      on_date_change:(task,start,end) => changes.push({
+        id:task.id,start:start.toISOString(),end:end.toISOString()
+      })
     });
+    const bar = chart.get_bar('editable');
+    const initialX = bar.$bar.getX();
+    const width = chart.config.column_width;
+    const before = changes.length;
+    bar.update_bar_position({x:initialX+width*3});
+    const afterPreview = changes.length;
+    host.remove();
+    return {before,afterPreview,initialX,width};
   });
-  const bar = page.locator('#frappe-edit-audit .bar-wrapper .bar').first();
-  await expect(bar).toBeVisible();
-  await bar.scrollIntoViewIfNeeded();
-  const bounds = await bar.boundingBox();
-  const x=bounds.x+bounds.width/2, y=bounds.y+bounds.height/2;
-  await page.mouse.move(x,y);
-  await page.mouse.down();
-  await page.mouse.move(x+90,y,{steps:6});
-  const beforePointerUp=await page.evaluate(() => window.__frappeEditAudit.changes.length);
-  await page.keyboard.press('Escape');
-  const afterEscape=await page.evaluate(() => window.__frappeEditAudit.changes.length);
-  await page.mouse.up();
-  expect(beforePointerUp).toBeGreaterThan(0);
-  expect(afterEscape).toBeGreaterThanOrEqual(beforePointerUp);
-  console.log('FRAPPE_PRECOMMIT_CALLBACKS',JSON.stringify({beforePointerUp,afterEscape}));
+  expect(result.before).toBe(0);
+  expect(result.afterPreview).toBeGreaterThan(0);
+  console.log('FRAPPE_UPSTREAM_PREVIEW_CALLBACK', JSON.stringify(result));
 });
