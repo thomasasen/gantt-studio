@@ -79,8 +79,10 @@ test('keyboard reorder, Escape cancellation, other-phase rejection',async({page}
 test('new and edited task keeps or appends its stable phase position',async({page})=>{
   await page.goto('/');
   await page.locator('#loadDemoBtn').click();
-  const phase=await page.locator('#taskPhase').locator('option').evaluateAll(options=>options.filter(o=>o.value).map(o=>o.value));
+  await expect(page.locator('#taskTableBody tr[data-task-row-id]')).toHaveCount(10);
   await page.locator('#addTaskBtn').click();
+  const phase=await page.locator('#taskPhase').locator('option').evaluateAll(options=>options.filter(o=>o.value).map(o=>o.value));
+  expect(phase.length).toBeGreaterThan(0);
   await page.locator('#taskName').fill('Stable order QA');
   await page.locator('#taskStart').fill('2026-05-01');
   await page.locator('#taskEnd').fill('2026-05-03');
