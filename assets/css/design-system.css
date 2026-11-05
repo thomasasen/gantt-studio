@@ -1717,6 +1717,17 @@ button:disabled, input:disabled, select:disabled { opacity: .52; cursor: not-all
   color:#D5DFE5 !important;
   background:#465765 !important;
 }
+/* Ephemeral save/error feedback must stay readable on dark projects. */
+:root[data-theme-mode="dark"] .toast{
+  background:var(--dark-button);
+  color:#F1F5F7;
+  border:1px solid var(--ui-outline);
+}
+:root[data-theme-mode="dark"] .toast.error{
+  background:#783F48;
+  color:#F6E5E5;
+  border-color:#96606A;
+}
 /* Screen-reader-only and semantic labels stay usable at higher contrast. */
 @media (prefers-reduced-transparency: reduce){
   :root[data-theme-mode="dark"] .topbar{
