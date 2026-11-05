@@ -50,6 +50,16 @@ export const DESIGN_PRESETS=Object.freeze([
     id:'waldnacht',label:'Waldnacht',description:'Dunkel · Tannengrün & Salbei',
     colors:{primary:'#B7D5C4',accent:'#91B59E',workstream:'#406A60',critical:'#6F5662',
       milestone:'#796B43',gate:'#79584B',pageBg:'#16231F',panelBg:'#23332D'}
+  },
+  {
+    id:'fjordlicht',label:'Fjordlicht',description:'Hybrid · Dunkler Schiefer & heller Fjord',
+    colors:{primary:'#234557',accent:'#22666D',workstream:'#326A7B',critical:'#3B4F66',
+      milestone:'#786337',gate:'#865A46',pageBg:'#26343E',panelBg:'#E8EFF0'}
+  },
+  {
+    id:'kupferatelier',label:'Kupferatelier',description:'Hybrid · Graphit & warmes Papier',
+    colors:{primary:'#50413E',accent:'#805846',workstream:'#806256',critical:'#63495B',
+      milestone:'#78643C',gate:'#825648',pageBg:'#302D2E',panelBg:'#F0E9E0'}
   }
 ]);
 
@@ -75,4 +85,17 @@ export function relativeLuminance(hex){
 // imported/custom dark projects without changing the export schema.
 export function isDarkDesignColors(colors){
   return relativeLuminance(colors?.panelBg)<.19;
+}
+
+// Deliberate mixed-material composition: subdued dark application chrome, a
+// light data canvas. Derive the layout from persisted colors, not preset IDs;
+// custom edits and JSON import/export therefore preserve the behavior.
+export function isHybridDesignColors(colors){
+  return relativeLuminance(colors?.pageBg)<.19 &&
+    relativeLuminance(colors?.panelBg)>.62;
+}
+
+export function designThemeMode(colors){
+  return isHybridDesignColors(colors)?'hybrid':
+    isDarkDesignColors(colors)?'dark':'light';
 }
