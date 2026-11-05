@@ -19,14 +19,16 @@ export async function saveLocal(project) {
   const db = await openDb();
   return new Promise((resolve, reject) => {
     const tx = db.transaction(STORE, 'readwrite');
-    tx.objectStore(STORE).put(structuredClone(project));
-    tx.oncomplete = () => {
-      localStorage.setItem(ACTIVE_KEY, project.id);
-      resolve();
-    };
-    tx.onerror = () => reject(tx.error);
+    tx.oncomplete = () => { db.close(); resolve(); };
+    tx.onabort = () => { const error = tx.error || new Error('IndexedDB transaction aborted.'); db.close(); reject(error); };
+    tx.onerror = () => { const error = tx.error || new Error('IndexedDB write failed.'); reject(error); };
+    try { tx.objectStore(STORE).put(structuredClone(project)); }
+    catch (error) { try { tx.abort(); } catch {} reject(error); }
   });
 }
+
+// Saving a project must never switch the active project. Selection is an explicit
+// UI action; otherwise a delayed write can silently undo a project switch.
 
 export async function loadProject(id) {
   if (!id) return null;
