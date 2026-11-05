@@ -14,10 +14,10 @@ function contrast(foreground,background='#FFFFFF'){
   return (Math.max(a,b)+.05)/(Math.min(a,b)+.05);
 }
 
-test('six design presets preserve both originals, have distinct colors and accessible new palettes',async()=>{
-  const {DESIGN_PRESETS,DESIGN_COLOR_FIELDS,findDesignPreset,matchDesignPreset}
+test('nine design presets preserve the original six palettes and keep bar label contrast',async()=>{
+  const {DESIGN_PRESETS,DESIGN_COLOR_FIELDS,findDesignPreset,matchDesignPreset,isDarkDesignColors}
     =await import('../assets/js/design-presets.mjs');
-  expect(DESIGN_PRESETS.map(p=>p.id)).toEqual(['odin','neutral',...newPresets]);
+  expect(DESIGN_PRESETS.map(p=>p.id)).toEqual(['odin','neutral',...newPresets,'mitternacht','graphit','waldnacht']);
   expect(findDesignPreset('odin').colors.primary).toBe('#20374E');
   expect(findDesignPreset('neutral').colors.primary).toBe('#334155');
   expect(findDesignPreset('unknown')).toBeNull();
@@ -29,17 +29,28 @@ test('six design presets preserve both originals, have distinct colors and acces
     expect(match?.id).toBe(p.id);
     combos.add(DESIGN_COLOR_FIELDS.map(key=>p.colors[key]).join('|'));
   }
-  expect(combos.size).toBe(6);
+  expect(combos.size).toBe(9);
   expect(matchDesignPreset({...DESIGN_PRESETS[0].colors,accent:'#112233'})).toBeNull();
   for(const id of newPresets){
     const p=findDesignPreset(id);
+    expect(isDarkDesignColors(p.colors)).toBe(false);
     for(const key of ['primary','accent','workstream','critical','milestone','gate']){
       expect(contrast(p.colors[key]),id+' '+key+' contrasts with white').toBeGreaterThanOrEqual(4.5);
     }
   }
+  for(const id of ['mitternacht','graphit','waldnacht']){
+    const p=findDesignPreset(id);
+    expect(isDarkDesignColors(p.colors)).toBe(true);
+    expect(contrast(p.colors.pageBg,p.colors.panelBg),id+' has subdued dark surface separation').toBeLessThanOrEqual(1.3);
+    for(const field of ['workstream','critical','milestone','gate']){
+      expect(contrast('#F1F5F7',p.colors[field]),id+' '+field+' contrast to bar labels').toBeGreaterThanOrEqual(4.5);
+    }
+    expect(contrast('#CED9E3',p.colors.panelBg),id+' primary body text').toBeGreaterThanOrEqual(7);
+    expect(contrast('#A9B9C7',p.colors.panelBg),id+' secondary body text').toBeGreaterThanOrEqual(4.5);
+  }
 });
 
-test('design gallery presents six selectable miniature palettes and keeps cancel non-destructive',async({page})=>{
+test('design gallery presents nine selectable miniature palettes and keeps cancel non-destructive',async({page})=>{
   await page.goto('/');
   await expect(page.locator('#projectSelect')).not.toHaveValue('');
   const startingPrimary=await page.locator('html').evaluate(el=>getComputedStyle(el).getPropertyValue('--primary').trim().toLowerCase());
@@ -48,7 +59,7 @@ test('design gallery presents six selectable miniature palettes and keeps cancel
   await expect(page.locator('#designDialog')).toBeVisible();
   await expect(page.locator('#saveDesignBtn')).toBeInViewport();
   const grid=page.locator('#designPresetGrid');
-  await expect(grid.locator('button')).toHaveCount(6);
+  await expect(grid.locator('button')).toHaveCount(9);
   await expect(page.locator('#designPresetOdin')).toBeVisible();
   await expect(page.locator('#designPresetNeutral')).toBeVisible();
   mkdirSync('visual-review',{recursive:true});
@@ -131,7 +142,7 @@ test('mobile design gallery remains usable without overflow, checked with access
   await page.locator('#designBtn').click();
   await expect(page.locator('#designDialog')).toBeVisible();
   await expect(page.locator('#saveDesignBtn')).toBeInViewport();
-  await expect(page.locator('#designPresetGrid button')).toHaveCount(6);
+  await expect(page.locator('#designPresetGrid button')).toHaveCount(9);
   await expect(page.locator('#designPresetGrid')).toBeInViewport();
   await expect(page.locator('#designPresetGrid [data-design-preset="marine"]')).toBeVisible();
   mkdirSync('visual-review',{recursive:true});
@@ -157,4 +168,162 @@ test('mobile design gallery remains usable without overflow, checked with access
   const scan=await new AxeBuilder({page})
     .withTags(['wcag2a','wcag2aa','wcag21a','wcag21aa']).analyze();
   expect(scan.violations.map(v=>({id:v.id,impact:v.impact,targets:v.nodes.map(n=>n.target)}))).toEqual([]);
+});
+
+function cssRGB(value){
+  const match=value.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+  if(!match)throw Error('Unsupported CSS color: '+value);
+  return '#'+match.slice(1,4).map(v=>Number(v).toString(16).padStart(2,'0')).join('').toUpperCase();
+}
+
+test('dark themes update every major UI surface and revert cleanly across projects',async({page})=>{
+  test.setTimeout(120000);
+  await page.goto('/');
+  await expect(page.locator('#projectSelect')).not.toHaveValue('');
+  const lightId=await page.locator('#projectSelect').inputValue();
+  await page.locator('#loadDemoBtn').click();
+  await expect(page.locator('#taskTableBody tr[data-task-row-id]')).toHaveCount(10);
+  const darkIds=['mitternacht','graphit','waldnacht'];
+  const {findDesignPreset}=await import('../assets/js/design-presets.mjs');
+  mkdirSync('visual-review',{recursive:true});
+
+  for(const id of darkIds){
+    const preset=findDesignPreset(id);
+    await page.locator('#designBtn').click();
+    await expect(page.locator('#designDialog')).toBeVisible();
+    await page.locator(`#designPresetGrid [data-design-preset="${id}"]`).click();
+    await expect(page.locator('#designPreviewCard')).toHaveAttribute('data-preview-mode','dark');
+    await expect(page.locator('#designPreviewMode')).toContainText('Dunkles Design');
+    await expect(page.locator('#designPresetSelection')).toContainText(preset.label);
+    // Selecting a preset is a preview, not a persistent theme switch.
+    if(id==='mitternacht')await expect(page.locator('html')).toHaveAttribute('data-theme-mode','light');
+    await page.locator('#saveDesignBtn').click();
+    await expect(page.locator('#designDialog')).toBeHidden();
+    await expect(page.locator('html')).toHaveAttribute('data-theme-mode','dark');
+    const surfaces=await page.evaluate(()=>{
+      const style=selector=>{
+        const element=document.querySelector(selector);
+        if(!element)throw Error('Missing '+selector);
+        const s=getComputedStyle(element);
+        return {background:s.backgroundColor,color:s.color};
+      };
+      return {
+        body:style('body'),topbar:style('.topbar'),
+        panel:style('.project-head'),gantt:style('.gantt-left'),
+        ganttRow:style('.gantt-left .task-row-left[data-task-id]'),
+        table:style('.task-overview-table'),
+        tableHeader:style('.task-overview-table th'),
+        tableCell:style('.task-overview-table td'),
+        title:style('.task-title strong'),button:style('.topbar .btn.primary')
+      };
+    });
+    for(const key of ['topbar','panel','gantt','ganttRow','table','tableHeader','tableCell']){
+      const bg=cssRGB(surfaces[key].background);
+      expect(contrast(bg,'#FFFFFF'),id+' '+key+' is genuinely dark').toBeGreaterThanOrEqual(6);
+    }
+    expect(contrast(cssRGB(surfaces.tableCell.color),cssRGB(surfaces.tableCell.background)),id+' table text').toBeGreaterThanOrEqual(4.5);
+    expect(contrast(cssRGB(surfaces.title.color),cssRGB(surfaces.ganttRow.background)),id+' task title').toBeGreaterThanOrEqual(4.5);
+    expect(contrast(cssRGB(surfaces.button.color),cssRGB(surfaces.button.background)),id+' primary action').toBeGreaterThanOrEqual(4.5);
+
+    await page.screenshot({path:`visual-review/dark-${id}-gantt.png`,fullPage:true});
+    const scan=await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa','wcag21a','wcag21aa']).analyze();
+    expect(scan.violations.map(v=>({id:v.id,impact:v.impact,targets:v.nodes.map(n=>n.target)})),id+' project Axe').toEqual([]);
+
+    await page.locator('#planningTabBtn').click();
+    const planning=await page.evaluate(()=>{
+      const selectors=['.planning-page','.planning-accordion > summary','.planning-cost-card','.relative-editor'];
+      return Object.fromEntries(selectors.map(sel=>{
+        const node=document.querySelector(sel);
+        return [sel,node?getComputedStyle(node).backgroundColor:'missing'];
+      }));
+    });
+    for(const [key,value] of Object.entries(planning)){
+      expect(value,id+' '+key).not.toBe('missing');
+      expect(contrast(cssRGB(value),'#FFFFFF'),id+' '+key+' is dark').toBeGreaterThanOrEqual(6);
+    }
+    if(id==='mitternacht'){
+      await page.screenshot({path:'visual-review/dark-mitternacht-planning.png',fullPage:true});
+      const axe=await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa','wcag21a','wcag21aa']).analyze();
+      expect(axe.violations.map(v=>({id:v.id,impact:v.impact,targets:v.nodes.map(n=>n.target)})),id+' planning Axe').toEqual([]);
+    }
+    await page.locator('#designBtn').click();
+    await expect(page.locator('#designDialog')).toBeVisible();
+    const modal=await page.evaluate(()=>{
+      const selectors=['#designDialog','#designPrimary','#designPresetGrid button'];
+      return selectors.map(sel=>getComputedStyle(document.querySelector(sel)).backgroundColor);
+    });
+    for(const color of modal)
+      expect(contrast(cssRGB(color),'#FFFFFF'),id+' modal surface must be dark').toBeGreaterThanOrEqual(5);
+    if(id==='mitternacht'){
+      await page.screenshot({path:'visual-review/dark-mitternacht-dialog.png',fullPage:true});
+      const axe=await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa','wcag21a','wcag21aa']).analyze();
+      expect(axe.violations.map(v=>({id:v.id,impact:v.impact,targets:v.nodes.map(n=>n.target)})),id+' dialog Axe').toEqual([]);
+    }
+    await page.locator('#designDialog button[value="cancel"]').last().click();
+    await page.locator('#projectTabBtn').click();
+    await page.reload();
+    await expect(page.locator('html')).toHaveAttribute('data-theme-mode','dark');
+    await page.locator('#designBtn').click();
+    await expect(page.locator(`#designPresetGrid [data-design-preset="${id}"]`)).toHaveAttribute('aria-pressed','true');
+    await page.locator('#designDialog button[value="cancel"]').last().click();
+  }
+
+  await page.locator('#projectSelect').selectOption(lightId);
+  await expect(page.locator('html')).toHaveAttribute('data-theme-mode','light');
+  const light=await page.evaluate(()=>{
+    const root=document.documentElement,s=getComputedStyle(root);
+    return {
+      body:getComputedStyle(document.body).backgroundColor,
+      color:s.getPropertyValue('--ui-ink').trim(),
+      border:s.getPropertyValue('--border').trim()
+    };
+  });
+  expect(contrast(cssRGB(light.body),'#FFFFFF')).toBeLessThan(1.4);
+  expect(light.color).toBe('#192c3e');
+  expect(light.border.toLowerCase()).toBe('#d8e1e4');
+});
+
+test('dark preset supports custom colors, mobile controls, and light print rendering',async({page})=>{
+  test.setTimeout(90000);
+  await page.goto('/');
+  await page.locator('#loadDemoBtn').click();
+  await expect(page.locator('#taskTableBody tr[data-task-row-id]')).toHaveCount(10);
+  await page.locator('#designBtn').click();
+  await page.locator('#designPresetGrid [data-design-preset="graphit"]').click();
+  await page.locator('#designAccent').fill('#A89BC1');
+  await expect(page.locator('#designPresetSelection')).toContainText('Individuelle');
+  await page.locator('#saveDesignBtn').click();
+  await expect(page.locator('html')).toHaveAttribute('data-theme-mode','dark');
+  await page.reload();
+  await expect(page.locator('html')).toHaveAttribute('data-theme-mode','dark');
+
+  await page.setViewportSize({width:390,height:844});
+  const narrow=await page.evaluate(()=>({
+    pageOverflow:document.documentElement.scrollWidth-innerWidth,
+    timelineWidth:document.querySelector('.gantt-left').getBoundingClientRect().width
+  }));
+  expect(narrow.pageOverflow).toBeLessThanOrEqual(2);
+  expect(narrow.timelineWidth).toBeLessThanOrEqual(195);
+  await page.locator('#designBtn').click();
+  await expect(page.locator('#saveDesignBtn')).toBeInViewport();
+  const axe=await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa','wcag21a','wcag21aa']).analyze();
+  expect(axe.violations.map(v=>({id:v.id,targets:v.nodes.map(n=>n.target)}))).toEqual([]);
+  await page.locator('#designDialog button[value="cancel"]').last().click();
+
+  await page.emulateMedia({media:'print'});
+  const print=await page.evaluate(()=>{
+    const css=getComputedStyle(document.documentElement);
+    return {
+      scheme:css.colorScheme,
+      bg:getComputedStyle(document.body).backgroundColor,
+      gantt:getComputedStyle(document.querySelector('.task-row-left[data-task-id]')).backgroundColor,
+      foreground:css.getPropertyValue('--ui-ink').trim()
+    };
+  });
+  expect(print.scheme).toBe('light');
+  expect(cssRGB(print.bg)).toBe('#FFFFFF');
+  expect(cssRGB(print.gantt)).toBe('#FFFFFF');
+  expect(print.foreground).toBe('#273C4A');
+  await page.emulateMedia({media:'screen'});
+  await expect(page.locator('html')).toHaveAttribute('data-theme-mode','dark');
 });
