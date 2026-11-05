@@ -10,7 +10,7 @@ Die Anwendung ist unter
 
 erreichbar.
 
-## Stand v1.5.0
+## Stand v1.5.0 (Funktionen) · Design 2.0
 
 ### Projektportfolio und lokale Speicherung
 
@@ -87,6 +87,9 @@ Die Odin-Phasenlogik wurde auf GitHub Pages übertragen:
 - integrierte Symbol-, Speicher- und Backup-Erklärung
 
 ### Design
+
+Design 2.0 vereinheitlicht Projektkopf, Navigation, Kennzahlen, Gantt, Aufgabentabelle, Planungseinstellungen und Dialoge. Das zentrale Stylesheet ist [`assets/css/design-system.css`](assets/css/design-system.css). Es ergänzt die bestehenden strukturellen Styles, ohne Projektformat oder Datenhaltung zu ändern. Tastaturbedienung und abbrechbare Gantt-Interaktionen wurden erweitert.
+
 
 - Einstieg `Design bearbeiten` wie in der Odin-Oberfläche
 - projektspezifische Farben für Primärfarbe, Akzent, Workstream, kritische Aufgaben, Meilensteine, Gates, Seiten- und Panelhintergrund
@@ -176,6 +179,6 @@ Der analysierte Odin-Build `frappe-gantt-online-editor` v1.1.3 besitzt weiterhin
 
 ## Entwicklungs- und Designvorgaben
 
-Bei UI-Arbeiten gelten die projektspezifischen [Agent-Anweisungen](AGENTS.md), der lokal auffindbare [Codex-Skill](.agents/skills/gantt-studio-design/SKILL.md) und die verbindlichen [Designrichtlinien](docs/design-guidelines.md).
+Bei UI-Arbeiten gelten die projektspezifischen [Agent-Anweisungen](AGENTS.md), der lokal auffindbare [Codex-Skill](.agents/skills/gantt-studio-design/SKILL.md) und die verbindlichen [Designrichtlinien](docs/design-guidelines.md). Ergänzend sichern [Chromium-Browser-Regressionstests](docs/ui-tests.md) Formularkonsistenz, Responsivität und zentrale Interaktionen ab.
 
-Die Grundlage ist [apple-design von Emil Kowalski](https://github.com/emilkowalski/skills/tree/main/skills/apple-design), angepasst auf Gantt Studio: präzise Planung, gute Lesbarkeit, einheitliche Feldgeometrie und sichere Interaktionen vor visuellen Effekten. Die Regeln allein verändern die bestehende GUI nicht.
+Die Grundlage ist [apple-design von Emil Kowalski](https://github.com/emilkowalski/skills/tree/main/skills/apple-design), angepasst auf Gantt Studio: präzise Planung, gute Lesbarkeit, einheitliche Feldgeometrie und sichere Interaktionen vor visuellen Effekten. Das Designsystem ist jetzt in der Anwendung eingebunden; spätere Erweiterungen bleiben an diese Regeln gebunden.
