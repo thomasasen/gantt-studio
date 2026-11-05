@@ -40,7 +40,8 @@ test('controller sends immutable independent project projections and emits inten
   expect(Object.isFrozen(rendering.project)).toBe(true);
   expect(Object.isFrozen(rendering.project.tasks[0])).toBe(true);
   expect(Object.isFrozen(rendering.view)).toBe(true);
-  expect(()=>{rendering.project.tasks[0].start='2026-11-11';}).not.toThrow();
+  try { rendering.project.tasks[0].start='2026-11-11'; }
+  catch(error) { expect(error).toBeInstanceOf(TypeError); }
   expect(rendering.project.tasks[0].start).toBe('2026-11-10');
   expect(project.tasks[0].start).toBe('2026-11-10');
   controller.setViewport({scrollLeft:42});
