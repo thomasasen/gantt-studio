@@ -34,7 +34,7 @@ export function createProjectCommitter(save) {
 
       next.revision = Math.max(1, Number(before.revision) || 1) + 1;
       next.updatedAt = new Date().toISOString();
-      await save(clone(next));
+      await save(clone(next), before.revision);
       committed.set(id, clone(next));
       return { changed: true, project: clone(next) };
     });
