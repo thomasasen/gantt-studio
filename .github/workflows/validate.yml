@@ -55,7 +55,7 @@ jobs:
           grep -q "storage.js?v=2.7.0" assets/js/app.js
           grep -q "task-order.mjs?v=2.7.0" assets/js/app.js
           grep -q "design-presets.mjs?v=2.7.0" assets/js/app.js
-          grep -q 'icons.mjs?v=2.6.0' assets/js/app.js
+          grep -q 'icons.mjs?v=2.7.0' assets/js/app.js
           grep -q 'icons.mjs?v=2.7.0' assets/js/gantt.js
           grep -q 'function periodWidth' assets/js/gantt.js
           grep -q 'const labelLanes=\[\]' assets/js/gantt.js
