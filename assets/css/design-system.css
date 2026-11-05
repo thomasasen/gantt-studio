@@ -2265,6 +2265,7 @@ button:disabled, input:disabled, select:disabled { opacity: .52; cursor: not-all
 .task-table-document:has(.ui-icon) { display:inline-flex; align-items:center; gap:4px; }
 .task-link-button:has(.ui-icon) { gap:4px; font-weight:650; }
 .export-option strong:has(.ui-icon) { display:flex; align-items:center; gap:8px; }
+.export-option strong > [data-icon] { color:inherit; }
 .export-option strong .ui-icon { width:19px; height:19px; }
 .entity-row .entity-row-edit { display:inline-flex; align-items:center; color:inherit; opacity:.7; margin-left:auto; }
 .entity-row .entity-row-edit .ui-icon { width:16px; height:16px; }

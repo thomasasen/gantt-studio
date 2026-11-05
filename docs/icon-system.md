@@ -32,7 +32,6 @@
 | Manuelle Reihenfolge | `grip-vertical` | Ausschließlich Drag-Griff |
 | Externer Dokumentlink | `external-link` | Link + Text |
 | Bestätigen/Abbrechen | `check` / `x` | Icon-only nur mit `aria-label` |
-| Planungstermin / Stichtag | `flag` | Icon + Text |
 | Zur Zeitlinie springen | `arrow-right-to-line` | Icon + Text |
 
 Nicht dieselbe Form für zwei widersprüchliche Funktionen einsetzen; vor neuen Icons zunächst die Registry prüfen. Kein Icon-Dekor für KPI-Karten, jede Datumszelle oder jede Überschrift.

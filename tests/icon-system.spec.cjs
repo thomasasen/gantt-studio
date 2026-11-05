@@ -17,6 +17,7 @@ test('registry renders static and dynamic controls without intercepting clicks',
   expect(await svg.evaluate(node => getComputedStyle(node).pointerEvents)).toBe('none');
   await page.locator('#planningTabBtn').click();
   await expect(page.locator('#planningView')).toBeVisible();
+  await page.locator('#phaseSection > summary').click();
   await page.locator('#addPhaseBtn').click();
   await expect(page.locator('#entityDialog')).toBeVisible();
   await page.locator('#entityDialog .icon-btn').click();
