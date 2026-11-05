@@ -8,7 +8,7 @@
  *
  * @typedef {{container:HTMLElement, onIntent:(intent:EngineIntent)=>Promise<unknown>,
  *            onSelect:(selection:{kind:'task'|'phase',id:string})=>void,
- *            onError:(error:Error)=>void}} MountOptions
+ *            onError:(error:Error)=>void, onStatus?:(message:string)=>void}} MountOptions
  *
  * @typedef {{project:object, view:{zoom:'day'|'week'|'month',reorderable:boolean}}} RenderRequest
  *
