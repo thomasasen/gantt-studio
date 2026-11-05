@@ -1,0 +1,76 @@
+# Designrichtlinien – Gantt Studio
+
+**Status: verbindlicher Designvertrag für kommende UI-Änderungen.** Das bloße Hinzufügen dieser Dokumentation ändert die aktuelle GUI nicht.
+
+Diese projektspezifischen Regeln adaptieren [Emil Kowalskis apple-design-Skill](https://github.com/emilkowalski/skills/tree/main/skills/apple-design) (MIT): unmittelbar wahrnehmbares Feedback, direkte und unterbrechbare Interaktionen, räumliche Orientierung, bewusst eingesetzte Materialien, Typografie und Accessibility.
+
+## 1. Priorität und Zielbild
+Gantt Studio ist ein browserbasiertes Planungstool mit hoher Informationsdichte. Fachliche Genauigkeit und Datenintegrität > Bedienbarkeit und Accessibility > Layoutkonsistenz und Performance > visuelle Effekte.
+
+Keine macOS-Kopie, kein Funktionsverlust zugunsten des Minimalismus, keine Animationsbibliothek ohne klaren Bedarf. Der Zeitplan und die Aufgabentabelle bleiben die primären Flächen. Projektdaten bleiben lokal in IndexedDB, Ansichtspräferenzen in localStorage; JSON-Schema, Speichern, Export und Projektfarben respektieren.
+
+## 2. Feldgeometrie und Layout
+
+**Alle Felder innerhalb derselben visuellen Formularzeile müssen dieselbe sichtbare Höhe haben und auf einer gemeinsamen Oberkante stehen.** Das gilt auch bei Kombinationen von Text, Select, Datum, Zahlenwert, Einheit oder Farbe.
+
+- Labeltexte auf einer gemeinsamen Höhe oberhalb der Bedienelemente ausrichten. Unterschiedliche Labellängen dürfen kein Feld nach unten versetzen.
+- Hilfetexte, Validierungsfehler und Beschreibungen **unter das jeweilige Feld** setzen. Die Position oder Höhe der benachbarten Felder bleibt unverändert.
+- Einheitliche Height-/Padding-/Radius-/Fokus-Token als CSS Custom Properties nutzen. Keine Kaskade immer neuer Sonderüberschreibungen.
+- Eingabefelder mit Suffix wie „Tage“ als einheitlich hohe Gruppe behandeln.
+- Responsive Raster auf weniger Spalten reduzieren; Formulare, Menüs und Dialoge dürfen keinen unnötigen horizontalen Overflow erzeugen.
+- Touch-Ziele möglichst 44 × 44 CSS-Pixel groß oder durch eine ausreichende Trefferfläche kompensiert; Desktop kann optisch kompakter bleiben.
+
+## 3. Typografie und visuelle Hierarchie
+- Systemnahe Schrift bevorzugen; Schriftgrad, Gewicht, Laufweite und Zeilenhöhe passend kombinieren. Zoom und vergrößerte Nutzerschrift respektieren.
+- Zielwerte: regulärer UI-Text überwiegend 14–16 CSS-Pixel; sekundäre Texte möglichst mindestens 12 CSS-Pixel. Kleinere vorhandene Definitionen schrittweise bereinigen, ohne die Datendichte zu zerstören.
+- Gantt-Balken, Datumsraster, Aufgaben und Status klar unterscheidbar. Status/Risiko nie nur über Farben ausdrücken.
+- Projektspezifische Presets/Farben und Kontrast berücksichtigen. Kein gestapeltes Glassmorphism oder transluzente Schichten über wichtigen Daten. Dezente Tiefe nur zur Orientierung.
+- Häufige Aktionen sichtbar halten, sekundäre Funktionen logisch gruppieren und beschriften.
+
+## 4. Gantt-Interaktionsvertrag
+
+| Ereignis | Erwartetes Verhalten |
+| --- | --- |
+| Pointer-Down | Sofortiges visuelles Feedback, noch keine gespeicherte Änderung |
+| Pointer-Move | Kontinuierliche 1:1-Vorschau, Grab-Offset erhalten, keine Persistenz pro Frame |
+| Pointer-Up | Fachlich gültigen Wert auf exaktes Datumsraster abbilden, prüfen und einmal speichern |
+| Pointer-Cancel | Vorschau zurücknehmen, keine Änderung übernehmen |
+| Escape | Laufende Bearbeitung abbrechen |
+| Ungültige Eingabe | Verständliches Feedback, keine stille Datenkorruption |
+| Tastatur | Gleichwertige Änderung über Editor/Aufgabentabelle ermöglichen |
+| Persistenzfehler | Fehlerstatus, niemals fälschlich „Gespeichert“ melden |
+
+- Datumswerte niemals geschwindigkeitsabhängig weiterlaufen lassen; kein Bounce, Momentum oder Rubber-Banding im Zeitraster.
+- Verschieben, linkes/rechtes Resize, Fortschrittsgriff, Mindestdauer und Abhängigkeiten separat testen.
+- Pointer Capture und Listener beim Commit/Abbruch aufräumen; keine unbeabsichtigten Klicks nach Drag.
+- Zeitleiste, linke Aufgabenliste, Pfeile, Baselines, Marker und Statuslinien müssen bei Zoom und Scroll konsistent bleiben.
+- Keine vollständigen Gantt-Neurenderings oder Datenbank-Schreibvorgänge auf jedem Pointer-Move.
+
+## 5. Feedback, Animation und Raum
+- Sofort auf Interaktion reagieren und während Bewegung laufend Feedback geben; Erfolg erst nach tatsächlich erfolgreicher Aktion melden.
+- Menüs/Popover/Dialoge am Auslöser verankern, Öffnungs-/Schließrichtung konsistent halten und jederzeit unterbrechbar gestalten.
+- Springs nur bei nicht-fachlichen Flächen, im Normalfall ohne Overshoot; keine Animation als Ersatz für exaktes Datums-Snapping.
+- Compositorfreundliche Transform-/Opacity-Effekte bevorzugen und rAF gezielt einsetzen; nicht mit unkontrolliertem Blur, Schatten oder will-change in vielen Tabellenzeilen arbeiten.
+- Reduced Motion beachten und größere Bewegungen durch sanfte Zustandswechsel oder statische Darstellung ersetzen. Bei Transparenzreduktion solide Flächen, bei erhöhtem Kontrast klarere Kanten.
+
+## 6. Bedienung, Sicherheit, Datenzustand
+- Nutzer erkennen jederzeit aktuelles Projekt, Arbeitsbereich und nächsten Schritt. Fokus sichtbar, Labels sinnvoll verknüpft, Dialoge mit Tastatur nutzbar.
+- Der lokale Speicherstatus („Speichert…“, „Gespeichert“, „Nicht gespeichert“) bleibt korrekt, ebenso die Hinweise auf fehlende Cloud-Synchronisierung und notwendige Backups.
+- Gantt, Tabelle, Editoren und gespeichertes Projekt müssen denselben Datenstand repräsentieren. Enter/F2/Escape-Konventionen bestehender Inline-Editoren erhalten.
+- Destruktive Aktionen gegen Fehlbedienung schützen; Nutzerkontrolle und Abbruchmöglichkeit priorisieren.
+
+## 7. Umsetzung und Qualitätssicherung
+
+Bestehende Architektur: `index.html`, `assets/js/app.js`, `assets/js/gantt.js`, `assets/js/storage.js`, `assets/css/`. Designänderungen zuerst über einheitliche Tokens und konsolidierte Komponenten; keine opportunistische Frameworkmigration.
+
+**Prüfmatrix für betroffene Änderungen:**
+
+1. **Formulare:** gleiche Input-Oberkante und Höhe pro Zeile bei langen Labels und Hilfs-/Fehlertexten; gemischte Typen und Einheiten.
+2. **Gantt:** Move, beide Resize-Richtungen, Fortschritt, Mindestdauer, Pointer-Cancel, Escape, exakter Datums-Snap und kein Klick nach Drag.
+3. **Daten:** Tabelle/Editor/Zeitleiste synchron, Auto-Save-Anzeige korrekt, Import/Export und Projektwechsel funktionieren.
+4. **Layout:** 1440/1024/768/390 CSS-Pixel, 200-%-Zoom, lange Texte, leeres und großes Projekt. Nur die Zeitachse darf planmäßig horizontal scrollen.
+5. **Accessibility:** Tastatur, Fokus, Labels, kontrastreiche Darstellungen, reduzierte Bewegung, Bedeutung ohne Farbabhängigkeit.
+6. **Leistung und Druck:** kein Drag-Lag, keine teuren Frame-Renderings, saubere Druckansicht.
+7. **Tests:** vorhandenen Workflow `.github/workflows/validate.yml` ausführen; für neue Interaktionen gezielte Browser-Regressionstests ergänzen (z. B. Playwright). Statische Validierung ersetzt keine visuelle oder funktionale Browserprüfung.
+
+Diese Datei ist **die zentrale Norm**; `AGENTS.md` verweist auf sie und der lokale Skill operationalisiert sie. Neue Standards hier eintragen statt widersprüchlicher Duplikate. Die Umsetzung bestehender Oberflächen ist eine getrennte, überprüfbare Codeänderung.

@@ -173,3 +173,9 @@ Der analysierte Odin-Build `frappe-gantt-online-editor` v1.1.3 besitzt weiterhin
 - Microsoft-Project-XML-Import/-Export
 - weitere Detailfunktionen der Odin-Erklär- und Einstellungsoberfläche
 - serverseitige Daily Backups entfallen auf Pages konzeptbedingt; die portable Projektdatei dient als explizites Backup
+
+## Entwicklungs- und Designvorgaben
+
+Bei UI-Arbeiten gelten die projektspezifischen [Agent-Anweisungen](AGENTS.md), der lokal auffindbare [Codex-Skill](.agents/skills/gantt-studio-design/SKILL.md) und die verbindlichen [Designrichtlinien](docs/design-guidelines.md).
+
+Die Grundlage ist [apple-design von Emil Kowalski](https://github.com/emilkowalski/skills/tree/main/skills/apple-design), angepasst auf Gantt Studio: präzise Planung, gute Lesbarkeit, einheitliche Feldgeometrie und sichere Interaktionen vor visuellen Effekten. Die Regeln allein verändern die bestehende GUI nicht.
