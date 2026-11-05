@@ -37,6 +37,9 @@ jobs:
           node --check assets/js/engine/native/native-adapter.mjs
           node --check assets/js/engine/native/native-interactions.mjs
           node --check tests/engine-contract.spec.cjs
+          node --check tests/engine-resilience.spec.cjs
+          node --check tests/relative-date-timezone.spec.cjs
+          node --check tests/native-performance.spec.cjs
           node --check tests/persistence.spec.cjs
           node --check assets/js/storage.js
           node --check tests/ui.spec.cjs
@@ -55,6 +58,13 @@ jobs:
         with:
           name: apple-design-qa
           path: design-audit/
+          if-no-files-found: ignore
+      - name: Upload native performance measurements
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-engine-performance
+          path: performance-results/native-benchmark.json
           if-no-files-found: ignore
       - name: Upload visual review screenshots
         if: always()
