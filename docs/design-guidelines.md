@@ -1,6 +1,6 @@
 # Designrichtlinien – Gantt Studio
 
-**Status: verbindlicher Designvertrag für kommende UI-Änderungen.** Das bloße Hinzufügen dieser Dokumentation ändert die aktuelle GUI nicht.
+**Status: verbindlicher Designvertrag; Design 2.0 ist in der Anwendung umgesetzt.** Gestaltung und Interaktionen werden weiter anhand dieser Anforderungen geprüft.
 
 Diese projektspezifischen Regeln adaptieren [Emil Kowalskis apple-design-Skill](https://github.com/emilkowalski/skills/tree/main/skills/apple-design) (MIT): unmittelbar wahrnehmbares Feedback, direkte und unterbrechbare Interaktionen, räumliche Orientierung, bewusst eingesetzte Materialien, Typografie und Accessibility.
 
@@ -73,4 +73,4 @@ Bestehende Architektur: `index.html`, `assets/js/app.js`, `assets/js/gantt.js`, 
 6. **Leistung und Druck:** kein Drag-Lag, keine teuren Frame-Renderings, saubere Druckansicht.
 7. **Tests:** vorhandenen Workflow `.github/workflows/validate.yml` ausführen; für neue Interaktionen gezielte Browser-Regressionstests ergänzen (z. B. Playwright). Statische Validierung ersetzt keine visuelle oder funktionale Browserprüfung.
 
-Diese Datei ist **die zentrale Norm**; `AGENTS.md` verweist auf sie und der lokale Skill operationalisiert sie. Neue Standards hier eintragen statt widersprüchlicher Duplikate. Die Umsetzung bestehender Oberflächen ist eine getrennte, überprüfbare Codeänderung.
+Diese Datei ist **die zentrale Norm**; `AGENTS.md` verweist auf sie und der lokale Skill operationalisiert sie. Neue Standards hier eintragen statt widersprüchlicher Duplikate. Das Designsystem wird zentral in `assets/css/design-system.css` gepflegt; Gantt-Geometrie bleibt an die in `assets/js/gantt.js` festgelegten Zeilenhöhen gekoppelt. Die UI-Browserprüfungen sind in `docs/ui-tests.md` dokumentiert.
