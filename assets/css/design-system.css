@@ -369,7 +369,9 @@ button:disabled, input:disabled, select:disabled { opacity: .52; cursor: not-all
   line-height: 1.55;
   margin-top: 5px;
 }
-.timeline-actions { width: 100%; gap: 9px; align-items: center; justify-content: flex-start; }
+.timeline-actions { width: 100%; gap: 7px; align-items: center; justify-content: flex-start; }
+/* Keep all planning controls on the first desktop toolbar row after adding icons. */
+.timeline-actions .control-cluster .seg-btn { padding-inline: 9px; }
 .control-cluster {
   border: 1px solid #dee6eb;
   background: #f6f8fa;
@@ -2245,3 +2247,30 @@ button:disabled, input:disabled, select:disabled { opacity: .52; cursor: not-all
   .gantt-stage { background: #fff; }
   .gantt-left, .gantt-head-left { position: static; }
 }
+
+/* Unified interaction icon system, v2.6: theme-neutral Lucide-style strokes. */
+:root { --ui-icon-size: 18px; }
+.ui-icon { display:inline-block; flex:none; width:var(--ui-icon-size); height:var(--ui-icon-size); stroke:currentColor; vertical-align:middle; pointer-events:none; }
+[data-icon] { display:inline-flex; align-items:center; justify-content:center; flex:none; color:inherit; line-height:1; }
+:is(.btn,.studio-tab,.text-action,.task-link-button,.task-details-toggle,.link-button):has(.ui-icon) { display:inline-flex; align-items:center; justify-content:center; gap:7px; }
+:is(.btn,.studio-tab,.text-action,.task-link-button,.task-details-toggle) > [data-icon] { flex:none; }
+.dropdown-control summary { display:flex; align-items:center; gap:6px; }
+.dropdown-control summary > [data-icon] { margin-left:2px; }
+.planning-chevron .ui-icon { width:17px; height:17px; }
+.icon-btn .ui-icon { width:20px; height:20px; }
+.save-status-icon { display:inline-flex; align-items:center; justify-content:center; }
+.save-status-icon .ui-icon { width:16px; height:16px; }
+.phase-collapse-icon .ui-icon,.phase-summary-arrow .ui-icon { width:14px; height:14px; }
+.task-drag-handle .ui-icon,.gantt-order-handle .ui-icon { width:18px; height:18px; }
+.task-inline-actions .ui-icon { width:17px; height:17px; }
+.task-table-document .ui-icon { width:14px; height:14px; }
+.task-table-document:has(.ui-icon) { display:inline-flex; align-items:center; gap:4px; }
+.task-link-button:has(.ui-icon) { gap:4px; font-weight:650; }
+.export-option strong:has(.ui-icon) { display:flex; align-items:center; gap:8px; }
+.export-option strong > [data-icon] { color:inherit; }
+.export-option strong .ui-icon { width:19px; height:19px; }
+.entity-row .entity-row-edit { display:inline-flex; align-items:center; color:inherit; opacity:.7; margin-left:auto; }
+.entity-row .entity-row-edit .ui-icon { width:16px; height:16px; }
+:is(.icon-btn,.task-link-button,.task-inline-actions button,.phase-collapse-button):focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+@media (pointer:coarse) { .icon-btn,.task-inline-actions button { min-width:44px; min-height:44px; } .gantt-order-handle,.task-drag-handle { min-width:40px; min-height:44px; } }
+@media print { .ui-icon { stroke:currentColor!important; } }

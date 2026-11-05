@@ -23,6 +23,7 @@ jobs:
       - name: Validate JavaScript syntax
         run: |
           node --check assets/js/app.js
+          node --check assets/js/icons.mjs
           node --check assets/js/task-order.mjs
           node --check assets/js/design-presets.mjs
           node --check tests/design-presets.spec.cjs
@@ -30,6 +31,7 @@ jobs:
           node --check assets/js/gantt.js
           node --check assets/js/storage.js
           node --check tests/ui.spec.cjs
+          node --check tests/icon-system.spec.cjs
           node --check tests/apple-design-audit.spec.cjs
           node --check playwright.config.cjs
       - name: Install browser test dependency
