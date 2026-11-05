@@ -100,3 +100,9 @@ Bestehende Architektur: `index.html`, `assets/js/app.js`, `assets/js/gantt.js`, 
 7. **Tests:** vorhandenen Workflow `.github/workflows/validate.yml` ausführen; für neue Interaktionen gezielte Browser-Regressionstests ergänzen (z. B. Playwright). Statische Validierung ersetzt keine visuelle oder funktionale Browserprüfung.
 
 Diese Datei ist **die zentrale Norm**; `AGENTS.md` verweist auf sie und der lokale Skill operationalisiert sie. Neue Standards hier eintragen statt widersprüchlicher Duplikate. Das Designsystem wird zentral in `assets/css/design-system.css` gepflegt; Gantt-Geometrie bleibt an die in `assets/js/gantt.js` festgelegten Zeilenhöhen gekoppelt. Die UI-Browserprüfungen sind in `docs/ui-tests.md` dokumentiert.
+
+## 8. Interaktions-Icons und fachliche Diagrammsymbole
+- Bedien-Icons sind zentral in [icon-system.md](icon-system.md) definiert und folgen dem dortigen Funktion-zu-Symbol-Vertrag (Lucide-basierte Outline-SVGs mit currentColor). Nie Emoji, gemischte Sonderzeichensätze oder neue Icon-Fonts verwenden.
+- SVGs sind in Textbuttons dekorativ und aus dem Accessibility Tree ausgeschlossen; Icon-only-Schaltflächen erfordern einen aussagekräftigen zugänglichen Namen. Trefferflächen, Fokus und Disabled/Active-Zustände bleiben am interaktiven Element.
+- Gantt-Fachnotation für Gate, Meilenstein, Abhängigkeit, Status, Risiko, Baseline und Puffer ist bewusst eigenständig und nicht durch generische Bedien-Icons zu ersetzen.
+- Alle elf Farbwelten und die Hybrid-Materialebenen müssen Icons über ihre Textfarbe korrekt erben. Keine festen hellen/dunklen SVG-Farben. Veränderte ESM-Dateien mit gemeinsamer Version ausliefern.
