@@ -1,4 +1,5 @@
-import { icon } from './icons.mjs?v=2.6.0';
+import { icon } from './icons.mjs?v=2.7.0';
+import { localTodayIso } from './core/date-only.mjs?v=2.7.0';
 
 const DAY = 86400000;
 const toDate = (s) => new Date(`${s}T00:00:00Z`);
@@ -15,7 +16,7 @@ function bounds(project) {
   const phaseDates = (project.planning?.phases || []).flatMap(p => [p.start,p.end]).filter(Boolean);
   const markerDates = (project.planning?.markers || []).map(m => m.date).filter(Boolean);
   dates.push(...phaseDates,...markerDates);
-  if (!dates.length) { const now=new Date(); return {start:addDays(now,-7),end:addDays(now,35)}; }
+  if (!dates.length) { const now=toDate(localTodayIso()); return {start:addDays(now,-7),end:addDays(now,35)}; }
   const sorted=dates.map(toDate).sort((a,b)=>a-b); return {start:sorted[0],end:sorted.at(-1)};
 }
 function fmtDate(date,options){return new Intl.DateTimeFormat('de-DE',{...options,timeZone:'UTC'}).format(date);}
@@ -132,7 +133,7 @@ export function renderGantt(container, project, options={}) {
     right.appendChild(rowR);
   });
   const lineItems=[];
-if(settings.showToday!==false)lineItems.push({date:new Date(),lineClass:'today-line',labelClass:'today-label',label:'Heute'});
+if(settings.showToday!==false)lineItems.push({date:toDate(localTodayIso()),lineClass:'today-line',labelClass:'today-label',label:'Heute'});
 (project.planning?.markers||[]).forEach(marker=>{if(marker.date)lineItems.push({date:toDate(marker.date),lineClass:'marker-line',labelClass:'marker-label',label:marker.name||'Marker',color:marker.color,style:marker.style});});
 if(settings.showRelativeToday&&Number.isFinite(Number(settings.relativeOffsetDays))){
   const relativeIso=calculateRelativeDate(settings,project.planning?.holidays||[]);
