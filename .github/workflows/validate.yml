@@ -24,6 +24,9 @@ jobs:
           node --check assets/js/gantt.js
           node --check assets/js/core/date-only.mjs
           node --check assets/js/core/project-commits.mjs
+          node --check assets/js/engine/engine-contract.mjs
+          node --check assets/js/engine/engine-controller.mjs
+          node --check assets/js/engine/native/native-adapter.mjs
           node --check assets/js/storage.js
       - name: Check required static files
         run: |
@@ -36,13 +39,16 @@ jobs:
           test -s assets/css/design-system.css
           test -s assets/js/core/date-only.mjs
           test -s assets/js/core/project-commits.mjs
+          test -s assets/js/engine/engine-contract.mjs
+          test -s assets/js/engine/engine-controller.mjs
+          test -s assets/js/engine/native/native-adapter.mjs
           test -s assets/js/icons.mjs
           test -s docs/icon-system.md
           test -s tests/ui.spec.cjs
           test -s playwright.config.cjs
           test -s examples/demo.gantt.json
           python -m json.tool examples/demo.gantt.json >/dev/null
-          grep -q 'assets/js/app.js?v=2.7.0' index.html
+          grep -q 'assets/js/app.js?v=2.8.0' index.html
           grep -q 'assets/css/app.css?v=1.4.4' index.html
           grep -q 'assets/css/privacy.css?v=1.4.4' index.html
           grep -q 'assets/css/odin.css?v=1.4.4' index.html
@@ -51,12 +57,13 @@ jobs:
           grep -q 'assets/css/design-system.css?v=2.6.0' index.html
           grep -q 'Readability scale v1.4.2' assets/css/odin.css
           grep -q 'Clickable phase rows v1.4.3' assets/css/odin.css
-          grep -q "gantt.js?v=2.7.0" assets/js/app.js
-          grep -q "storage.js?v=2.7.0" assets/js/app.js
-          grep -q "task-order.mjs?v=2.7.0" assets/js/app.js
-          grep -q "design-presets.mjs?v=2.7.0" assets/js/app.js
-          grep -q 'icons.mjs?v=2.7.0' assets/js/app.js
-          grep -q 'icons.mjs?v=2.7.0' assets/js/gantt.js
+          grep -q "native-adapter.mjs?v=2.8.0" assets/js/app.js
+          grep -q "gantt.js?v=2.8.0" assets/js/engine/native/native-adapter.mjs
+          grep -q "storage.js?v=2.8.0" assets/js/app.js
+          grep -q "task-order.mjs?v=2.8.0" assets/js/app.js
+          grep -q "design-presets.mjs?v=2.8.0" assets/js/app.js
+          grep -q 'icons.mjs?v=2.8.0' assets/js/app.js
+          grep -q 'icons.mjs?v=2.8.0' assets/js/gantt.js
           grep -q 'function periodWidth' assets/js/gantt.js
           grep -q 'const labelLanes=\[\]' assets/js/gantt.js
           grep -q 'text-overflow: ellipsis' assets/css/app.css
