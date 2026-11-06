@@ -47,6 +47,8 @@ test('switching projects during Gantt drag discards the preview',async({page})=>
   await expect(page.locator('#taskTableBody tr[data-task-row-id]')).toHaveCount(0);
   const targetId=await page.locator('#projectSelect').inputValue();
   await page.locator('#projectSelect').selectOption(sourceId);
+  await expect(page.locator('#projectSelect')).toHaveValue(sourceId);
+  await expect(page.locator('#taskTableBody tr[data-task-row-id]')).toHaveCount(10);
   await expect(bar).toBeVisible();
   const bounds=await bar.boundingBox();
   const x=bounds.x+Math.min(bounds.width/3,40),y=bounds.y+bounds.height/2;
