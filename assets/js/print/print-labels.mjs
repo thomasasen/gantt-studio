@@ -73,7 +73,7 @@ export function wrapAnnotation(text,maxWidth,{fontSize=12,twoLine=true,ellipsis=
 
 // Positions are entirely contained within a dedicated task row. This avoids
 // annotation collisions between tasks and guarantees no right-side clipping.
-export function planBarAnnotation({text,barStart,barEnd,timelineWidth,rowHeight,config:rawConfig,fontSize=12,isMilestone=false}){
+export function planBarAnnotation({text,barStart,barEnd,timelineWidth,rowHeight,config:rawConfig,fontSize=12,isMilestone=false,trackIndex=0}){
  const config=resolveLabelConfig(rawConfig);
  if(!text||!config.enabled)return null;
  const padding=8,maximum=Math.max(36,Math.min(config.maxWidth,timelineWidth-2*padding));
@@ -83,7 +83,7 @@ export function planBarAnnotation({text,barStart,barEnd,timelineWidth,rowHeight,
  const lineH=fontSize+3,blockH=lines.length*lineH;
  const a=clamp(barStart,0,timelineWidth),b=clamp(barEnd,0,timelineWidth);
  const availableRight=timelineWidth-b-padding,availableLeft=a-padding;
- const fitsInside=!isMilestone&&(b-a>=labelW+16);
+ const fitsInside=!isMilestone&&lines.length===1&&(b-a>=labelW+16);
  const priority=config.placement;
  let mode;
  if(priority==='inside'&&fitsInside)mode='inside';
@@ -93,6 +93,7 @@ export function planBarAnnotation({text,barStart,barEnd,timelineWidth,rowHeight,
  else if(availableRight>=labelW+7)mode='right';
  else if(availableLeft>=labelW+7)mode='left';
  else mode='above';
+ if(mode==='above'&&config.tracks>1&&trackIndex%2===1)mode='below';
  if(mode==='inside'&&!fitsInside)mode=availableRight>=labelW+7?'right':'above';
  if(mode==='right'&&availableRight<labelW+7)mode='above';
  const safeH=Math.max(rowHeight,blockH+25);
