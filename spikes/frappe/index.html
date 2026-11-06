@@ -9,7 +9,7 @@
   <link rel="stylesheet" href="../../assets/css/odin.css?v=1.4.4">
   <link rel="stylesheet" href="../../assets/css/task-table.css?v=1.5.1">
   <link rel="stylesheet" href="../../assets/css/design-system.css?v=2.6.0">
-  <link rel="stylesheet" href="./vendor/frappe-gantt.css">
+  
   <style>
     body { margin:0; padding:24px; background:#f1f4f5; color:#243746; font:14px/1.5 system-ui,sans-serif; }
     h1 { margin:0 0 8px; font-size:24px; }
@@ -25,12 +25,12 @@
     :focus-visible { outline:2px solid #087e75; outline-offset:2px; }
     @media (max-width:600px) { body { padding:12px; } }
   </style>
-  <script src="./vendor/frappe-gantt.umd.js"></script>
+  
   <script type="module" src="./spike.mjs"></script>
 </head>
 <body>
-  <h1>Frappe Gantt 1.2.2 – technischer Vergleich</h1>
-  <p class="notice">Experiment, nicht produktiv: Frappe ist schreibgeschützt. Projektdateien und IndexedDB werden von dieser Seite nicht beschrieben.</p>
+  <h1>Frappe Gantt 1.2.2 – isolierter Lifecycle-Test</h1>
+  <p class="notice">Experiment, nicht produktiv: Frappe läuft im isolierten Frame und ist schreibgeschützt. Projektdateien und IndexedDB werden von dieser Seite nicht beschrieben.</p>
   <div class="controls">
     <label for="viewMode">Zeitskala</label>
     <select id="viewMode">
