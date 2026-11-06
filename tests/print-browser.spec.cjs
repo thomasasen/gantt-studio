@@ -115,3 +115,32 @@ test('Papierfarben sind für dunkle Projektfarben und mehrere Skalierungen neutr
   },fixture(20,2));
   for(const item of result){expect(item.white).toBe(true);expect(item.svg).toBe(true);expect(item.width).toBeGreaterThan(200);}
 });
+
+test('Browser-Druckknopf gibt das vollständig geladene Print-Dokument aus, nicht about:blank',async({page})=>{
+  await page.addInitScript(()=>{
+    if(window!==window.top){
+      window.print=()=>window.parent.postMessage({
+        ganttPrintEvidence:true,
+        title:document.title,
+        count:document.querySelectorAll('[data-print-page]').length,
+        body:document.body.textContent.slice(0,2000)
+      },'*');
+    }
+  });
+  await page.goto('/');
+  await page.locator('#loadDemoBtn').click();
+  await expect(page.locator('#projectName')).toHaveValue('Dynamisches Demo-Projekt');
+  await openPrint(page);
+  await page.evaluate(()=>{
+    window.__printEvidence=[];
+    window.addEventListener('message',event=>{
+      if(event.data?.ganttPrintEvidence)window.__printEvidence.push(event.data);
+    });
+  });
+  await page.locator('#printExecute').click();
+  await expect.poll(()=>page.evaluate(()=>window.__printEvidence?.length||0)).toBeGreaterThan(0);
+  const info=await page.evaluate(()=>window.__printEvidence[0]);
+  expect(info.count).toBeGreaterThan(0);
+  expect(info.title).toContain('Dynamisches Demo-Projekt');
+  expect(info.body).toContain('Projekt-Kick-off');
+});
