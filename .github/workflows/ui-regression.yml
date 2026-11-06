@@ -32,6 +32,10 @@ jobs:
       - name: Validate JavaScript syntax
         run: |
           node --check assets/js/app.js
+          node --check assets/js/print/print-ui.mjs
+          node --check assets/js/print/print-model.mjs
+          node --check tests/print-dialog.spec.cjs
+          node --check tests/print-pdf.spec.cjs
           node --check assets/js/engine/dhtmlx/dhtmlx-mapper.mjs
           node --check assets/js/engine/dhtmlx/dhtmlx-adapter.mjs
           node --check spikes/dhtmlx/spike.mjs
@@ -108,6 +112,8 @@ jobs:
         run: npm install --no-save --no-package-lock @playwright/test@1.56.1 @axe-core/playwright@4.11.0
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
+      - name: Install PDF inspection utilities
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq poppler-utils
       - name: Run responsive and interaction checks
         run: npx playwright test --reporter=line
       - name: Repeat the critical Gantt project-switch regression 20 times
