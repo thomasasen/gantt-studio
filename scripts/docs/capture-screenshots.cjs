@@ -20,10 +20,13 @@ async function shoot(name,title,targets=[]){
     const node=el(selector);
     await node.waitFor({state:'visible',timeout:15000});
     const b=await node.boundingBox();
-    if(!b || b.x>=WIDTH || b.y>=HEIGHT || b.x+b.width<=0 || b.y+b.height<=0)
-      throw new Error('Nicht sichtbares Ziel '+selector+' in '+name);
+    if(!b || b.x>=WIDTH || b.y>=HEIGHT || b.x+b.width<=0 || b.y+b.height<=0){
+      console.warn('SKIP unsichtbares DOM-Ziel: '+selector+' in '+name);
+      continue;
+    }
     marks.push({selector,label,x:Math.round(Math.max(22,Math.min(WIDTH-22,b.x+Math.min(65,Math.max(25,b.width*.45))))),y:Math.round(Math.max(22,Math.min(HEIGHT-22,b.y+Math.min(23,Math.max(12,b.height*.2)))))});
   }
+  if(targets.length && marks.length===0) throw new Error('Keine sichtbaren Beschriftungsziele in '+name);
   await page.screenshot({path:path.join(OUT,name+'.png'),animations:'disabled'});
   files.push({name,title,marks});
   console.log('PHOTO',name,marks.length,'DOM-geprüfte Markierungen');
