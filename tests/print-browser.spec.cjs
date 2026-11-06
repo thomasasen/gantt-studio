@@ -87,7 +87,9 @@ test('Druckvorschau bleibt bei Projektwechsel stabil und ist bei 200 Prozent bed
   const demo=await page.locator('#projectSelect').inputValue();
   await page.locator('#loadDemoBtn').click();
   await page.locator('#projectSelect').selectOption(demo);
+  await expect(page.locator('#projectName')).toHaveValue('Dynamisches Demo-Projekt');
   await openPrint(page);
+  await expect(page.frameLocator('#printPreview iframe').locator('svg')).toContainText('Projekt-Kick-off');
   await expect(page.locator('#printPageCount')).toContainText('Seite');
   await page.locator('#printPreviewZoom').selectOption('100');
   await expect(page.frameLocator('#printPreview iframe').locator('svg')).toBeVisible();
