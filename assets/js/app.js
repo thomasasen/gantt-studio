@@ -1,13 +1,13 @@
-import { createEngineController } from './engine/engine-controller.mjs?v=2.8.1';
-import { createNativeEngine } from './engine/native/native-adapter.mjs?v=2.8.1';
-import { createProjectCommitter } from './core/project-commits.mjs?v=2.8.1';
-import { createProjectActivationCoordinator } from './core/project-activation.mjs?v=2.8.1';
-import { matchesEngineIntentScope } from './core/engine-intent-scope.mjs?v=2.8.1';
-import { localTodayIso, isValidIsoDate } from './core/date-only.mjs?v=2.8.1';
-import { icon, hydrateIcons } from './icons.mjs?v=2.8.1';
-import { saveLocal, loadActive, loadProject, listProjects, deleteProject, setActiveProject } from './storage.js?v=2.8.1';
-import { normalizeTaskOrder, nextDisplayOrder, sortedProjectTasks, phaseKey, reorderTask, nudgeTask } from './task-order.mjs?v=2.8.1';
-import { DESIGN_COLOR_FIELDS, DESIGN_PRESETS, findDesignPreset, matchDesignPreset, designThemeMode } from './design-presets.mjs?v=2.8.1';
+import { createEngineController } from './engine/engine-controller.mjs?v=2.8.2';
+import { createNativeEngine } from './engine/native/native-adapter.mjs?v=2.8.2';
+import { createProjectCommitter } from './core/project-commits.mjs?v=2.8.2';
+import { createProjectActivationCoordinator } from './core/project-activation.mjs?v=2.8.2';
+import { matchesEngineIntentScope } from './core/engine-intent-scope.mjs?v=2.8.2';
+import { localTodayIso, isValidIsoDate } from './core/date-only.mjs?v=2.8.2';
+import { icon, hydrateIcons } from './icons.mjs?v=2.8.2';
+import { saveLocal, loadActive, loadProject, listProjects, deleteProject, setActiveProject } from './storage.js?v=2.8.2';
+import { normalizeTaskOrder, nextDisplayOrder, sortedProjectTasks, phaseKey, reorderTask, nudgeTask } from './task-order.mjs?v=2.8.2';
+import { DESIGN_COLOR_FIELDS, DESIGN_PRESETS, findDesignPreset, matchDesignPreset, designThemeMode } from './design-presets.mjs?v=2.8.2';
 
 const $ = (id) => document.getElementById(id);
 const clone = (x) => JSON.parse(JSON.stringify(x));
