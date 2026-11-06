@@ -116,22 +116,17 @@ export function createAsyncEngineController(initialFactory) {
     const width = Math.max(1, rect.width || active.clientWidth || parent.clientWidth);
     const height = Math.max(0, rect.height || active.offsetHeight);
     const liveWidth = active.style.width;
-    const previousPosition = parent.style.position;
-    if (getComputedStyle(parent).position === 'static') parent.style.position = 'relative';
     const node = document.createElement(active.tagName.toLowerCase());
     node.className = active.className;
     node.setAttribute('aria-hidden', 'true');
     node.inert = true;
     node.style.cssText = 'position:absolute;visibility:hidden;pointer-events:none;'
       + 'overflow:hidden;box-sizing:border-box;'
-      + 'left:' + active.offsetLeft + 'px;top:' + active.offsetTop + 'px;'
+      + 'left:0;top:0;'
       + 'width:' + width + 'px;min-height:' + height + 'px;';
     let committed = false;
     let closed = false;
     active.after(node);
-    function restoreParent() {
-      parent.style.position = previousPosition;
-    }
     return {
       node,
       activate() {
@@ -162,7 +157,6 @@ export function createAsyncEngineController(initialFactory) {
           node.removeAttribute('aria-hidden');
           node.inert = false;
           committed = true;
-          restoreParent();
         } catch (error) {
           undo();
           throw error;
@@ -179,8 +173,7 @@ export function createAsyncEngineController(initialFactory) {
           node.setAttribute('aria-hidden', 'true');
           node.inert = true;
           committed = false;
-          restoreParent();
-        }
+          }
       },
       close() {
         if (closed) return;
