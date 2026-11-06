@@ -8,6 +8,7 @@ import { icon, hydrateIcons } from './icons.mjs?v=2.8.2';
 import { saveLocal, loadActive, loadProject, listProjects, deleteProject, setActiveProject } from './storage.js?v=2.8.2';
 import { normalizeTaskOrder, nextDisplayOrder, sortedProjectTasks, phaseKey, reorderTask, nudgeTask } from './task-order.mjs?v=2.8.2';
 import { DESIGN_COLOR_FIELDS, DESIGN_PRESETS, findDesignPreset, matchDesignPreset, designThemeMode } from './design-presets.mjs?v=2.8.2';
+import { createPrintController } from './print/print-controller.mjs?v=2.9.0';
 
 const $ = (id) => document.getElementById(id);
 const clone = (x) => JSON.parse(JSON.stringify(x));
@@ -57,6 +58,7 @@ let taskSortMode = 'manual';
 let taskDrag = null;
 let ganttLeftWidth = 0;
 let resizeRenderQueued = false;
+let printController = null;
 
 function createEnvelope() {
   const now = new Date().toISOString();
@@ -90,6 +92,9 @@ async function boot() {
     onSelect:handleEngineSelection,onError:error=>console.error('Gantt-Engine:',error),
     onStatus:setTaskOrderStatus});
   window.addEventListener('beforeunload',()=>engineController.destroy(),{once:true});
+  printController=createPrintController(()=>({project:envelope.project,
+    filteredTaskIds:filteredBaseTasks().map(task=>task.id),
+    collapsedPhaseIds:[...collapsedPhases],sortMode:taskSortMode}));
   bindEvents();
   buildSettings();
   let local = null;
@@ -134,7 +139,7 @@ function bindEvents() {
   $('centralExportBtn').addEventListener('click', () => $('exportDialog').showModal());
   $('exportJsonBtn').addEventListener('click', exportProject);
   $('exportCsvBtn').addEventListener('click', exportCsv);
-  $('printPdfBtn').addEventListener('click', () => { $('exportDialog').close(); window.print(); });
+  $('printPdfBtn').addEventListener('click', () => { $('exportDialog').close(); printController.open(); });
   $('projectTabBtn').addEventListener('click', () => switchTab('project'));
   $('planningTabBtn').addEventListener('click', () => switchTab('planning'));
   document.querySelector('.studio-tabs').addEventListener('keydown', e => {
