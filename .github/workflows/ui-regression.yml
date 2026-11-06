@@ -34,6 +34,7 @@ jobs:
           node --check assets/js/gantt.js
           node --check assets/js/core/date-only.mjs
           node --check assets/js/core/project-commits.mjs
+          node --check assets/js/core/project-activation.mjs
           node --check assets/js/engine/engine-contract.mjs
           node --check assets/js/engine/engine-controller.mjs
           node --check assets/js/engine/native/native-adapter.mjs
@@ -44,6 +45,8 @@ jobs:
           node --check tests/native-performance.spec.cjs
           node --check tests/native-main-comparison.spec.cjs
           node --check tests/project-switch-cancel.spec.cjs
+          node --check tests/project-activation.spec.cjs
+          node --check tests/project-activation-browser.spec.cjs
           node --check tests/theme-geometry-matrix.spec.cjs
           node --check tests/indexeddb-lifecycle.spec.cjs
           node --check tests/no-duplicate-commit.spec.cjs
@@ -59,6 +62,8 @@ jobs:
         run: npx playwright install --with-deps chromium
       - name: Run responsive and interaction checks
         run: npx playwright test --reporter=line
+      - name: Repeat the critical Gantt project-switch regression 20 times
+        run: npx playwright test tests/project-switch-cancel.spec.cjs --grep "switching projects during Gantt drag" --repeat-each=20 --workers=1 --reporter=line
       - name: Upload design audit report
         if: always()
         uses: actions/upload-artifact@v4
