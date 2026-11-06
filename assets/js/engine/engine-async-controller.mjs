@@ -183,9 +183,8 @@ export function createAsyncEngineController(initialFactory) {
       }
     };
   }
-  function focusAfterCommit(oldContainer, newContainer, focused) {
-    if (typeof document === 'undefined') return;
-    if (!focused || !oldContainer?.contains(focused)) return;
+  function focusAfterCommit(newContainer, focused, shouldRestoreFocus) {
+    if (typeof document === 'undefined' || !shouldRestoreFocus) return;
     const taskId = focused.closest?.('[data-task-id]')?.dataset.taskId;
     const control = focused.closest?.('[data-gantt-order-handle]') ? 'reorder' : 'task';
     let restored = false;
@@ -331,13 +330,14 @@ export function createAsyncEngineController(initialFactory) {
             engine = old; activeContainer = oldContainer;
             throw error;
           }
-          focusAfterCommit(oldContainer, activeContainer, focusBeforeCommit);
+          const restoreFocus = Boolean(focusBeforeCommit && oldContainer?.contains?.(focusBeforeCommit));
           // Cleanup is post-commit. Its failure is reported, never rolled back
           // by reactivating an already destroyed / detached old engine.
           const errors = destroySafely(old);
           if (typeof document !== 'undefined' && oldContainer?.isConnected)
             oldContainer.remove();
           errors.forEach(reportCleanup);
+          focusAfterCommit(activeContainer, focusBeforeCommit, restoreFocus);
           return true;
         } catch (error) {
           if (!current(token)) return superseded();
