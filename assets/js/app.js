@@ -1,6 +1,7 @@
 import { createEngineController } from './engine/engine-controller.mjs?v=2.8.0';
 import { createNativeEngine } from './engine/native/native-adapter.mjs?v=2.8.0';
 import { createProjectCommitter } from './core/project-commits.mjs?v=2.8.0';
+import { createProjectActivationCoordinator } from './core/project-activation.mjs?v=2.8.0';
 import { localTodayIso, isValidIsoDate } from './core/date-only.mjs?v=2.8.0';
 import { icon, hydrateIcons } from './icons.mjs?v=2.8.0';
 import { saveLocal, loadActive, loadProject, listProjects, deleteProject, setActiveProject } from './storage.js?v=2.8.0';
@@ -32,7 +33,18 @@ let managementCriteria = { ...managementDefaults };
 let collapsedPhases = new Set();
 const projectCommitter = createProjectCommitter(saveLocal);
 const engineController = createEngineController(createNativeEngine);
-let projectSelectionSerial = 0;
+const projectActivation = createProjectActivationCoordinator({
+  load: async id => {
+    // A reactivated project must see any completed in-flight commit, not a
+    // stale snapshot loaded before its previous write finishes.
+    await projectCommitter.whenIdle(id);
+    const project = await loadProject(id);
+    if (!project) return null;
+    return {project, portfolio: await listProjects()};
+  },
+  present: ({project, portfolio}) => presentProject(project, portfolio)
+});
+const deletingProjects = new Set();
 let taskSavePending = false;
 let entitySavePending = false;
 const pendingSaves = new Map();
@@ -156,17 +168,86 @@ function bindEvents() {
   document.addEventListener('input', e => { if (['designPrimary','designAccent','designWorkstream','designCritical','designMilestone','designGate','designPageBg','designPanelBg'].includes(e.target.id)) updateDesignPreview(); });
 }
 
+// Fetch before touching the DOM. The entire project surface then renders
+// synchronously so an older portfolio read cannot repaint a newer selection.
 async function renderAll() {
+  const token = currentProjectGeneration(), id = envelope.project.id;
+  const projects = await listProjects();
+  if (!projectActivation.isCurrent(token) || envelope.project.id !== id) return false;
+  renderAllFromPortfolio(projects);
+  return true;
+}
+
+function renderAllFromPortfolio(projects) {
   applyDesign();
   $('projectName').value = envelope.project.name;
-  await renderPortfolio();
+  renderPortfolioFromList(projects);
   renderMeta(); renderMetrics(); renderPlanningLists(); syncSettings(); renderQuickSettings(); renderPhaseToolbar(); renderGanttOnly(); renderTaskTable(); populateTaskPhases(); syncControlStates();
 }
 
 async function renderPortfolio() {
+  const token = currentProjectGeneration(), id = envelope.project.id;
   const projects = await listProjects();
+  if (!projectActivation.isCurrent(token) || envelope.project.id !== id) return false;
+  renderPortfolioFromList(projects);
+  return true;
+}
+
+function renderPortfolioFromList(projects) {
   $('projectSelect').innerHTML = projects.map(p => `<option value="${esc(p.id)}">${esc(p.name)} · ${p.tasks.length} Aufgaben</option>`).join('');
   $('projectSelect').value = envelope.project.id;
+}
+
+// All project-changing entry points share this generation. An outstanding
+// table or Gantt drag is invalidated before any asynchronous work begins.
+function beginProjectActivation() {
+  cancelTaskDrag();
+  engineController.cancelInteraction();
+  return projectActivation.begin();
+}
+function currentProjectGeneration() {
+  return projectActivation.current();
+}
+function restoreProjectSelection(token) {
+  if (projectActivation.isCurrent(token)) $('projectSelect').value = envelope.project.id;
+}
+
+function presentProject(stored, portfolio) {
+  const candidate = normalizeEnvelope({
+    schema:'gantt-studio.project', schemaVersion:1, generator:'Gantt Studio', project:stored
+  });
+  const previous = {
+    envelope, zoom, managementMode, managementCriteria, collapsedPhases, taskSortMode
+  };
+  try {
+    envelope = candidate;
+    loadViewState();
+    renderAllFromPortfolio(portfolio);
+    projectCommitter.remember(envelope.project);
+    setActiveProject(envelope.project.id);
+    if (pendingSaves.has(envelope.project.id))
+      setSaveStatus('saving','Änderungen werden lokal gesichert');
+    else if (lastSaveFailed.has(envelope.project.id))
+      setSaveStatus('error','Browser-Speicherung fehlgeschlagen');
+    else setSaveStatus('saved');
+    for (const id of ['taskDialog','entityDialog','designDialog']) {
+      const dialog = $(id);
+      if (dialog?.open) dialog.close();
+    }
+  } catch (error) {
+    envelope = previous.envelope;
+    zoom = previous.zoom;
+    managementMode = previous.managementMode;
+    managementCriteria = previous.managementCriteria;
+    collapsedPhases = previous.collapsedPhases;
+    taskSortMode = previous.taskSortMode;
+    try { renderAllFromPortfolio(portfolio); }
+    catch (rollbackError) {
+      throw new AggregateError([error,rollbackError],
+        'Projektwechsel fehlgeschlagen; vorherige Darstellung konnte nicht wiederhergestellt werden.');
+    }
+    throw error;
+  }
 }
 
 function renderMeta() {
@@ -191,6 +272,7 @@ function setSaveStatus(state, detail='Lokal im Browser') {
 async function commitProjectChange(change) {
   const project = envelope.project;
   const id = project.id;
+  if (deletingProjects.has(id)) throw new Error('Dieses Projekt wird gerade gelöscht.');
   pendingSaves.set(id,(pendingSaves.get(id)||0)+1);
   if (envelope.project.id===id) setSaveStatus('saving','Änderungen werden lokal gesichert');
   try {
@@ -484,6 +566,7 @@ async function loadDemoProject() {
   const button = $('loadDemoBtn');
   const emptyButton = $('emptyDemoBtn');
   if (button.disabled) return;
+  const token = beginProjectActivation();
   const originalLabel = button.textContent;
   button.disabled = true;
   button.textContent = 'Lade Demo…';
@@ -492,22 +575,21 @@ async function loadDemoProject() {
     const demoUrl = new URL('../../examples/demo.gantt.json', import.meta.url);
     const response = await fetch(demoUrl, { cache: 'no-store' });
     if (!response.ok) throw new Error(`Beispieldatei nicht erreichbar (HTTP ${response.status})`);
-
-    // Identischer Validierungs- und ID-Migrationspfad wie beim Dateiimport.
-    // Zuerst als separates Projekt speichern, erst danach die aktive Ansicht wechseln.
     const demo = cloneForImport(normalizeEnvelope(await response.json()));
-    demo.project.name = uniqueName(demo.project.name, await listProjects());
+    const projects = await listProjects();
+    if (!projectActivation.isCurrent(token)) return;
+    demo.project.name = uniqueName(demo.project.name, projects);
     await saveLocal(demo.project);
-    envelope = demo;
-    projectCommitter.remember(demo.project);
-    setActiveProject(demo.project.id);
-    loadViewState();
-    switchTab('project');
-    await renderAll();
-    toast('Demoprojekt geladen. Bestehende Projekte bleiben erhalten.');
+    if (await projectActivation.activate(demo.project.id, token)) {
+      switchTab('project');
+      toast('Demoprojekt geladen. Bestehende Projekte bleiben erhalten.');
+    }
   } catch (error) {
-    console.error('Demoprojekt konnte nicht geladen werden:', error);
-    toast('Demoprojekt konnte nicht geladen werden. Bitte erneut versuchen.', true);
+    if (projectActivation.isCurrent(token)) {
+      restoreProjectSelection(token);
+      console.error('Demoprojekt konnte nicht geladen werden:', error);
+      toast('Demoprojekt konnte nicht geladen werden. Bitte erneut versuchen.', true);
+    }
   } finally {
     button.disabled = false;
     button.textContent = originalLabel;
@@ -516,73 +598,89 @@ async function loadDemoProject() {
 }
 
 async function createProject() {
-  const name=(prompt('Name des neuen Projekts:','Neues Projekt')||'').trim();
-  if(!name)return;
-  const created=createEnvelope();
-  created.project.name=uniqueName(name,await listProjects());
+  const name = (prompt('Name des neuen Projekts:','Neues Projekt')||'').trim();
+  if (!name) return;
+  const token = beginProjectActivation();
   try {
+    const projects = await listProjects();
+    if (!projectActivation.isCurrent(token)) return;
+    const created = createEnvelope();
+    created.project.name = uniqueName(name, projects);
     await saveLocal(created.project);
-    envelope=created;
-    projectCommitter.remember(created.project);
-    setActiveProject(created.project.id);
-    loadViewState();await renderAll();toast('Projekt wurde angelegt.');
-  } catch(error) { toast(`Projekt konnte nicht angelegt werden: ${error.message}`,true); }
+    if (await projectActivation.activate(created.project.id, token))
+      toast('Projekt wurde angelegt.');
+  } catch (error) {
+    if (projectActivation.isCurrent(token)) {
+      restoreProjectSelection(token);
+      toast(`Projekt konnte nicht angelegt werden: ${error.message}`,true);
+    }
+  }
 }
 
-async function changeProject(e) {
-  const id=e.target.value;
-  const selection=++projectSelectionSerial;
-  // Cancel both surfaces immediately. Never let an older asynchronous read
-  // overwrite a newer selection, even if a pending render repopulates select.
-  cancelTaskDrag();
-  engineController.cancelInteraction();
+async function changeProject(event) {
+  const id = event.target.value;
+  const token = beginProjectActivation();
   try {
-    const p=await loadProject(id);
-    if(!p || selection!==projectSelectionSerial)return;
-    envelope=normalizeEnvelope({schema:'gantt-studio.project',schemaVersion:1,generator:'Gantt Studio',project:p});
-    projectCommitter.remember(envelope.project);
-    setActiveProject(p.id);
-    loadViewState();await renderAll();
-    if(pendingSaves.has(id))setSaveStatus('saving','Änderungen werden lokal gesichert');
-  } catch(error) { toast(`Projektwechsel fehlgeschlagen: ${error.message}`,true); }
+    if (!await projectActivation.activate(id, token) && projectActivation.isCurrent(token))
+      restoreProjectSelection(token);
+  } catch (error) {
+    if (projectActivation.isCurrent(token)) {
+      restoreProjectSelection(token);
+      toast(`Projektwechsel fehlgeschlagen: ${error.message}`, true);
+    }
+  }
 }
 
 async function removeProject() {
-  const id=envelope.project?.id;
-  if(!id||!confirm(`Projekt „${envelope.project.name}“ vollständig löschen?`))return;
+  const id = envelope.project?.id;
+  if (!id || !confirm(`Projekt „${envelope.project.name}“ vollständig löschen?`)) return;
+  const token = beginProjectActivation();
+  deletingProjects.add(id);
   try {
     await projectCommitter.whenIdle(id);
-    const projects=await listProjects();
+    const projects = await listProjects();
+    if (!projectActivation.isCurrent(token)) return;
+    const remaining = projects.filter(project => project.id !== id);
+    let targetId = remaining[0]?.id;
+    if (!targetId) {
+      // Prepare a valid fallback before deleting the currently active project.
+      const fresh = createEnvelope();
+      await saveLocal(fresh.project);
+      targetId = fresh.project.id;
+    }
+    if (!projectActivation.isCurrent(token)) return;
     await deleteProject(id);
     projectCommitter.forget(id);
-    const remaining=projects.filter(p=>p.id!==id);
-    if(remaining.length) {
-      const p=await loadProject(remaining[0].id);
-      envelope=normalizeEnvelope({schema:'gantt-studio.project',schemaVersion:1,generator:'Gantt Studio',project:p});
-    } else {
-      const fresh=createEnvelope();
-      await saveLocal(fresh.project);
-      envelope=fresh;
+    if (await projectActivation.activate(targetId, token))
+      toast('Projekt wurde gelöscht.');
+  } catch (error) {
+    if (projectActivation.isCurrent(token)) {
+      restoreProjectSelection(token);
+      toast(`Projekt konnte nicht gelöscht werden: ${error.message}`,true);
     }
-    projectCommitter.remember(envelope.project);
-    setActiveProject(envelope.project.id);
-    loadViewState();await renderAll();toast('Projekt wurde gelöscht.');
-  } catch(error) { toast(`Projekt konnte nicht gelöscht werden: ${error.message}`,true); }
+  } finally {
+    deletingProjects.delete(id);
+  }
 }
 
 async function importFile(event) {
-  const file=event.target.files?.[0];
-  if(!file)return;
+  const file = event.target.files?.[0];
+  if (!file) return;
+  const token = beginProjectActivation();
   try {
-    const imported=cloneForImport(normalizeEnvelope(JSON.parse(await file.text())));
-    imported.project.name=uniqueName(imported.project.name,await listProjects());
+    const imported = cloneForImport(normalizeEnvelope(JSON.parse(await file.text())));
+    const projects = await listProjects();
+    if (!projectActivation.isCurrent(token)) return;
+    imported.project.name = uniqueName(imported.project.name, projects);
     await saveLocal(imported.project);
-    envelope=imported;
-    projectCommitter.remember(imported.project);
-    setActiveProject(imported.project.id);
-    loadViewState();await renderAll();toast('Projekt importiert.');
-  } catch(error) { toast(error.message||'Datei konnte nicht importiert werden.',true); }
-  finally { event.target.value=''; }
+    if (await projectActivation.activate(imported.project.id, token))
+      toast('Projekt importiert.');
+  } catch (error) {
+    if (projectActivation.isCurrent(token)) {
+      restoreProjectSelection(token);
+      toast(error.message||'Datei konnte nicht importiert werden.',true);
+    }
+  } finally { event.target.value = ''; }
 }
 
 function cloneForImport(source) {const e=clone(source),map=new Map();e.project.tasks.forEach(t=>map.set(t.id,uuid()));e.project.tasks=e.project.tasks.map(t=>({...t,id:map.get(t.id),dependencies:(t.dependencies||[]).map(d=>map.get(d)).filter(Boolean)}));const now=new Date().toISOString();e.project.id=uuid();e.project.createdAt=now;e.project.updatedAt=now;e.project.revision=1;e.exportedAt=now;return e;}
