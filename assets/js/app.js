@@ -33,6 +33,8 @@ let collapsedPhases = new Set();
 const projectCommitter = createProjectCommitter(saveLocal);
 const engineController = createEngineController(createNativeEngine);
 let projectSelectionSerial = 0;
+let taskSavePending = false;
+let entitySavePending = false;
 const pendingSaves = new Map();
 const lastSaveFailed = new Set();
 let toastTimer = null;
@@ -431,6 +433,7 @@ function populateTaskPhases(selected='') {
 function populateDependencies(task) {$('taskDependencies').innerHTML=envelope.project.tasks.filter(t=>t.id!==task?.id).map(t=>`<option value="${esc(t.id)}" ${(task?.dependencies||[]).includes(t.id)?'selected':''}>${esc(t.name)}</option>`).join('');}
 
 async function saveTask() {
+  if(taskSavePending)return;
   const name=$('taskName').value.trim(), start=$('taskStart').value, end=$('taskEnd').value;
   if(!name||!start||!end) return toast('Name, Start und Ende sind Pflicht.',true);
   if(end<start) return toast('Das Enddatum darf nicht vor dem Start liegen.',true);
@@ -444,6 +447,8 @@ async function saveTask() {
   const task={id,name,start,end,progress:clamp(Number($('taskProgress').value)||0,0,100),type:$('taskType').value,dependencies:[...$('taskDependencies').selectedOptions].map(o=>o.value),phaseId,displayOrder:order,owner:$('taskOwner').value.trim().slice(0,80),status:$('taskStatus').value,risk:$('taskRisk').value,baselineStart,baselineEnd,bufferDays:clamp(Number($('taskBuffer').value)||0,0,365),costEur:Math.max(0,Number($('taskCost').value)||0),url:safeUrl($('taskUrl').value),notes:$('taskNotes').value.trim().slice(0,2000),showInGantt:true};
   const copy=envelope.project.tasks.map(t=>t.id===id?task:t); if(!copy.some(t=>t.id===id)) copy.push(task);
   try { validateGraph(copy); } catch(e) { return toast(e.message,true); }
+  taskSavePending=true;
+  $('saveTaskBtn').disabled=true;
   try {
     const result=await commitProjectChange(project=>{
       const previous=project.tasks.find(t=>String(t.id)===String(id));
@@ -458,6 +463,7 @@ async function saveTask() {
     if(!result.active)return;
     $('taskDialog').close();await renderAll();toast(old?'Aufgabe aktualisiert.':'Aufgabe erstellt.');
   } catch(error) { toast(error.message||'Aufgabe konnte nicht gespeichert werden.',true); }
+  finally { taskSavePending=false; $('saveTaskBtn').disabled=false; }
 }
 
 async function deleteTask() {
@@ -946,6 +952,7 @@ function entityRows(kind,items,detail){return items.length?items.slice().sort((a
 
 function openEntity(kind,id=''){const list=kind==='phase'?envelope.project.planning.phases:kind==='marker'?envelope.project.planning.markers:envelope.project.planning.holidays;const item=list.find(x=>x.id===id)||{};$('entityKind').value=kind;$('entityId').value=id;$('deleteEntityBtn').style.visibility=id?'visible':'hidden';const cfg={phase:['PHASE','Phase bearbeiten'],marker:['STICHTAG','Stichtag bearbeiten'],holiday:['SONDERTAG','Sondertag bearbeiten']}[kind];$('entityEyebrow').textContent=cfg[0];$('entityTitle').textContent=id?cfg[1]:cfg[1].replace('bearbeiten','anlegen');if(kind==='phase')$('entityFields').innerHTML=`<label class="span-2">Name<input id="entityName" maxlength="120" required value="${esc(item.name||'')}"></label><label>Start<input id="entityStart" type="date" required value="${esc(item.start||todayIso())}"></label><label>Ende<input id="entityEnd" type="date" required value="${esc(item.end||todayIso())}"></label><label>Farbe<input id="entityColor" type="color" value="${esc(item.color||'#DCE8EB')}"></label>`;if(kind==='marker')$('entityFields').innerHTML=`<label class="span-2">Name<input id="entityName" maxlength="120" required value="${esc(item.name||'')}"></label><label>Datum<input id="entityDate" type="date" required value="${esc(item.date||todayIso())}"></label><label>Farbe<input id="entityColor" type="color" value="${esc(item.color||'#607A00')}"></label><label>Linie<select id="entityStyle"><option value="solid">Durchgezogen</option><option value="dashed">Gestrichelt</option><option value="dotted">Gepunktet</option></select></label>`;if(kind==='holiday')$('entityFields').innerHTML=`<label class="span-2">Name<input id="entityName" maxlength="120" required value="${esc(item.name||'')}"></label><label>Datum<input id="entityDate" type="date" required value="${esc(item.date||todayIso())}"></label>`;if(kind==='marker')$('entityStyle').value=item.style||'solid';$('entityDialog').showModal();}
 async function saveEntity() {
+  if(entitySavePending)return;
   const kind=$('entityKind').value,id=$('entityId').value||uuid(),name=$('entityName').value.trim();
   if(!name)return toast('Name darf nicht leer sein.',true);
   let item;
@@ -963,6 +970,8 @@ async function saveEntity() {
     if(!isValidIsoDate(date))return toast('Ungültiges Datum.',true);
     item={id,name,date,source:'manual',country:'',subdivision:'',imported:false,importedAt:''};
   }
+  entitySavePending=true;
+  $('saveEntityBtn').disabled=true;
   try {
     const result=await commitProjectChange(project=>{
       const planning=project.planning;
@@ -974,6 +983,7 @@ async function saveEntity() {
     $('entityDialog').close();renderPlanningLists();populateTaskPhases();renderPhaseToolbar();renderGanttOnly();
     toast('Planungselement gespeichert.');
   } catch {}
+  finally { entitySavePending=false; $('saveEntityBtn').disabled=false; }
 }
 
 async function deleteEntity() {
