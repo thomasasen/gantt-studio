@@ -59,8 +59,8 @@ export async function loadProject(id) {
   const db = await openDb();
   return new Promise((resolve, reject) => {
     const request = db.transaction(STORE, 'readonly').objectStore(STORE).get(id);
-    request.onsuccess = () => resolve(request.result || null);
-    request.onerror = () => reject(request.error);
+    request.onsuccess = () => { db.close(); resolve(request.result || null); };
+    request.onerror = () => { db.close(); reject(request.error); };
   });
 }
 
@@ -72,8 +72,8 @@ export async function listProjects() {
   const db = await openDb();
   return new Promise((resolve, reject) => {
     const request = db.transaction(STORE, 'readonly').objectStore(STORE).getAll();
-    request.onsuccess = () => resolve((request.result || []).sort((a, b) => String(b.updatedAt || '').localeCompare(String(a.updatedAt || ''))));
-    request.onerror = () => reject(request.error);
+    request.onsuccess = () => { db.close(); resolve((request.result || []).sort((a, b) => String(b.updatedAt || '').localeCompare(String(a.updatedAt || '')))); };
+    request.onerror = () => { db.close(); reject(request.error); };
   });
 }
 
@@ -83,10 +83,11 @@ export async function deleteProject(id) {
     const tx = db.transaction(STORE, 'readwrite');
     tx.objectStore(STORE).delete(id);
     tx.oncomplete = () => {
+      db.close();
       if (localStorage.getItem(ACTIVE_KEY) === id) localStorage.removeItem(ACTIVE_KEY);
       resolve();
     };
-    tx.onerror = () => reject(tx.error);
+    tx.onabort = () => { db.close(); reject(tx.error || new Error('Projekt konnte nicht gelöscht werden.')); };
   });
 }
 
