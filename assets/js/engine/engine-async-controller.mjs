@@ -115,6 +115,7 @@ export function createAsyncEngineController(initialFactory) {
     const rect = active.getBoundingClientRect();
     const width = Math.max(1, rect.width || active.clientWidth || parent.clientWidth);
     const height = Math.max(0, rect.height || active.offsetHeight);
+    const liveWidth = active.style.width;
     const previousPosition = parent.style.position;
     if (getComputedStyle(parent).position === 'static') parent.style.position = 'relative';
     const node = document.createElement(active.tagName.toLowerCase());
@@ -152,7 +153,9 @@ export function createAsyncEngineController(initialFactory) {
           node.style.position = '';
           node.style.left = '';
           node.style.top = '';
-          node.style.width = '';
+          // Honor an explicit size on the original mount root. Clearing this
+          // width would clamp horizontal scroll during an atomic switch.
+          node.style.width = liveWidth;
           node.style.visibility = '';
           node.style.pointerEvents = '';
           node.style.overflow = '';
