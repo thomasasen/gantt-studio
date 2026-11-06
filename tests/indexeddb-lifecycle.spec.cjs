@@ -26,6 +26,7 @@ test('repeated project listing and reading close IndexedDB connections',async({p
 
 test('project deletion also closes IndexedDB and never changes another active project',async({page})=>{
   await page.goto('/');
+  await expect(page.locator('#projectSelect')).not.toHaveValue('');
   const response=await page.evaluate(async()=>{
     const {saveLocal,deleteProject,loadProject}=await import('/assets/js/storage.js?v=2.8.0');
     const active=document.querySelector('#projectSelect').value;
