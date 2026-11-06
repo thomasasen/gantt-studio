@@ -671,3 +671,25 @@ Die Vergleichsmatrix ist ausdrücklich **kein vollständiger 1.2.1-vs.-1.2.2-Int
 - **Noch offen:** Herstellervalidierter End-of-Gesture-/Cancel-Vertrag, echte positive Move-/Resize-/Progress-Matrix, Kalender-/DST-/TZ-End-to-end über den Vendor, vollständiger Commit nach IndexedDB und UI-Refresh, Projektwechsel während begonnenem Save, Touch/Keyboard/A11y, Native-Feature-Parität, Memory-/Performance-Langzeitmessungen.
 - **Entscheidung:** **NO-GO** für einen schreibfähigen Frappe-Editor. Die neue Diagnostik ist nur eine unabhängige experimentelle Härtung. Kein Merge und keine produktive Aktivierung.
 
+### E. Reale Browsermessung auf PR-Merge-Ref `be37bd2` (CI vom 06.11.2026)
+
+Die erste neue Browser-CI (`44c56670`) schlug bei vier Fällen fehl, weil der unterhalb der Native-Referenzansicht liegende Frappe-iframe vor dem physischen Mauszug **nicht in den sichtbaren Browserviewport gescrollt** wurde. Dadurch erreichte `pointerdown` den iframe überhaupt nicht. Der Messaufbau wurde ausdrücklich korrigiert: `scrollIntoViewIfNeeded()`, `toBeInViewport()` sowie eine im iframe instrumentierte echte `pointerdown`-Bestätigung. Damit lässt sich ein falsch-grüner Offscreen-Maustest künftig nicht als Browsernachweis ausgeben.
+
+**Nachgewiesen auf `20b5f9b0012f53d775b90ba8a9d5e32f0858b190`:** [PR-Validate #42231551668](https://github.com/thomasasen/gantt-studio/actions/runs/42231551668) erfolgreich, **43/43 Node-Tests**; [PR-Merge-Ref-UI #42231551678](https://github.com/thomasasen/gantt-studio/actions/runs/42231551678) erfolgreich, **115/115 Chromium-Tests** und **20/20 Projektwechsel-Stresstests**, tatsächlicher Checkout des PR-Merge-Commits `be37bd2` gegen den Feature-Branch. Ebenfalls erfolgreicher [Branch-Push-Validate #42231539816](https://github.com/thomasasen/gantt-studio/actions/runs/42231539816) und [Branch-Push-UI #42231540108](https://github.com/thomasasen/gantt-studio/actions/runs/42231540108). [Messdaten-Archiv](https://github.com/thomasasen/gantt-studio/actions/runs/42231551678/artifacts/13510170939).
+
+| Echte Playwright-Interaktion | Öffentliche Frappe-Callbacks laut Browsertrace | Diagnose-Gate/IndexedDB | Bewertung |
+| --- | --- | --- | --- |
+| Balken-Move (+65 px) | **3 × `on_date_change`, alle vor Pointer-Up**; letzter Callback 44,2 ms vor Pointer-Up | **1 Intent erst nach Pointer-Up**, keine Speicherung | Früh-Callbacks real reproduziert |
+| Resize links (−30 px) | **1 × `on_date_change` vor Pointer-Up** | 1 Intent nach Up, keine Speicherung | Physische Vorschau/Abgabe demonstriert, nicht API-zertifiziert |
+| Resize rechts (+35 px) | **1 × `on_date_change` vor Pointer-Up** | 1 Intent nach Up, keine Speicherung | Wie oben |
+| Progress (+25 px) | **1 × `on_progress_change` nach Pointer-Up** | 1 Intent nach Up, keine Speicherung | Abschließender Callback empirisch beobachtet, nicht garantiert |
+| Klick ohne Bewegung | 0 Edit-Callbacks | 0 Intents, keine Speicherung | Sicherheitsgate bestanden |
+| Escape während Drag | 3 × `on_date_change` **vor Escape** | 0 Intents, keine Speicherung | Rollback-Gate wirksam; Frame wird neu aufgebaut |
+| Pointer-Up außerhalb | 3 × `on_date_change` **vor Verlassen** | 0 Intents, keine Speicherung | Kein fachlicher Commit; Frame entfernt/neugeladen |
+| iframe-Neurendern während Drag | Alte Frame-Trace durch Teardown nicht vollständig erhalten | 0 Intents, keine Speicherung | Stale-Negativgate, **kein** vollständiger Ablaufnachweis |
+
+**Konkrete Move-Spur:** Callbacks bei 795,7 / 843,4 / 905,7 ms (relative Frame-Zeit), Pointer-Up bei 949,9 ms, Diagnose-Intent bei 950,3 ms. Der letzte Callback enthielt `demo-core` mit `start:2026-07-23`, `end:2026-08-19` und wurde vom Gate nach Pointer-Up einmal weitergereicht. Für Resize links wurde `2026-07-19..2026-08-16`, rechts `2026-07-20..2026-08-17`, für Progress `52` gemessen. Einzelne CI-Messung, kein Nachweis für alle Zeitraster, Zeitgrenzen oder Laufzeitumgebungen.
+
+**Verschärfung nach dieser Messung:** In `tests/frappe-public-editor-pointer.spec.cjs` müssen die vier eigentlichen Edit-Szenarien nun **mindestens einen echten Upstream-Callback, genau einen Intent und dessen Übereinstimmung mit dem letzten Callback** nachweisen. Die bisherige negative Prüfung `maximal ein Intent` bleibt durch diese positive Pflicht verschärft; damit kann ein Stummbleiben des Herstellers nicht mehr als bestandener Edit-Test gelten. Die neue finale CI für diesen nachfolgenden Commit ist gesondert zu bestätigen.
+
+**Red-Team-Auswertung:** Der sichere Gate-Diagnosemodus funktioniert unter den beobachteten Playwright-Mausgesten. Ein garantiertes öffentliches `Preview → Finish / Cancel`-API-Signal fehlt weiterhin. Die neue positive Testpflicht beweist funktionierende Beispielgesten für **die ausgelieferte 1.2.2-Runtime**, aber weder robuste Release-Stabilität noch Touch/Escape/Pointer-Capture-/Blur-Parität, Endzustandskonsistenz in sämtlichen Fällen, Transaktionsabbrüche während IndexedDB-Writes oder die Native-Funktionsparität. **NO-GO bleibt verbindlich; Native bleibt produktiv.**
