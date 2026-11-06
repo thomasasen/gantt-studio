@@ -273,6 +273,17 @@ test('commit preserves scroll and transfers keyboard focus, including 200 percen
    const afterEngine=document.activeElement===newRoot;
    newRoot.tabIndex=0;newRoot.focus();
    const afterManual=document.activeElement===newRoot;
+   const ancestorChain=[];
+   for(let el=newRoot;el;el=el.parentElement)ancestorChain.push({
+     tag:el.tagName,id:el.id,class:el.className,
+     computedVisibility:getComputedStyle(el).visibility,
+     inlineVisibility:el.style.visibility,inert:el.inert,hasHidden:el.hidden,
+     inlinePriority:el.style.getPropertyPriority('visibility')
+   });
+   newRoot.style.setProperty('visibility','visible','important');
+   const afterImportantVisibility=getComputedStyle(newRoot).visibility;
+   newRoot.focus({preventScroll:true});
+   const afterImportantFocus=document.activeElement===newRoot;
    return {
     switched,wasFocused,focusTransferred:afterEngine,
     left:viewport.scrollLeft,top:viewport.scrollTop,
@@ -280,7 +291,7 @@ test('commit preserves scroll and transfers keyboard focus, including 200 percen
     sizePreserved:newRoot.offsetWidth===originalSize.width && newRoot.offsetHeight===originalSize.height,
     frames:viewport.querySelectorAll('iframe').length,
     oldRemoved:!viewport.contains(host),
-    debug:{afterManual,visibility:computed.visibility,display:computed.display,
+    debug:{afterManual,afterImportantVisibility,afterImportantFocus,ancestorChain,visibility:computed.visibility,display:computed.display,
       inlineVisibility:newRoot.style.visibility,bodyVisibility:getComputedStyle(document.body).visibility,
       viewportVisibility:getComputedStyle(viewport).visibility,
       computedPointerEvents:computed.pointerEvents,connected:newRoot.isConnected,
