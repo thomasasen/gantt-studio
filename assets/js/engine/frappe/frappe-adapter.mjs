@@ -19,7 +19,7 @@ const VIEW_MODE=Object.freeze({day:'Day',week:'Week',month:'Month'});
 const CHANNEL='gantt-studio-frappe-isolated-v1';
 const FRAME_URL=new URL('../../../../spikes/frappe/frame.html',import.meta.url);
 
-export function createFrappeEngine({experimentalEditable=false,readyTimeoutMs=15000,frameUrl=FRAME_URL}={}) {
+export function createFrappeEngine({experimentalEditable=false,experimentalIndependentLayer=false,readyTimeoutMs=15000,frameUrl=FRAME_URL}={}) {
   if (!Number.isFinite(readyTimeoutMs) || readyTimeoutMs < 1)
     throw new RangeError('A positive finite frame readiness timeout is required.');
   // Same-origin test fixture injection only; never load a remote runtime.
@@ -76,14 +76,25 @@ export function createFrappeEngine({experimentalEditable=false,readyTimeoutMs=15
           onError(error);
         }
         else if(data.type==='cancelled' && experimentalEditable && renderReady && lastRequest)
-          engine.render(lastRequest);
-        else if(data.type==='intent' && experimentalEditable && renderReady && lastRequest) {
+          engine.render(lastRequest); // legacy vendor diagnostic rollback only
+        else if(data.type==='intent' && (experimentalEditable||experimentalIndependentLayer) && renderReady && lastRequest) {
           try{
             if(!Number.isSafeInteger(data.gestureId)||data.gestureId<1
                 || seenGestures.has(data.gestureId))return;
             const change=validateEditorIntent(data.intent,lastRequest.project,allowedIds);
-            seenGestures.add(data.gestureId);
-            Promise.resolve(onIntent({type:'task-change',change})).catch(onError);
+            if(experimentalIndependentLayer){
+              const tx=data.transaction;
+              if(!tx||tx.gestureId!==data.gestureId
+                ||tx.projectId!==lastRequest.project.id
+                ||tx.expectedRevision!==(lastRequest.project.revision||1)
+                ||!['move','resize-left','resize-right','progress'].includes(tx.kind))
+                throw new Error('Independent transaction fence failed.');
+              seenGestures.add(data.gestureId);
+              Promise.resolve(onIntent({...tx,change})).catch(onError);
+            }else{
+              seenGestures.add(data.gestureId);
+              Promise.resolve(onIntent({type:'task-change',change})).catch(onError);
+            }
           }catch(error){onError(error);}
         }
       };
@@ -92,6 +103,7 @@ export function createFrappeEngine({experimentalEditable=false,readyTimeoutMs=15
     render({project,view}) {
       if(!mounted)throw new Error('Frappe engine must be mounted first.');
       if(!Object.hasOwn(VIEW_MODE,view?.zoom))throw new RangeError('Unsupported zoom');
+      if(experimentalIndependentLayer&&view.zoom!=='day')throw new RangeError('Independent experiment requires Day zoom');
       const tasks=mapProjectToFrappeTasks(project);
       lastRequest={project:structuredClone(project),view:{...view}};
       allowedIds=new Set(tasks.map(task=>task.id));
@@ -113,7 +125,9 @@ export function createFrappeEngine({experimentalEditable=false,readyTimeoutMs=15
         target.contentWindow?.postMessage({
           channel:CHANNEL,type:'render',generation:token,session:frameSession,
           tasks,viewMode:VIEW_MODE[view.zoom],
-          experimentalEditable:Boolean(experimentalEditable)
+          projectId:project.id,revision:project.revision||1,
+          experimentalEditable:Boolean(experimentalEditable),
+          experimentalIndependentLayer:Boolean(experimentalIndependentLayer)
         },location.origin);
       };
       frame=target;
@@ -145,7 +159,7 @@ export function createFrappeEngine({experimentalEditable=false,readyTimeoutMs=15
       if(scroller&&Number.isFinite(next.scrollTop))scroller.scrollTop=next.scrollTop;
     },
     cancelInteraction() {
-      if(experimentalEditable&&frame?.contentWindow){
+      if((experimentalEditable||experimentalIndependentLayer)&&frame?.contentWindow){
         frame.contentWindow.postMessage({channel:CHANNEL,type:'cancel',generation,
           session:frameSession},location.origin);
       }
