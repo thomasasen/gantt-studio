@@ -115,11 +115,13 @@ export function printHtml(projection,layout){
 export function createPrintController({getProject,getContext,onError=console.error}){
  const dialog=document.createElement('dialog');dialog.className='print-dialog';dialog.id='printPdfDialog';
  dialog.innerHTML='<header class="print-dialog-head"><div><h2>Drucken &amp; PDF</h2><p>Vollständiger Projektzeitplan, unabhängig vom sichtbaren Ausschnitt</p></div><button class="btn" type="button" data-print-close>Schließen</button></header>'+
- '<div class="print-dialog-body"><aside class="print-controls"><div id="printOptions"></div><div class="print-actions"><button class="btn" type="button" data-print-reset>Zurücksetzen</button><button class="btn primary" type="button" data-print-output>Drucken / PDF speichern</button></div></aside>'+
+ '<div class="print-dialog-body"><aside class="print-controls"><div id="printOptions"></div><div class="print-profile-save"><label><span>Eigenes Druckprofil</span><input id="printProfileName" maxlength="50" placeholder="Profilname"></label><button type="button" class="btn" data-print-save-profile>Speichern</button><select id="printSavedProfiles" aria-label="Gespeichertes Druckprofil auswählen"><option value="">Gespeicherte Profile…</option></select></div><div class="print-actions"><button class="btn" type="button" data-print-reset>Zurücksetzen</button><button class="btn primary" type="button" data-print-output>Drucken / PDF speichern</button></div></aside>'+
  '<section class="print-preview" aria-label="Druckvorschau"><div class="print-preview-head"><strong id="printCount"></strong><span id="printWarning" role="status"></span><div class="print-page-tools"><button type="button" class="btn" data-print-prev aria-label="Vorherige Druckseite">‹</button><output id="printCurrentPage">1</output><button type="button" class="btn" data-print-next aria-label="Nächste Druckseite">›</button><label>Zoom <input id="printPreviewZoom" type="range" min="35" max="100" value="65" step="5" aria-label="Vorschau-Zoom in Prozent"></label></div></div><iframe title="Mehrseitige Druckvorschau" id="printFrame"></iframe></section></div>';
  document.body.append(dialog);
  const options=dialog.querySelector('#printOptions'),frame=dialog.querySelector('#printFrame'),storageKey='gantt-studio.print-preferences-v1';
- let settings={...PRINT_DEFAULTS},snapshot,contextSnapshot,html='',pending=null,currentPage=1,pageCount=1;
+ let settings={...PRINT_DEFAULTS},snapshot,contextSnapshot,html='',pending=null,currentPage=1,pageCount=1,storedProfiles={};
+ const profilesKey='gantt-studio.print-profiles-v1';
+ const showProfiles=()=>{const select=dialog.querySelector('#printSavedProfiles');select.innerHTML='<option value="">Gespeicherte Profile…</option>'+Object.keys(storedProfiles).sort().map(name=>'<option value="'+escape(name)+'">'+escape(name)+'</option>').join('');};
  const update=()=>{
   try{
    const projection=projectForPrint(snapshot,settings,contextSnapshot);
@@ -158,6 +160,17 @@ export function createPrintController({getProject,getContext,onError=console.err
   }else settings={...settings,[key]:value};
   settings=sanitizePrintSettings(settings);persist();draw();
  });
+ dialog.querySelector('[data-print-save-profile]').addEventListener('click',()=>{
+  const input=dialog.querySelector('#printProfileName'),name=input.value.trim();
+  if(!name){input.focus();return;}
+  storedProfiles[name]=sanitizePrintSettings(settings);
+  try{localStorage.setItem(profilesKey,JSON.stringify(storedProfiles));}catch(error){onError(error);}
+  showProfiles();dialog.querySelector('#printSavedProfiles').value=name;
+ });
+ dialog.querySelector('#printSavedProfiles').addEventListener('change',event=>{
+  const profile=storedProfiles[event.target.value];if(!profile)return;
+  settings=sanitizePrintSettings(profile);persist();draw();
+ });
  dialog.querySelector('[data-print-close]').addEventListener('click',()=>dialog.close());
  dialog.querySelector('[data-print-reset]').addEventListener('click',()=>{settings={...PRINT_DEFAULTS};persist();draw();});
  dialog.querySelector('[data-print-output]').addEventListener('click',()=>{
@@ -174,6 +187,7 @@ export function createPrintController({getProject,getContext,onError=console.err
   snapshot=JSON.parse(JSON.stringify(getProject()));
   contextSnapshot=JSON.parse(JSON.stringify(getContext()));
   try{settings=sanitizePrintSettings(JSON.parse(localStorage.getItem(storageKey)||'{}'));}catch{settings={...PRINT_DEFAULTS};}
-  draw();dialog.showModal();
+  try{const parsed=JSON.parse(localStorage.getItem(profilesKey)||'{}');storedProfiles=parsed&&typeof parsed==='object'&&!Array.isArray(parsed)?parsed:{};}catch{storedProfiles={};}
+  showProfiles();draw();dialog.showModal();
  },destroy(){if(dialog.open)dialog.close();dialog.remove();}};
 }
