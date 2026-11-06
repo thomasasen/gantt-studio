@@ -567,3 +567,46 @@ Die Staging-Verwaltung ist bewusst Bestandteil des opt-in `engine-async-controll
 **Verbleibende Risiken:** Keine vollständige Gesten-/A11y-Editorparität von Frappe, keine produktionsreife Schreibanbindung, keine Langzeit-Leak-Messung und kein eigener Nachweis für echte 200-%-Browser-Zoom-Einstellung oder Screenreader. Bei einem fehlerhaften Adapter-`destroy()` kann der Controller seine internen Referenzen einmalig freigeben, aber nicht die Entfernung aller vom Adapter extern registrierten Ressourcen garantieren. Dieses Verhalten wird über `onError` gemeldet.
 
 **Entscheidung:** Die isolierte zweiphasige Umschaltung ist auf dem verifizierten Implementierungs-SHA technisch bestanden. **PR #15 bleibt Draft und NOT READY zum Merge als produktiver Frappe-Ersatz.** `main` und PR #14 unverändert; keine produktive Frappe-Aktivierung.
+
+
+## 16. Transaktionaler Frappe-Editorvertrag (experimenteller Folge-PR, 06.11.2026)
+
+**Basis:** `fix/frappe-lifecycle-isolation@86de64e13f004de4b75e5e8f29c04f00bdab3241`. **Branch:** `feature/frappe-transactional-editor`, Draft gegen PR #15. Kein Merge, kein Default-Wechsel und **keine Aktivierung der Frappe-Schreibfunktion in `app.js`**. Auch der reguläre Spike bleibt read-only. Der Testparameter `?edit=1` ist ausschließlich ein Diagnosemodus ohne Projektpersistenz.
+
+### Architekturentscheidung: Engine-unabhängige Transaction Boundary statt vertrauenswürdiger Frappe-Callbacks
+
+1. `assets/js/core/transactional-editor.mjs` implementiert einen vom Renderer unabhängigen Sitzungs- und Änderungsvertrag. Er akzeptiert ausschließlich `task-change`, validiert Aufgabe, sichtbare Task-ID, inklusive Kalenderdaten, Mindestdauer und Fortschritt 0–100 und greift nur über die bestehende `createProjectCommitter`-Schicht auf die Persistenz zu. Unveränderte Felder wie Abhängigkeiten, Phase und `displayOrder` bleiben erhalten.
+2. Ein Editor-Sitzungstoken wird mit Projekt-ID, Basisrevision, Engine-Generation und expliziter Aufgaben-Whitelist verknüpft. `preview()` speichert niemals. `submit()` validiert den Zustand nochmals **innerhalb** der Projekt-Commit-Queue. `onCommitted()` wird erst nach erfolgreichem `save()` aufgerufen; fehlgeschlagene Änderungen werden zurückgesetzt und nicht als gespeichert gemeldet. Unpassende Tokens und Revisionen werden verworfen.
+3. `frappe-gesture-gate.mjs` akzeptiert maximal eine Abgabe je Gesture, kontrolliert Pointer-ID und Task-ID, blockiert Reentrancy während eines ausstehenden `emit`-Promises und unterscheidet ausdrücklich **Intent versandt** von **Persistenz bestätigt**. Abbruch und Fehler lösen Rollback aus, soweit noch nicht gespeichert wurde.
+4. `spikes/frappe/frame.mjs` führt nur im expliziten Diagnosemodus Pointer-/Mouse-Events zusammen. Der Abschluss wird nach den synchronen Upstream-`mouseup`-Callbacks abgewickelt; Escape, Pointer-Cancel, Capture-Verlust und Blur brechen ab. Ohne `?edit=1` ist Frappe schreibgeschützt.
+5. `frappe-adapter.mjs` prüft neben Origin, Source und Generation eine pro Render zufällige Session-ID, Render-Readiness, Gesture-Sequenz/Deduplikation und Änderungs-Payloads gegen sichtbare Aufgaben. Ungültige, alte und doppelte Meldungen dürfen keine `onIntent`-Callback-Aufrufe erzeugen. Eine erfolgreiche, gültige Nachricht bleibt trotzdem nur ein *fachlicher Änderungswunsch*, **kein Commit-Nachweis**.
+
+**Zustände:** `idle → preview → pending → committed / cancelled / failed`. `invalidate()` schließt die Sitzung bei Projekt-/Engine-Wechsel. Ein speichernder Aufrufer muss nach erfolgreichem Commit den neuen, bestätigten Projekt-Snapshot veröffentlichen und einen neuen Sitzungstoken ausgeben. Fehlende oder unzulässige Aufgaben werden fail-closed abgewiesen.
+
+### Grenzen, die explizit keine produktive Freigabe zulassen
+
+- **P1 / NO-GO:** Frappe 1.2.2 bietet weiterhin keinen verifizierten öffentlichen, transaktionalen Drag-/Resize-/Progress-Abschlussvertrag mit garantiertem Abort und genau einer verlässlichen finalen Vorschau. Ein Listener-Gate auf internen DOM-Ereignissen ist nur Diagnose, keine belastbare Produkt-API. Die bereits reproduzierten Upstream-Früh-Callbacks sind dadurch nicht behoben.
+- **P1 / gespeicherter Schreibvorgang:** Sobald ein IndexedDB-Commit erfolgreich angelaufen ist, kann die übergeordnete Engine ihn nicht rückwirkend durch `destroy()`, Projektwechsel oder iframe-Abbruch annullieren. Das neue Fencing verhindert das **Veröffentlichen** eines veralteten Ergebnisses in der aktiven UI und verwirft vor der Queue-Ausführung ungültige Aufträge. Für den stärkeren Anspruch „keine Persistenz nach Abbruch während laufendem Save“ wäre ein transaktional abbrechbarer Storage-Vertrag mit Abort/Revision-Fencing erforderlich; bislang bewusst nicht als garantiert behauptet.
+- **P1 / kein Live-Wiring:** Der isolierte Diagnosemodus zeichnet `EngineIntent` ausschließlich im Arbeitsspeicher der Vergleichsseite auf. Ein reales Frappe→App→IndexedDB→Frappe-Acknowledgement mit sauberem Rollback und UI-/Tabellensynchronisierung ist **nicht implementiert**; deshalb bleibt der Capabilities-Vertrag read-only und PR Draft.
+- **P2:** Tastatur-, Touch-/Stift-, tatsächlicher Browserzoom und Screenreader-Parität, Scroll-/Fokuserhalt bei einem schreibenden Render-Rollback sowie das vollständige Frappe-Feature-Delta bleiben externe Abnahmesperren. CSS-Zoom kann echte Browser-Zoom-/Assistive-Tech-Tests nicht ersetzen.
+- **P2:** Die iframe-Session reduziert versehentliche alte/replayte Nachrichten, stellt aber keine sichere Sandbox gegenüber kompromittiertem gleichoriginigem JavaScript dar. Die fachliche Validierung **muss** auch vor jedem tatsächlichen Persistenzauftrag im Parent erfolgen.
+
+### Red-Team-Review: vier unabhängige Prüfperspektiven
+
+| Perspektive | Befund | Schweregrad | Maßnahme / Stop-Kriterium |
+| --- | --- | --- | --- |
+| Architektur | Frappe-interne DOM-Events werden für den Diagnose-Gesture-Abschluss benötigt | P1 | Kein produktives Editor-Wiring; öffentliche Upstream-API zwingend erforderlich |
+| Datenintegrität | Gestarteter IndexedDB-Save nicht nachträglich abbrechbar | P1 | Stale Publikation unterdrückt, neues Storage-Abort-/Fencing-Gate nötig |
+| Frontend/UX | Upstream-Früh-Callbacks, Move/Resize-Unterscheidung und Touch nicht robust verifiziert | P1 | Reale Pointer-Testmatrix inkl. Progress, Cancel, Resize + A11y als Stop-Kriterium |
+| QA/Sicherheit | Fremde/alte/doppelte Frame-Intents zuvor nicht ausreichend geprüft | P1 → mitigiert | Origin+Source+Session+Generation+Whitelist+Payload+Gesture-Deduplizierung |
+| Frontend/UX | `committed` konnte zuvor schon beim bloßen Intent-Dispatch suggeriert werden | P2 → behoben | Gate-Zustand heißt `dispatched`; persistierter Erfolg liegt allein beim Committer |
+| QA | Reale Mausläufe waren in PR #14 bekanntermaßen teils flaky | P2 | Echte Pointer-Proben ergänzen, negative Ergebnisse nicht durch Mock-Erfolge verdecken |
+| Architektur | Funktionsparität zur Native-Engine bleibt offen | P1 | Native bleibt Standard und Referenz, kein Merge |
+
+### Tests und Entscheidung
+
+- Unit-/Contract-Testdatei: `tests/transactional-editor.spec.mjs` (strikte Inputs, Termine, Filter, Move/Resize/Progress, doppelte Abgabe, Commit-Queue, Persistenzfehler, Wiederholung, Projekt-/Generationswechsel).
+- Bestehende Gesture-Gate-Tests: `tests/frappe-gesture-gate.spec.mjs`; zusätzlich Browserprüfung mit *echtem* Maus-Pointer und isoliertem Frappe-1.2.2-Vendor in `tests/frappe-transactional-browser.spec.cjs`.
+- CI: `validate.yml` und `ui-regression.yml` auf den neuen Branch und Draft-PR gegen den Lifecycle-Branch erweitert; sowohl finaler Head als auch PR-Merge-Ref sind separat zu prüfen.
+- **Keine Behauptung eines erfolgreichen realen schreibenden Browser-Commits:** Dafür existiert noch keine freigabefähige Runtime-Schnittstelle.
+- **Entscheidung für eine schreibfähige Frappe-Engine: NO-GO.** Teilweise GO nur für die isolierte, engineunabhängige Vertrags- und Negativtest-Infrastruktur, solange sämtliche editierenden Funktionen aus bleiben. Dies setzt das frühere Gate-C-NO-GO aus PR #14 **nicht** außer Kraft.
