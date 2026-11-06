@@ -69,7 +69,9 @@ test('failed iframe readiness rejects switch and restores confirmed old project 
   const controller=createAsyncEngineController(factory);
   try{
    controller.mount({container:host,onError:()=>{},onSelect:()=>{},onStatus:()=>{},onIntent:async()=>{}});
-   await controller.render({project:{id:'A',tasks:[]},view:{zoom:'day'}});
+   await controller.render({project:{id:'A',tasks:[{
+    id:'a-task',name:'Confirmed task',start:'2026-11-01',end:'2026-11-04',progress:0
+   }]},view:{zoom:'day'}});
    await controller.setViewport({scrollLeft:55});
    let error;
    try{await controller.switchEngine(()=>createFrappeEngine({readyTimeoutMs:350,frameUrl:'/spikes/frappe/fixture-no-ready.html'}));}
