@@ -37,6 +37,8 @@ test('switching projects during a table reorder cancels the gesture and prevents
 test('switching projects during Gantt drag discards the preview',async({page})=>{
   await page.goto('/');
   await page.locator('#loadDemoBtn').click();
+  // The click handler is asynchronous. Never snapshot the pre-demo empty project ID.
+  await expect(page.locator('#taskTableBody tr[data-task-row-id]')).toHaveCount(10);
   const sourceId=await page.locator('#projectSelect').inputValue();
   const bar=page.locator('#ganttStage .gantt-bar.workstream').first();
   const original=await bar.evaluate(el=>({left:el.style.left,taskId:el.dataset.taskId}));
@@ -58,7 +60,7 @@ test('switching projects during Gantt drag discards the preview',async({page})=>
       sourceStoredTasks:(await loadProject(source))?.tasks?.length,
       toast:document.querySelector('#toast').textContent};
   },sourceId);
-  console.log('PROJECT_SWITCH_PROBE '+JSON.stringify(diagnostic));
+  expect(diagnostic.sourceStoredTasks,'source must be the persisted ten-task demo').toBe(10);
   await expect(page.locator('#projectSelect')).toHaveValue(sourceId);
   await expect(page.locator('#taskTableBody tr[data-task-row-id]')).toHaveCount(10);
   await expect(bar).toBeVisible();
