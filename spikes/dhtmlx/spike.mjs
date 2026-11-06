@@ -24,6 +24,7 @@ try{
   store=createMemoryRevisionStore(project);
   window.__dhtmlxMemoryStore=store;
   window.__dhtmlxTrace=()=>engine.getTrace();
+  window.__dhtmlxDestroy=()=>engine.destroy(); // diagnostic-only lifecycle probe
   window.__dhtmlxSwitchProject=()=>{
     const newProject={...store.snapshot(),id:'dhtmlx-second-project',revision:1};
     store.activate(newProject);project=store.snapshot();render();

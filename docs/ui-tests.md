@@ -90,3 +90,5 @@ npx playwright test tests/project-switch-cancel.spec.cjs --grep "switching proje
 ```
 
 Ein grüner statischer Test allein ist keine Editor-Freigabe. CI-Ergebnisse auf endgültigem Head und tatsächlichem PR-Merge-Ref dokumentieren. Bei fehlschlagenden Positivtests bleiben exakt diese Fälle offen.
+
+**Zusätzliche Abbruch- und Session-Gates:** Reiner Klick ohne Bewegung; reales Loslassen außerhalb des ursprünglichen Balkens; Destroy während echter Geste; Browser-Fokusverlust über Aktivieren eines weiteren Tabs; zwei unmittelbar folgende echte Drags mit Revisionsprüfung und Replay-Abwehr; zweiter gleichzeitiger Browser-Pointer via Chromium-CDP-Touchstart; Read-only-Rendering bei 390/768/1024/1440px, CSS-Zoom 200 % und Reduced Motion. Diese Tests dürfen nicht als bestanden gelten, bevor der finale GitHub-PR-Merge-Ref grün ist. CDP erzeugt einen echten Browser-Touchpointer, aber ersetzt keine manuelle Mehrfingerprüfung am Touchgerät.

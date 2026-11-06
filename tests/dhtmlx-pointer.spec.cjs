@@ -94,3 +94,108 @@ test('zoom and fresh instance repeatedly tear down without duplicate intents',as
  await expect(page.locator('.gantt_task_line[task_id="demo-core"]')).toBeVisible();
  expect(await page.evaluate(()=>window.__dhtmlxTestIntents.length)).toBe(0);
 });
+
+test('physical click with no movement cannot commit',async({page})=>{
+ const bar=await setup(page);
+ await bar.scrollIntoViewIfNeeded();
+ const b=await bar.boundingBox();expect(b).toBeTruthy();
+ await page.mouse.move(b.x+b.width*.55,b.y+b.height/2);
+ await page.mouse.down();await page.mouse.up();
+ expect(await page.evaluate(()=>window.__dhtmlxTestIntents.length)).toBe(0);
+ expect(await page.evaluate(()=>indexedDB.databases())).toEqual([]);
+});
+
+test('physical release outside the original task bar commits at most once',async({page})=>{
+ const bar=await setup(page);
+ await bar.scrollIntoViewIfNeeded();await expect(bar).toBeInViewport();
+ const b=await bar.boundingBox();expect(b).toBeTruthy();
+ const x=b.x+b.width/2,y=b.y+b.height/2;
+ await page.mouse.move(x,y);await page.mouse.down();
+ await page.mouse.move(b.x+b.width+30,y,{steps:15});
+ const moving=await page.evaluate(()=>window.__dhtmlxTrace());
+ expect(moving.some(e=>e.type==='onTaskDrag'&&e.mode==='move')).toBe(true);
+ expect(await page.evaluate(()=>window.__dhtmlxTestIntents.length)).toBe(0);
+ await page.mouse.up();
+ await expect.poll(()=>page.evaluate(()=>window.__dhtmlxTestIntents.length)).toBe(1);
+ expect(await page.evaluate(()=>window.__dhtmlxCommits[0].result.ok)).toBe(true);
+ expect(await page.evaluate(()=>indexedDB.databases())).toEqual([]);
+});
+
+test('destroy during real drag cancels gesture and removes all DHTMLX nodes',async({page})=>{
+ const bar=await setup(page);
+ await bar.scrollIntoViewIfNeeded();const b=await bar.boundingBox();
+ const x=b.x+b.width*.6,y=b.y+b.height/2;
+ await page.mouse.move(x,y);await page.mouse.down();await page.mouse.move(x+65,y,{steps:8});
+ const moving=await page.evaluate(()=>window.__dhtmlxTrace());
+ expect(moving.some(e=>e.type==='onTaskDrag')).toBe(true);
+ await page.evaluate(()=>window.__dhtmlxDestroy());
+ await page.mouse.up();
+ expect(await page.evaluate(()=>window.__dhtmlxTestIntents.length)).toBe(0);
+ expect(await page.locator('#dhtmlxRoot').evaluate(node=>node.children.length)).toBe(0);
+ expect(await page.evaluate(()=>indexedDB.databases())).toEqual([]);
+});
+
+test('physical browser focus loss cancels in-flight task drag',async({page,context})=>{
+ const bar=await setup(page);
+ await bar.scrollIntoViewIfNeeded();const b=await bar.boundingBox();
+ const x=b.x+b.width*.6,y=b.y+b.height/2;
+ await page.mouse.move(x,y);await page.mouse.down();await page.mouse.move(x+65,y,{steps:8});
+ expect((await page.evaluate(()=>window.__dhtmlxTrace())).some(e=>e.type==='onTaskDrag')).toBe(true);
+ const other=await context.newPage();await other.goto('about:blank');await other.bringToFront();
+ await expect.poll(()=>page.evaluate(()=>window.__dhtmlxTrace().some(e=>e.type==='cancel'&&e.reason==='focus-lost'))).toBe(true);
+ await page.mouse.up();await other.close();
+ expect(await page.evaluate(()=>window.__dhtmlxTestIntents.length)).toBe(0);
+ expect(await page.evaluate(()=>indexedDB.databases())).toEqual([]);
+});
+
+test('two physical sequential drags have exactly two commits and reject replay',async({page})=>{
+ let bar=await setup(page);
+ await drag(page,bar,'move',70);
+ await expect.poll(()=>page.evaluate(()=>window.__dhtmlxCommits.length)).toBe(1);
+ bar=page.locator('.gantt_task_line[task_id="demo-core"]');
+ await drag(page,bar,'move',-50);
+ await expect.poll(()=>page.evaluate(()=>window.__dhtmlxCommits.length)).toBe(2);
+ const result=await page.evaluate(()=>{
+  const before=window.__dhtmlxMemoryStore.snapshot();
+  const duplicate=window.__dhtmlxMemoryStore.commit(window.__dhtmlxCommits[0].intent);
+  const after=window.__dhtmlxMemoryStore.snapshot();
+  return {revision:after.revision,duplicate,unchanged:JSON.stringify(before)===JSON.stringify(after),
+    commits:window.__dhtmlxCommits.map(c=>c.result)};
+ });
+ expect(result.revision).toBe(3);
+ expect(result.commits.every(c=>c.ok)).toBe(true);
+ expect(result.duplicate.ok).toBe(false);
+ expect(result.unchanged).toBe(true);
+ expect(await page.evaluate(()=>indexedDB.databases())).toEqual([]);
+});
+
+test('second simultaneous browser pointer aborts first drag',async({page})=>{
+ const bar=await setup(page);
+ await bar.scrollIntoViewIfNeeded();const b=await bar.boundingBox();
+ const x=b.x+b.width*.6,y=b.y+b.height/2;
+ await page.mouse.move(x,y);await page.mouse.down();await page.mouse.move(x+50,y,{steps:7});
+ expect((await page.evaluate(()=>window.__dhtmlxTrace())).some(e=>e.type==='onTaskDrag')).toBe(true);
+ const session=await page.context().newCDPSession(page);
+ try{
+  await session.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:x+22,y:y+32,id:17}]});
+  await expect.poll(()=>page.evaluate(()=>window.__dhtmlxTrace().some(e=>e.type==='cancel'&&e.reason==='second-pointer'))).toBe(true);
+  await session.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
+  await page.mouse.up();
+  expect(await page.evaluate(()=>window.__dhtmlxTestIntents.length)).toBe(0);
+  expect(await page.evaluate(()=>indexedDB.databases())).toEqual([]);
+ }finally{await session.detach();}
+});
+
+test('read-only DHTMLX renders across responsive widths, CSS zoom and reduced motion',async({page})=>{
+ await setup(page,false);
+ for(const width of [390,768,1024,1440]){
+  await page.setViewportSize({width,height:900});
+  await expect(page.locator('#dhtmlxRoot .gantt_container')).toBeVisible();
+  await expect(page.locator('#nativeRoot')).toBeVisible();
+ }
+ await page.emulateMedia({reducedMotion:'reduce'});
+ await page.evaluate(()=>{document.body.style.zoom='200%';document.getElementById('reloadBtn').click();});
+ await expect(page.locator('#dhtmlxRoot .gantt_container')).toBeVisible();
+ expect(await page.evaluate(()=>window.__dhtmlxTestIntents.length)).toBe(0);
+ expect(await page.evaluate(()=>indexedDB.databases())).toEqual([]);
+});
