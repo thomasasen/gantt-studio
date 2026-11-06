@@ -31,3 +31,10 @@
 .print-page-tools label{display:flex;align-items:center;gap:6px;font-size:12px;white-space:nowrap}
 #printPreviewZoom{width:88px;accent-color:#26778e}
 @media(max-width:650px){.print-page-tools{width:100%;justify-content:center}}
+
+.print-profile-save{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;padding:12px 20px;border-top:1px solid var(--border,#d7e1e5)}
+.print-profile-save label{display:flex;flex-direction:column;gap:4px;min-width:0;font-size:12px;font-weight:650}
+.print-profile-save input,.print-profile-save select,.print-profile-save button{height:38px;border-radius:7px}
+.print-profile-save input,.print-profile-save select{border:1px solid var(--border,#cdd8dd);background:var(--panel,#fff);color:var(--ink,#253746);padding:0 8px;min-width:0}
+#printSavedProfiles{grid-column:1 / -1;width:100%}
+@media(max-width:850px){.print-profile-save{padding:8px 12px}}
