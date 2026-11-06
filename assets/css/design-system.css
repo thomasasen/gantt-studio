@@ -1109,7 +1109,14 @@ button:disabled, input:disabled, select:disabled { opacity: .52; cursor: not-all
   box-shadow: 0 10px 32px rgba(14, 31, 45, .24);
   font-size: 13px;
   line-height: 1.45;
+  /* A semi-transparent fading message can fall below WCAG contrast on a
+     contrasting panel. Show it fully opaque, then hide it atomically. */
+  visibility: hidden;
+  opacity: 0;
+  transform: none;
+  transition: none;
 }
+.toast.show { visibility: visible; opacity: 1; transform: none; }
 .toast.error { background: #9b3942; }
 
 /* WCAG 2.1 AA: secondary text must be legible on both white and tinted rows.
