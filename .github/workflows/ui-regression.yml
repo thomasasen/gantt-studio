@@ -44,6 +44,8 @@ jobs:
           node --check tests/native-performance.spec.cjs
           node --check tests/native-main-comparison.spec.cjs
           node --check tests/project-switch-cancel.spec.cjs
+          node --check tests/theme-geometry-matrix.spec.cjs
+          node --check tests/indexeddb-lifecycle.spec.cjs
           node --check tests/persistence.spec.cjs
           node --check assets/js/storage.js
           node --check tests/ui.spec.cjs
