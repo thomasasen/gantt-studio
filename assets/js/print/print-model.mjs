@@ -61,7 +61,7 @@ function orderedTasks(project,tasks,sortMode) {
         progress:Math.round(group.reduce((a,t)=>a+(Number(t.progress)||0),0)/group.length),
         phaseId:phase.id,phaseColor:phase.color,owner:group.length+' Aufgaben'});
     }
-    output.push(...group);
+    output.push(...group.map(task=>({...task,phaseName:phase.name||'Phase'})));
   }
   return [...output,...unphased.sort(sort)];
 }
@@ -94,7 +94,7 @@ export function projectForPrint(project, settings, context={}) {
     from=iso(Date.UTC(y,q,1));to=add(iso(Date.UTC(y,q+3,1)),-1);
   }
   const rangeRows=rows.filter(t=>t.end>=from&&t.start<=to);
-  return deepFreeze({name:source.name||'Projektplan',revision:source.revision,colors:source.design?.colors||{},
+  return deepFreeze({name:source.name||'Projektplan',revision:source.revision,colors:source.design?.colors||{},labelConfig:source.labelConfig||{},
     rows:rangeRows,from,to,markers:s.markers?(source.planning?.markers||[]).filter(m=>valid(m.date)&&m.date>=from&&m.date<=to):[],
     holidays:s.holidays?(source.planning?.holidays||[]).filter(h=>valid(h.date)&&h.date>=from&&h.date<=to):[],settings:s});
 }
