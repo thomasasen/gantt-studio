@@ -10,10 +10,11 @@ const clamp = (n,min,max) => Math.max(min,Math.min(max,n));
 export const PRINT_DEFAULTS = Object.freeze({
   profile:'detail', paper:'A4', orientation:'landscape', strategy:'readable',
   margin:12, scale:100, labelWidth:57, rowHeight:9, fontSize:9,
-  scope:'all', range:'full', from:'', to:'', color:true,
+  scope:'all', selectedPhaseIds:[], selectedTaskIds:[], expandCollapsed:true, range:'full', from:'', to:'', color:true,
   names:true, owners:true, status:true, progress:true, dates:false,
   phases:true, milestones:true, dependencies:true, baseline:true, markers:true,
-  weekends:false, legend:false, header:true, footer:true, title:''
+  weekends:false, holidays:true, buffers:true, risks:true, today:false,
+  legend:false, header:true, footer:true, title:''
 });
 export const PAGE_MM = Object.freeze({A4:[210,297],A3:[297,420]});
 export function sanitizePrintSettings(input={}) {
@@ -22,12 +23,13 @@ export function sanitizePrintSettings(input={}) {
     profile:['management','detail','custom'],paper:['A4','A3'],
     orientation:['portrait','landscape','auto'],
     strategy:['one','fitWidth','readable','manual'],
-    scope:['all','filtered','milestones'],range:['full','custom','month','quarter']
+    scope:['all','filtered','milestones','phases','selected'],range:['full','custom','month','quarter']
   })) if(!values.includes(s[key])) s[key]=PRINT_DEFAULTS[key];
   for(const [key,min,max] of [['margin',5,30],['scale',30,200],['labelWidth',32,100],['rowHeight',6,16],['fontSize',7,14]])
     s[key]=clamp(Number(s[key])||PRINT_DEFAULTS[key],min,max);
-  for(const key of ['color','names','owners','status','progress','dates','phases','milestones','dependencies','baseline','markers','weekends','legend','header','footer'])
+  for(const key of ['color','names','owners','status','progress','dates','phases','milestones','dependencies','baseline','markers','weekends','holidays','buffers','risks','today','expandCollapsed','legend','header','footer'])
     s[key]=Boolean(s[key]);
+  for(const key of ['selectedPhaseIds','selectedTaskIds'])s[key]=Array.isArray(s[key])?[...new Set(s[key].filter(x=>typeof x==='string').slice(0,2000))]:[];
   s.title=String(s.title||'').slice(0,120);
   return s;
 }
@@ -67,11 +69,15 @@ export function projectForPrint(project, settings, context={}) {
     const ids=new Set(context.filteredTaskIds||[]);
     tasks=tasks.filter(t=>ids.has(t.id));
   } else if(s.scope==='milestones') tasks=tasks.filter(t=>['milestone','gate'].includes(t.type));
+  else if(s.scope==='phases'){const ids=new Set(s.selectedPhaseIds);tasks=tasks.filter(t=>ids.has(String(t.phaseId||'')));}
+  else if(s.scope==='selected'){const ids=new Set(s.selectedTaskIds);tasks=tasks.filter(t=>ids.has(String(t.id)));}
   if(!s.milestones) tasks=tasks.filter(t=>!['milestone','gate'].includes(t.type));
   source._printPhases=s.phases;
-  const rows=orderedTasks(source,tasks,context.sortMode);
-  const dates=rows.flatMap(t=>[t.start,t.end,...(s.baseline?[t.baselineStart,t.baselineEnd]:[])]).filter(valid);
+  let rows=orderedTasks(source,tasks,context.sortMode);
+  if(!s.expandCollapsed){const hidden=new Set(context.collapsedPhaseIds||[]);rows=rows.filter(t=>t.type==='phase-summary'||!hidden.has(String(t.phaseId||'')));}
+  const dates=rows.flatMap(t=>[t.start,t.end,...(s.baseline?[t.baselineStart,t.baselineEnd]:[]),...(s.buffers&&Number(t.bufferDays)>0?[add(t.end,Math.ceil(Number(t.bufferDays)))]:[])]).filter(valid);
   if(s.markers) dates.push(...(source.planning?.markers||[]).map(m=>m.date).filter(valid));
+  if(s.today) dates.push(iso(Date.now()));
   if(s.phases)dates.push(...(source.planning?.phases||[]).filter(p=>rows.some(t=>t.phaseId===p.id)).flatMap(p=>[p.start,p.end]).filter(valid));
   const today=iso(Date.now());
   let from=dates.length?[...dates].sort()[0]:today;
@@ -85,7 +91,7 @@ export function projectForPrint(project, settings, context={}) {
   const rangeRows=rows.filter(t=>t.end>=from&&t.start<=to);
   return Object.freeze({name:source.name||'Projektplan',revision:source.revision,
     rows:rangeRows,from,to,markers:s.markers?(source.planning?.markers||[]).filter(m=>valid(m.date)&&m.date>=from&&m.date<=to):[],
-    holidays:source.planning?.holidays||[],settings:s});
+    holidays:s.holidays?(source.planning?.holidays||[]).filter(h=>valid(h.date)&&h.date>=from&&h.date<=to):[],settings:s});
 }
 export function paginatePrint(projection) {
   const s=projection.settings;
@@ -123,7 +129,7 @@ export function paginatePrint(projection) {
   const heightFor=row=>{
     const label=s.names?String(row.name||''):String(row.id||'');
     const lines=Math.max(1,Math.ceil(label.length/charsPerLine));
-    const extras=(s.owners&&row.owner?4:0)+(s.dates?4:0);
+    const extras=(s.owners&&row.owner?4:0)+(s.dates?4:0)+(s.dependencies&&row.dependencies?.length?4:0);
     return Math.max(rowHeight,2+lines*s.fontSize*.43+extras);
   };
   const bands=[];let active=[],used=0;
