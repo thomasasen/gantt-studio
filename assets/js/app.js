@@ -4,7 +4,7 @@ import { createProjectCommitter } from './core/project-commits.mjs?v=2.8.0';
 import { createProjectActivationCoordinator } from './core/project-activation.mjs?v=2.8.0';
 import { localTodayIso, isValidIsoDate } from './core/date-only.mjs?v=2.8.0';
 import { icon, hydrateIcons } from './icons.mjs?v=2.8.0';
-import { saveLocal, loadActive, loadProject, listProjects, deleteProject, setActiveProject } from './storage.js?v=2.8.0';
+import { saveLocal, loadActive, loadProject, listProjects, deleteProject, setActiveProject } from './storage.js?v=2.8.1';
 import { normalizeTaskOrder, nextDisplayOrder, sortedProjectTasks, phaseKey, reorderTask, nudgeTask } from './task-order.mjs?v=2.8.0';
 import { DESIGN_COLOR_FIELDS, DESIGN_PRESETS, findDesignPreset, matchDesignPreset, designThemeMode } from './design-presets.mjs?v=2.8.0';
 
