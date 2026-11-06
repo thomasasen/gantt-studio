@@ -286,6 +286,12 @@ export function createAsyncEngineController(initialFactory) {
         phase = 'preparing';
         try {
           next = assertEngineContract(nextFactory());
+          if (next === old || destroyed.has(next)) {
+            // A reused adapter belongs to the active view (or a previous
+            // teardown). Never let failed candidate cleanup destroy it.
+            next = null;
+            throw new Error('Engine factory must return a fresh adapter instance.');
+          }
           switchingCandidate = next;
           staging = createStage(oldContainer);
           pendingStaging = staging;
