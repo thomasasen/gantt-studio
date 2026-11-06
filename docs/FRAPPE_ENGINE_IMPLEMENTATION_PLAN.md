@@ -450,3 +450,40 @@ Red-Team: P1-Test-Synchronisation, Generation-übergreifende Aktivierung, IDB-Fe
 ### Ergänzung: expliziter Pointer-Cancel-Nachweis
 
 Das Red-Team identifizierte einen fehlenden, ausdrücklich per `PointerEvent('pointercancel')` ausgelösten Browser-Regressionstest (bisher waren Escape und Projektwechsel-Cancel nachgewiesen). `tests/pointercancel-regression.spec.cjs` prüft nun beide unabhängig: Tabellen-Reorder und Native-Gantt-Reorder, begonnen mit echter Playwright-Pointer-Interaktion, danach gezielter `pointercancel`, DOM-Vorschau-Cleanup, Freigabe von Pointer Capture, keine fachliche Änderung in IndexedDB und unveränderte Aufgaben nach Reload. Kein Sleep, keine abgeschwächte Assertion. Der Workflow prüft die Tests auf Syntax und führt sie innerhalb der vollständigen Suite aus. **Dieser neue Testcommit erfordert erneut alle finalen CI-Nachweise und 20 Wiederholungen.**
+
+
+## 13. Abnahme des Pointer-Cancel-Finalstands vom 06.11.2026
+
+**Geprüfter Code-Head:** `cbbce9dcd75f4ecdec88d88e9b0399d195a4dce2`. `main` bleibt bei `1ef29c9388b555308242bb6174ff6ed60127ea5d`; PR #14, Frappe-NO-GO und Schema v1 unverändert.
+
+### Root Cause, Korrektur und Red-Team
+
+Die forensisch nachgewiesene Primärursache des intermittierenden Gantt-Projektwechseltests war die zu frühe Übernahme einer Quellprojekt-ID vor Abschluss des asynchronen Demo-Ladevorgangs (Trace: `sourceStoredTasks: 0`). Der Test wartet seit `4a5e3d53` auf zehn Aufgaben und validiert das gespeicherte Quellprojekt. Unabhängig davon wurden echte Lücken der bisherigen Auswahlserialisierung gefunden und durch die gemeinsame monotone Projektaktivierung, veraltete-Leseantworten-Guards, synchronen Publikationspunkt, Commit-Drain, Rollback sowie Pointer-Cancel geschlossen (siehe Abschnitt 12). Die jüngste Red-Team-Ergänzung `tests/pointercancel-regression.spec.cjs` prüft Tabellen- und Gantt-Drag einschließlich Pointer-Capture-Freigabe, vollständigem IndexedDB-Snapshot und Reload. Der zunächst rote Griff-Viewport-Test auf `86844b78` wurde mit `scrollIntoViewIfNeeded()` und realem Hover in `cbbce9d` korrigiert, ohne Assertions abzuschwächen.
+
+### Drei vollständige erfolgreiche Push-CI-Versuche auf identischem Code-SHA
+
+| Workflow / Versuch | Ausgecheckter Stand | Vollständige Suite | Kritischer Projektwechsel (20x) |
+| --- | --- | --- | --- |
+| [Push-UI #42200394670, Versuch 1](https://github.com/thomasasen/gantt-studio/actions/runs/42200394670/attempts/1) | Head `cbbce9d…` | **87/87 erfolgreich** | **20/20 erfolgreich** |
+| [Push-UI #42200394670, Versuch 2](https://github.com/thomasasen/gantt-studio/actions/runs/42200394670/attempts/2) | Head `cbbce9d…` | **87/87 erfolgreich** | **20/20 erfolgreich** |
+| [Push-UI #42200394670, Versuch 3](https://github.com/thomasasen/gantt-studio/actions/runs/42200394670/attempts/3) | Head `cbbce9d…` | **87/87 erfolgreich** | **20/20 erfolgreich** |
+| [PR-UI #42200402334](https://github.com/thomasasen/gantt-studio/actions/runs/42200402334) | Merge-Ref `23dcbba838acf1fbadab8df263c35063c66d8ebe`, **nicht** Head | **87/87 erfolgreich** | **20/20 erfolgreich** |
+| [Validate #42200394814](https://github.com/thomasasen/gantt-studio/actions/runs/42200394814) | Head `cbbce9d…` | Statische Validierung erfolgreich | Entfällt |
+
+Diese Auswertung unterscheidet explizit Push-Head und den GitHub-generierten PR-Merge-Ref. Frühere dokumentierte Fehlversuche, einschließlich `86844b78` mit nicht sichtbar gescrolltem Drag-Griff, bleiben als Fehlerhistorie erhalten.
+
+### Gleicher Runner pro Main-/Native-Messpaar
+
+| Aufgaben | Versuch 1 Main/Native | Versuch 2 Main/Native | Versuch 3 Main/Native | PR-Merge-Ref Main/Native |
+| ---: | ---: | ---: | ---: | ---: |
+| 0 | 0,0 / 0,0 ms | 0,0 / 0,0 ms | 0,0 / 0,0 ms | 0,0 / 0,0 ms |
+| 1 | 2,9 / 4,6 ms | 2,5 / 2,0 ms | 5,1 / 2,8 ms | 3,1 / 3,1 ms |
+| 25 | 23,9 / 17,6 ms | 13,8 / 14,6 ms | 20,3 / 18,0 ms | 16,8 / 20,4 ms |
+| 250 | 138,8 / 157,6 ms | 117,9 / 109,4 ms | 160,8 / 151,7 ms | 159,5 / 167,7 ms |
+| 1000 | 601,6 / 637,1 ms | 428,9 / 446,5 ms | 615,4 / 630,6 ms | 580,7 / 630,2 ms |
+
+Native ist im 1.000-Aufgaben-Paar 2,5–8,5 % langsamer, ohne nachgewiesenen gravierenden strukturellen Ausreißer. Rendering großer Projekte bleibt ein dokumentiertes P2-Thema; die Zahlen sind keine End-to-End-Projektwechsel-Latenzen.
+
+**Red-Team-Restpunkte P2:** Mehrtab-Löschkonflikte; große Vollrenders; nicht realgerätgeprüfte Touch-/Screenreader-/Firefox-/Safari-Szenarien; von späteren Aktivierungen überholte Import-Kopien. Keine aktuell nachgewiesenen offenen P0/P1 aus dem geprüften Teststand; manuelle Gerätekontrollen bleiben separat.
+
+**Dokumentations-Gate:** Dieser Abschnitt wird als neuer Commit auf dem Arbeitsbranch gespeichert. Die vorstehenden drei erfolgreichen Läufe gelten strikt für **`cbbce9d…`**, nicht automatisch für den neuen Dokumentations-Commit. Vor abschließendem READY müssen die geforderten CI-Nachweise erneut dem finalen Branch-Head zugeordnet werden. PR #13 bleibt Draft; keine Merge-Aktion.
