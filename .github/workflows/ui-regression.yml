@@ -34,6 +34,8 @@ jobs:
           node --check assets/js/app.js
           node --check assets/js/print/print-ui.mjs
           node --check assets/js/print/print-export.mjs
+          node --check assets/js/print/print-labels.mjs
+          node --check tests/print-labels.spec.mjs
           node --check tests/print-image-model.spec.mjs
           node --check assets/js/print/print-model.mjs
           node --check tests/print-dialog.spec.cjs
