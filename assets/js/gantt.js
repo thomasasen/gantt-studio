@@ -1,5 +1,5 @@
-import { icon } from './icons.mjs?v=2.8.2';
-import { localTodayIso } from './core/date-only.mjs?v=2.8.2';
+import { icon } from './icons.mjs?v=2.9.0';
+import { localTodayIso } from './core/date-only.mjs?v=2.9.0';
 
 const DAY = 86400000;
 const toDate = (s) => new Date(`${s}T00:00:00Z`);
