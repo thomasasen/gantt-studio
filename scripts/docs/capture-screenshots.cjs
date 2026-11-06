@@ -24,7 +24,10 @@ async function shoot(name,title,targets=[]){
       console.warn('SKIP unsichtbares DOM-Ziel: '+selector+' in '+name);
       continue;
     }
-    marks.push({selector,label,x:Math.round(Math.max(22,Math.min(WIDTH-22,b.x+Math.min(65,Math.max(25,b.width*.45))))),y:Math.round(Math.max(22,Math.min(HEIGHT-22,b.y+Math.min(23,Math.max(12,b.height*.2)))))});
+    // Pins sitzen außerhalb der Beschriftung, am Rand des echten DOM-Ziels.
+    const pinX=b.x+b.width-14;
+    const pinY=b.y<50?b.y+b.height+14:b.y-12;
+    marks.push({selector,label,x:Math.round(Math.max(22,Math.min(WIDTH-22,pinX))),y:Math.round(Math.max(22,Math.min(HEIGHT-22,pinY)))});
   }
   if(targets.length && marks.length===0) throw new Error('Keine sichtbaren Beschriftungsziele in '+name);
   await page.screenshot({path:path.join(OUT,name+'.png'),animations:'disabled'});
@@ -77,7 +80,7 @@ async function shoot(name,title,targets=[]){
     await el('#taskOverviewTitle').scrollIntoViewIfNeeded();
     await shoot('07-aufgabentabelle','Tabellenansicht und direkte Bearbeitung',[
       ['#taskDetailsToggle','Weitere Felder zeigen'],['#taskTableAddBtn','Aufgabe ergänzen'],
-      ['#taskOverviewTable','Zellen direkt bearbeiten'],['#taskOverviewTable thead','Status, Risiko und Abhängigkeiten']
+      ['#taskOverviewTable tbody tr:first-child td:nth-child(4)','Zellen direkt bearbeiten'],['#taskOverviewTable thead th:nth-child(7)','Status, Risiko und Abhängigkeiten']
     ]);
     await top();
     await shoot('08-phasen','Phasen und Sammelzeilen im Zeitplan',[

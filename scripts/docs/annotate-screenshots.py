@@ -24,8 +24,8 @@ def create(entry, src):
     d.text((31,h+18),'IM BILD MARKIERT',font=font(19,True),fill=INK)
     for i,m in enumerate(marks):
         num=str(i+1); x,y=int(m['x']),int(m['y'])
-        d.line((min(w-15,x+24),max(15,y-24),x,y),fill=WHITE,width=6)
-        d.line((min(w-15,x+24),max(15,y-24),x,y),fill=ACCENT,width=3)
+        d.line((max(15,x-24),min(h-15,y+24),x,y),fill=WHITE,width=6)
+        d.line((max(15,x-24),min(h-15,y+24),x,y),fill=ACCENT,width=3)
         d.ellipse((x-19,y-19,x+19,y+19),fill=ACCENT,outline=WHITE,width=3)
         box=d.textbbox((0,0),num,font=font(20,True))
         d.text((x-(box[2]-box[0])/2,y-(box[3]-box[1])/2-4),num,fill=WHITE,font=font(20,True))
