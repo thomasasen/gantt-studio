@@ -37,3 +37,15 @@ The runtime application itself has no Playwright dependency.
 
 
 **Verifizierte PR-Merge-Ref-CI der Transaktionsimplementierung `f967304`:** [43 Unit-Tests](https://github.com/thomasasen/gantt-studio/actions/runs/42227444924) und [107 Chromium-Tests plus 20 Projektwechsel-Stresstests](https://github.com/thomasasen/gantt-studio/actions/runs/42227444915), beide **SUCCESS**. Getestet wurde der berechnete Merge-Commit `800fbc2` gegen `fix/frappe-lifecycle-isolation@86de64e`. Der experimentelle Frappe-Diagnosemodus schreibt nicht in IndexedDB; die Tests beanspruchen ausdrücklich keine Schreibfreigabe.
+
+
+### Physische Frappe-Editor-API-Diagnose (Draft, Branch `spike/frappe-public-editor-api`)
+
+Aktuelle veröffentlichte Stable-Version: `frappe-gantt@1.2.2`; es gibt Stand 06.11.2026 kein neueres stabiles npm-Paket. Upstream-Issue [#494](https://github.com/frappe/gantt/issues/494) beschreibt die mehrfachen `on_date_change`-Aufrufe während des Drags.
+
+- Browser-Befehl nach `npm ci --prefix spikes/frappe && npm run build --prefix spikes/frappe`: `npx playwright test tests/frappe-public-editor-pointer.spec.cjs --workers=1 --reporter=line`.
+- Der Test `?edit=1` verwendet die ausgelieferte lokale Frappe-UMD-Bibliothek und echte Playwright-Maus-/Tastaturereignisse. Fälle: Move, Resize links, Resize rechts, Progress, Klick ohne Bewegung, Escape, Loslassen außerhalb und iframe-Neurendern während der Geste.
+- Ereignisspur je Fall: `frappe-evidence/*.json`. Enthält native Browser-Events, `on_date_change`, `on_progress_change`, Gate-Intent, Gate-Cancel und verbleibende Intents. Sie wird durch den CI-Workflow auch bei Testfehlern hochgeladen, sofern vorhanden.
+- **Abnahmegrenze:** Tests prüfen zunächst streng Negativ-Sicherheit (kein früher Commit, höchstens ein Intent, keine IndexedDB-Schreibung). Wenn keine Callback-Ereignisse eintreffen, **ist das kein Nachweis für Editor-Funktionsfähigkeit**. Positive Anforderungen wie exakt ein gültiger Endzustand bei Drag/Resize/Progress und der vollständige persistente Datenfluss bleiben gesonderte Blocker.
+- Tests in `tests/frappe-interaction-preview.spec.cjs` nutzen zu Diagnosezwecken teilweise private Upstream-Aufrufe. Sie sind **keine** Ersatznachweise für physische Pointer-Bedienung.
+- Für die aktuelle Branch-/PR-Abnahme sind vollständige Static-Validate- und Browser-CI auf finalem Head **und** PR-Merge-Ref gegen `feature/frappe-transactional-editor` erforderlich. Ein älterer Erfolg von PR #16 zählt nicht als Beleg für neue Änderungen.
