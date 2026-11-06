@@ -487,3 +487,28 @@ Native ist im 1.000-Aufgaben-Paar 2,5–8,5 % langsamer, ohne nachgewiesenen gra
 **Red-Team-Restpunkte P2:** Mehrtab-Löschkonflikte; große Vollrenders; nicht realgerätgeprüfte Touch-/Screenreader-/Firefox-/Safari-Szenarien; von späteren Aktivierungen überholte Import-Kopien. Keine aktuell nachgewiesenen offenen P0/P1 aus dem geprüften Teststand; manuelle Gerätekontrollen bleiben separat.
 
 **Dokumentations-Gate:** Dieser Abschnitt wird als neuer Commit auf dem Arbeitsbranch gespeichert. Die vorstehenden drei erfolgreichen Läufe gelten strikt für **`cbbce9d…`**, nicht automatisch für den neuen Dokumentations-Commit. Vor abschließendem READY müssen die geforderten CI-Nachweise erneut dem finalen Branch-Head zugeordnet werden. PR #13 bleibt Draft; keine Merge-Aktion.
+
+
+## 14. Experimental Frappe repairs (Draft-PR #15, 06.11.2026)
+
+**Branch:** `fix/frappe-lifecycle-isolation`. **PR:** https://github.com/thomasasen/gantt-studio/pull/15. This is a new isolated experiment, not a reversal of the NO-GO for Frappe 1.2.2 and not a merge approval. The existing application stays Native-only; no changes to the project schema or IndexedDB protocol.
+
+### A. Global listener leak: isolation instead of monkey-patching
+
+Upstream Frappe 1.2.2 registers a `document.mouseup` listener per chart with no public dispose. The existing comparison rebuilt a Frappe chart in the parent document, so removing only its SVG could not release that global listener.
+
+`assets/js/engine/frappe/frappe-adapter.mjs` now creates a fresh same-origin iframe for each render. `spikes/frappe/frame.html` / `frame.mjs` load the pinned UMD and CSS inside that child document only. Replacing/removing the iframe destroys the vendor document and its listener registrations. The parent has one explicit `message` listener per mount; it is removed on `destroy()`. Every response is checked against origin, source window, message channel and current generation to reject late or forged completion messages. No runtime CDN, no upstream modification, no global monkey-patching.
+
+The browser test `tests/frappe-isolation.spec.cjs` checks repeated rerenders, no new parent `mouseup` listeners, one live iframe, stale-message rejection, same-origin behavior and no new IndexedDB/localStorage projects. This checks *host isolation*, not full memory usage or browser GC timings.
+
+### B. Premature Frappe edit callbacks: explicit gesture gate
+
+Upstream `Bar.update_bar_position()` can invoke `on_date_change` before any valid release. Thus callbacks must never directly create a persistent project command. `assets/js/engine/frappe/frappe-gesture-gate.mjs` adds a small deterministic state machine that buffers the latest date/progress change for one active task and pointer, emits at most one `task-change` intent on a valid matching mouseup, and discards previews on Escape, Pointer-Cancel and invalid releases. Unit tests cover early callbacks, superseded previews, stale pointers, cancel, and double release.
+
+The isolated frame has an *opt-in experiment* `/spikes/frappe/index.html?edit=1`. It records emitted intents in memory only; it never calls IndexedDB and never modifies the canonical project. The regular evaluation page and all production paths remain read-only. The new `tests/frappe-interaction-preview.spec.cjs` uses the upstream bar-preview method only inside the test to check actual callback timing and cancellation. **This does not yet certify a real end-to-end mouse/keyboard editor.** The publicly advertised adapter capabilities remain read-only.
+
+### C. Still-blocking feature gaps / acceptance criteria
+
+The following remain **not implemented and therefore merge-blocking** as a full Native replacement: phase summary rows, chart-side reorder with table sync, baselines, buffers, markers, holidays, eleven themes, print/A11y parity, keyboard editing, task focus and marker navigation. The new iframe adds potential focus/scroll and large-project overhead which must be measured before production consideration. A real-browser drag/resize/progress matrix with Pointer-Cancel/Escape and successful persisted atomic commits remains an explicit separate gate.
+
+**Decision: NOT READY FOR MERGE as a production Gantt engine.** PR #15 must stay Draft. PR #14 unchanged. Native remains the only supported and productive renderer.
