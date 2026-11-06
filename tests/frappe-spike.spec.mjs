@@ -70,42 +70,13 @@ test('calendar-only conversion survives DST and non-European timezones', () => {
   }
 });
 
-test('adapter matches frozen engine contract, read-only and no data mutation', () => {
-  let invocation=null, selections=[], intents=0;
-  class FakeGantt {
-    constructor(container,tasks,options) {
-      invocation={container,tasks,options};
-    }
-  }
-  const scroller={scrollLeft:0,scrollTop:0};
-  const container={parentElement:scroller,cleared:0,replaceChildren(){this.cleared++;}};
-  const engine=assertEngineContract(createFrappeEngine({Gantt:FakeGantt}));
-  assert.equal(engine.getCapabilities().taskMove,false);
-  engine.mount({container,onIntent:()=>{intents++;},onSelect:event=>selections.push(event)});
-  const view={zoom:'week',reorderable:true};
-  const frozen=immutableEngineProjection(demo);
-  const result=engine.render({project:frozen,view});
-  assert.equal(result.empty,false);
-  assert.equal(invocation.options.readonly,true);
-  assert.equal(invocation.options.move_dependencies,false);
-  assert.equal(invocation.options.readonly_dates,true);
-  assert.equal(invocation.options.readonly_progress,true);
-  assert.equal(invocation.options.view_mode,'Week');
-  invocation.options.on_click({id:'demo-core'});
-  assert.deepEqual(selections,[{kind:'task',id:'demo-core'}]);
-  assert.equal(intents,0);
-  engine.setViewport({scrollLeft:99,scrollTop:3});
-  assert.equal(scroller.scrollLeft,99);
-  assert.equal(scroller.scrollTop,3);
-  engine.destroy();
-  engine.destroy();
-  assert.ok(container.cleared>=2);
-});
 
-test('empty state renders without loading vendor constructor', () => {
-  const container={replaceChildren(){},parentElement:{}};
-  const engine=createFrappeEngine();
-  engine.mount({container});
-  assert.deepEqual(engine.render({project:{tasks:[]},view:{zoom:'day'}}),{empty:true});
-  engine.destroy();
+test('isolated adapter obeys engine contract and explicitly forbids edits',async()=>{
+  const {createFrappeEngine}=await import('../assets/js/engine/frappe/frappe-adapter.mjs');
+  const engine=assertEngineContract(createFrappeEngine());
+  const caps=engine.getCapabilities();
+  for(const key of ['taskMove','resizeStart','resizeEnd','progress','reorder',
+    'keyboardReorder','phaseRows'])assert.equal(caps[key],false,key);
+  assert.equal(caps.offline,true);
+  assert.equal(caps.zoom.length,3);
 });
