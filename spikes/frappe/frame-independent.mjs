@@ -69,6 +69,9 @@ export function mountIndependentLayer({root,tasks,projectId,revision,record,send
     record('independent-handles',{count:overlayNodes.length});
   }
   drawHandles();
+  // Pointerdown on an SVG rect can be prevented from focusing the iframe.
+  // The editor surface must own keyboard focus for Escape to be reliable.
+  root.tabIndex=-1;
   const onDown=e=>{
     const target=e.target?.closest?.('[data-independent-kind]');
     if(!target||e.isPrimary===false||e.button!==0)return;
@@ -87,6 +90,7 @@ export function mountIndependentLayer({root,tasks,projectId,revision,record,send
     ghost.style.width=box.width+'px';ghost.style.height=box.height+'px';
     label.textContent=task.start+' – '+task.end+' · '+task.progress+' %';
     root.setPointerCapture(e.pointerId);
+    root.focus({preventScroll:true});
     record('independent-pointerdown',{kind,id,pointerId:e.pointerId,x:e.clientX});
   };
   const onMove=e=>{if(gesture.getActive()?.pointerId===e.pointerId)gesture.move(e.pointerId,e.clientX-startX);};
