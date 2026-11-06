@@ -3,16 +3,22 @@ import {mapFrappeDateChange} from '../../assets/js/engine/frappe/frappe-task-map
 
 // Executed in a disposable browsing context. The outer app stays Native-only.
 const CHANNEL='gantt-studio-frappe-isolated-v1';
-let initialized=false;
+let initialized=false,activeGate=null,activeGeneration=null;
 function reply(type,payload={}){
   window.parent.postMessage({channel:CHANNEL,type,...payload},location.origin);
 }
 window.addEventListener('message',event=>{
-  if(initialized||event.origin!==location.origin||event.source!==window.parent)return;
+  if(event.origin!==location.origin||event.source!==window.parent)return;
   const data=event.data;
-  if(!data||data.channel!==CHANNEL||data.type!=='render')return;
+  if(!data||data.channel!==CHANNEL)return;
+  if(data.type==='cancel'&&initialized&&data.generation===activeGeneration){
+    activeGate?.cancel();
+    return;
+  }
+  if(initialized||data.type!=='render')return;
   initialized=true;
   const generation=data.generation;
+  activeGeneration=generation;
   try{
     if(typeof globalThis.Gantt!=='function')throw new Error('Local Frappe UMD missing');
     const editable=data.experimentalEditable===true;
@@ -22,6 +28,7 @@ window.addEventListener('message',event=>{
       emit:intent=>reply('intent',{generation,intent}),
       rollback:()=>reply('cancelled',{generation})
     });
+    activeGate=gate;
     if(editable){
       root.addEventListener('mousedown',e=>{
         if(e.button!==0)return;
