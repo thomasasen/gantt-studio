@@ -113,3 +113,12 @@ Diese Datei ist **die zentrale Norm**; `AGENTS.md` verweist auf sie und der loka
 ## Atomare Engine-Umschaltung (experimenteller Async-Controller)
 
 Bei optionalen asynchronen Renderern bleibt der bestätigte Gantt-Baum bis zu einer eindeutigen Render-Ready-Bestätigung sichtbar und bedienbar. Eine neue Engine wird als inert, `aria-hidden`, `opacity:0` und für Pointer nicht erreichbares Geschwisterelement mit gültiger Geometrie vorbereitet. Sie darf bis zum Commit keine Projektänderungen auslösen, den Fokus übernehmen oder in der Screenreader-Reihenfolge erscheinen. Der Commit muss ohne Zwischenpaint erfolgen. Scrollposition und Tastaturfokus sind zu erhalten beziehungsweise sinnvoll auf den aktiven Container zu übertragen. Dekorative Übergänge sind untersagt; Reduced Motion und 200-%-Zoom sind zu prüfen.
+
+
+## 8. Druckdialog und druckoptimierte Seiten
+
+- Drucken verwendet einen isolierten, unveränderlichen Projektsnapshot; der produktive Gantt-Viewport ist nicht die Druckquelle. Scroll, Zoom, Bildschirmgröße und aktive Engine dürfen keine Inhalte aus dem Druck entfernen.
+- Die Bedienelemente des Druckdialogs stehen auf identischen Oberkanten mit gleicher Höhe. Einstellungen sind klar gruppiert; bei schmalen Bildschirmen wird das Bedienfeld über der Vorschau gestapelt.
+- Druckseiten besitzen einen hellen Papierhintergrund in allen Designs, klar abgesetzte Aufgabenbezeichnungen und wiederholte Zeitachsen. PDF-/Druckseitenorientierung ist aus dem tatsächlichen Dokumentlayout abgeleitet.
+- Vor der Produktivfreigabe müssen erzeugte PDF-Dateien auf Seitengröße, Vollständigkeit, Aufgabentext und visuelle Lesbarkeit geprüft werden. CSS- oder JavaScript-Syntaxtests ersetzen diesen Nachweis nicht.
+- Druckprofile und Benutzerauswahl liegen getrennt vom Projektmodell in lokalen Ansichtspräferenzen. Drucken verändert weder Projekt-Revision noch IndexedDB.
