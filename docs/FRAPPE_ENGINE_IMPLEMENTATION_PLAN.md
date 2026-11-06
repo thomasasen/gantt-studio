@@ -511,4 +511,6 @@ The isolated frame has an *opt-in experiment* `/spikes/frappe/index.html?edit=1`
 
 The following remain **not implemented and therefore merge-blocking** as a full Native replacement: phase summary rows, chart-side reorder with table sync, baselines, buffers, markers, holidays, eleven themes, print/A11y parity, keyboard editing, task focus and marker navigation. The new iframe adds potential focus/scroll and large-project overhead which must be measured before production consideration. A real-browser drag/resize/progress matrix with Pointer-Cancel/Escape and successful persisted atomic commits remains an explicit separate gate.
 
+**Weitere P1-Integrationsgrenze:** Das isolierte Frame signalisiert seinen Render-Erfolg asynchron über `postMessage`; der aktuelle `engine-controller.mjs` bestätigt Rendering und Rollback synchron. Der Experiment-Adapter darf deshalb nicht in den produktiven Controller eingehängt werden, bevor ein generationensicherer asynchroner Render-/Rollback-Vertrag oder eine gleichwertige atomare Aktivierung implementiert und getestet ist.
+
 **Decision: NOT READY FOR MERGE as a production Gantt engine.** PR #15 must stay Draft. PR #14 unchanged. Native remains the only supported and productive renderer.
