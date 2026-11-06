@@ -1,4 +1,4 @@
-import { assertEngineContract, immutableEngineProjection } from './engine-contract.mjs?v=2.9.0';
+import { assertEngineContract, immutableEngineProjection } from './engine-contract.mjs?v=2.10.0';
 
 /**
  * Owns the active adapter and the last successfully rendered immutable view.
@@ -149,4 +149,4 @@ export function createEngineController(initialFactory) {
 }
 
 // Opt-in asynchronous lifecycle; existing production controller remains synchronous.
-export {createAsyncEngineController} from './engine-async-controller.mjs?v=2.9.0';
+export {createAsyncEngineController} from './engine-async-controller.mjs?v=2.10.0';
