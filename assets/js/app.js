@@ -37,7 +37,7 @@ const projectCommitter = createProjectCommitter(saveLocal);
 const engineController = createEngineController(createNativeEngine);
 const printController = createPrintController({
   getProject: () => envelope.project,
-  getContext: () => ({ filteredTaskIds: filteredBaseTasks().map(task => task.id), sortMode: taskSortMode }),
+  getContext: () => ({ filteredTaskIds: filteredBaseTasks().map(task => task.id), collapsedPhaseIds: [...collapsedPhases], sortMode: taskSortMode }),
   onError: error => console.error('Druckansicht:', error)
 });
 const projectActivation = createProjectActivationCoordinator({
