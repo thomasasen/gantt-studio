@@ -15,12 +15,16 @@ test('vendor document listeners remain isolated through repeated renders',async(
   const bars=page.frameLocator('#frappeRoot iframe').locator('.bar-wrapper');
   await expect(bars).toHaveCount(10);
   const initial=await page.evaluate(()=>window.__hostMouseups.length);
+  const firstFrame=page.frames().find(f=>f.url().includes('/spikes/frappe/frame.html'));
+  expect(firstFrame).toBeTruthy();
+  expect(await firstFrame.evaluate(()=>window.__hostMouseups.length)).toBeGreaterThan(0);
   for(let i=0;i<7;i++){
     await page.locator('#reloadBtn').click();
     await expect(page.locator('#status')).toContainText('Frappe: gerendert');
     await expect(bars).toHaveCount(10);
   }
   expect(await page.evaluate(()=>window.__hostMouseups.length)).toBe(initial);
+  expect(firstFrame.isDetached()).toBe(true);
   await expect(page.locator('#frappeRoot iframe')).toHaveCount(1);
   expect(await page.evaluate(async()=>({db:await indexedDB.databases(),local:localStorage.length})))
     .toEqual({db:[],local:0});
