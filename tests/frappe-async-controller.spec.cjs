@@ -189,6 +189,7 @@ test('atomic stage preserves visible DOM until a real frame is allowed to load',
   await expect(stage).toBeHidden();
   expect(await stage.evaluate(el=>el.inert)).toBe(true);
   expect(await old.evaluate(el=>el.getBoundingClientRect().height)).toBeGreaterThan(0);
+  expect(await old.evaluate(el=>el.parentElement.style.position)).toBe('');
   const during=await page.evaluate(()=>({
    stageCount:document.querySelectorAll('#atomic-old + div[aria-hidden="true"] iframe').length,
    nativeAlive:document.getElementById('atomic-old').textContent==='CONFIRMED CHART'
@@ -265,12 +266,14 @@ test('commit preserves scroll and transfers keyboard focus, including 200 percen
    viewport.scrollLeft=82;viewport.scrollTop=105;
    host.querySelector('button').focus({preventScroll:true});
    const wasFocused=document.activeElement.textContent==='Old focused task';
+   const originalSize={width:host.offsetWidth,height:host.offsetHeight};
    const switched=await c.switchEngine(createFrappeEngine);
    const newRoot=viewport.firstElementChild;
    return {
     switched,wasFocused,focusTransferred:document.activeElement===newRoot,
     left:viewport.scrollLeft,top:viewport.scrollTop,
     active:newRoot.inert===false && !newRoot.hasAttribute('aria-hidden'),
+    sizePreserved:newRoot.offsetWidth===originalSize.width && newRoot.offsetHeight===originalSize.height,
     frames:viewport.querySelectorAll('iframe').length,
     oldRemoved:!viewport.contains(host)
    };
@@ -280,6 +283,6 @@ test('commit preserves scroll and transfers keyboard focus, including 200 percen
  });
  expect(result).toEqual({
   switched:true,wasFocused:true,focusTransferred:true,
-  left:82,top:105,active:true,frames:1,oldRemoved:true
+  left:82,top:105,active:true,sizePreserved:true,frames:1,oldRemoved:true
  });
 });
