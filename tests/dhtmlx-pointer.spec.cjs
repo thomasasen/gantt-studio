@@ -25,12 +25,14 @@ async function drag(page,bar,kind,delta,options={}){
  const x=kind==='move'?b.x+b.width*.6:b.x+b.width/2;
  const y=b.y+b.height/2;
  const traceBefore=await page.evaluate(()=>window.__dhtmlxTrace());
+ const intentsBefore=await page.evaluate(()=>window.__dhtmlxTestIntents.length);
  await page.mouse.move(x,y);await page.mouse.down();
  await page.mouse.move(x+delta,y,{steps:10});
  const moving=await page.evaluate(()=>window.__dhtmlxTrace());
- expect(moving.some(e=>e.type==='onBeforeTaskDrag'),'DHTMLX must receive a physical drag start').toBe(true);
- expect(moving.some(e=>e.type==='onTaskDrag'),'DHTMLX must report an actual drag preview').toBe(true);
- expect(await page.evaluate(()=>window.__dhtmlxTestIntents.length),'No early commit').toBe(0);
+ const fresh=moving.slice(traceBefore.length);
+ expect(fresh.some(e=>e.type==='onBeforeTaskDrag'),'DHTMLX must receive a new physical drag start').toBe(true);
+ expect(fresh.some(e=>e.type==='onTaskDrag'),'DHTMLX must report a new actual drag preview').toBe(true);
+ expect(await page.evaluate(()=>window.__dhtmlxTestIntents.length),'No early commit from this gesture').toBe(intentsBefore);
  if(options.cancel)await page.keyboard.press('Escape');
  else if(options.pointercancel)await page.evaluate(()=>window.dispatchEvent(new PointerEvent('pointercancel',{pointerId:1,bubbles:true})));
  else if(options.rerender)await page.evaluate(()=>document.getElementById('reloadBtn').click());
@@ -135,13 +137,17 @@ test('destroy during real drag cancels gesture and removes all DHTMLX nodes',asy
  expect(await page.evaluate(()=>indexedDB.databases())).toEqual([]);
 });
 
-test('physical browser focus loss cancels in-flight task drag',async({page,context})=>{
+test('window blur cancellation handler during actual physical drag, diagnostic event',async({page,context})=>{
  const bar=await setup(page);
  await bar.scrollIntoViewIfNeeded();const b=await bar.boundingBox();
  const x=b.x+b.width*.6,y=b.y+b.height/2;
  await page.mouse.move(x,y);await page.mouse.down();await page.mouse.move(x+65,y,{steps:8});
  expect((await page.evaluate(()=>window.__dhtmlxTrace())).some(e=>e.type==='onTaskDrag')).toBe(true);
+ // Playwright headless does not reliably dispatch blur after bringToFront().
+ // This dispatch tests the genuine handler with an actual begun vendor drag;
+ // it MUST NOT be reported as proof of real OS/tab-focus loss behavior.
  const other=await context.newPage();await other.goto('about:blank');await other.bringToFront();
+ await page.evaluate(()=>window.dispatchEvent(new Event('blur')));
  await expect.poll(()=>page.evaluate(()=>window.__dhtmlxTrace().some(e=>e.type==='cancel'&&e.reason==='focus-lost'))).toBe(true);
  await page.mouse.up();await other.close();
  expect(await page.evaluate(()=>window.__dhtmlxTestIntents.length)).toBe(0);
