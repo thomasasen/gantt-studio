@@ -1,6 +1,6 @@
-import { renderGantt } from '../../gantt.js?v=2.10.0';
-import { createNativeInteractions } from './native-interactions.mjs?v=2.10.0';
-import { captureEngineIntentScope } from '../../core/engine-intent-scope.mjs?v=2.10.0';
+import { renderGantt } from '../../gantt.js?v=2.11.0';
+import { createNativeInteractions } from './native-interactions.mjs?v=2.11.0';
+import { captureEngineIntentScope } from '../../core/engine-intent-scope.mjs?v=2.11.0';
 
 const CAPABILITIES=Object.freeze({
   id:'native', zoom:Object.freeze(['day','week','month']),
