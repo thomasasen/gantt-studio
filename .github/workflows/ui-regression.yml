@@ -36,6 +36,8 @@ jobs:
           node --check spikes/dhtmlx/spike.mjs
           node --check spikes/dhtmlx/build.mjs
           node --check tests/dhtmlx-pointer.spec.cjs
+          node --check tests/dhtmlx-performance.spec.cjs
+          node --check spikes/dhtmlx/bench.mjs
           node --check assets/js/icons.mjs
           node --check assets/js/task-order.mjs
           node --check assets/js/design-presets.mjs
@@ -119,6 +121,13 @@ jobs:
         with:
           name: apple-design-qa
           path: design-audit/
+          if-no-files-found: ignore
+      - name: Upload DHTMLX comparison performance measurements
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dhtmlx-community-performance
+          path: performance-results/dhtmlx-community-10.0.3.json
           if-no-files-found: ignore
       - name: Upload native performance measurements
         if: always()
