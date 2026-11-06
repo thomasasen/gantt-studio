@@ -186,3 +186,30 @@ test('sessions are fenced after replacement or destroy',async()=>{
   assert.equal(await t.editor.submit(next),false);
   assert.equal(t.writes.length,0);
 });
+
+test('pending save cannot publish into a new project even without explicit invalidate',async()=>{
+  let release,started;
+  const gate=new Promise(r=>{release=r;});
+  const startedP=new Promise(r=>{started=r;});
+  const t=setup({save:async()=>{started();await gate;}});
+  const token=t.open();
+  t.editor.preview(token,intent({progress:91}));
+  const pending=t.editor.submit(token);
+  await startedP;
+  t.setCurrent(project('other-active-project')); // host missed invalidate()
+  release();
+  assert.equal(await pending,false);
+  assert.equal(t.current().id,'other-active-project');
+  assert.equal(t.current().tasks[0].progress,0);
+  assert.equal(t.writes.length,1);
+});
+test('concurrent same-project revision change is caught inside serialized command',async()=>{
+  const t=setup(),token=t.open();
+  t.editor.preview(token,intent({progress:88}));
+  const updated=await t.committer.commit(t.current(),p=>{p.tasks[1].end='2026-01-03';});
+  assert.equal(updated.changed,true);
+  // The caller still has an old snapshot; the queued command cannot write it.
+  assert.equal(await t.editor.submit(token),false);
+  assert.equal(t.writes.length,1);
+  assert.equal(t.writes[0].tasks[0].progress,0);
+});
