@@ -234,3 +234,52 @@ test('failed staged iframe does not destroy or re-render old DOM across viewport
   });
  }
 });
+
+
+test('commit preserves scroll and transfers keyboard focus, including 200 percent zoom',async({page})=>{
+ await page.goto('/spikes/frappe/index.html');
+ await expect(page.locator('#status')).toContainText('Frappe: gerendert');
+ await page.emulateMedia({reducedMotion:'reduce'});
+ const result=await page.evaluate(async()=>{
+  document.documentElement.style.zoom='200%';
+  const {createAsyncEngineController}=await import('/assets/js/engine/engine-controller.mjs?v=2.8.1');
+  const {createFrappeEngine}=await import('/assets/js/engine/frappe/frappe-adapter.mjs?v=2.8.1');
+  const viewport=document.createElement('div');
+  viewport.style.cssText='width:500px;height:220px;overflow:auto;position:relative';
+  const host=document.createElement('div');host.style.cssText='width:850px;height:700px';
+  viewport.append(host);document.body.append(viewport);
+  const caps=Object.freeze({id:'focus-old'});
+  const c=createAsyncEngineController(()=>{let root;return{
+   mount(o){root=o.container;},render(){
+    root.innerHTML='<button data-task-id="t">Old focused task</button>';
+    return{empty:false};
+   },setViewport(){},cancelInteraction(){},locateMarker(){return null;},
+   focusTask(){return false;},destroy(){root?.replaceChildren();root=null;},
+   getCapabilities(){return caps;}
+  };});
+  try{
+   c.mount({container:host,onError:()=>{}});
+   await c.render({project:{id:'focus',tasks:[{
+    id:'t',name:'Task',start:'2026-11-01',end:'2026-11-04'
+   }]},view:{zoom:'week',reorderable:false}});
+   viewport.scrollLeft=82;viewport.scrollTop=105;
+   host.querySelector('button').focus({preventScroll:true});
+   const wasFocused=document.activeElement.textContent==='Old focused task';
+   const switched=await c.switchEngine(createFrappeEngine);
+   const newRoot=viewport.firstElementChild;
+   return {
+    switched,wasFocused,focusTransferred:document.activeElement===newRoot,
+    left:viewport.scrollLeft,top:viewport.scrollTop,
+    active:newRoot.inert===false && !newRoot.hasAttribute('aria-hidden'),
+    frames:viewport.querySelectorAll('iframe').length,
+    oldRemoved:!viewport.contains(host)
+   };
+  }finally{
+   c.destroy();viewport.remove();document.documentElement.style.zoom='';
+  }
+ });
+ expect(result).toEqual({
+  switched:true,wasFocused:true,focusTransferred:true,
+  left:82,top:105,active:true,frames:1,oldRemoved:true
+ });
+});
