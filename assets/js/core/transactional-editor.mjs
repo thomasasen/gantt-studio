@@ -82,7 +82,8 @@ export function createTransactionalEditor({
     catch(error) { try { onError(error); } catch (_) {} }
   };
   function invalidate() {
-    if (session && (state === 'preview' || state === 'pending')) restore(session);
+    if (session && (state === 'preview' || state === 'pending')
+        && projectMatches(session)) restore(session);
     session = null;
     ++counter;
     notify('idle');
