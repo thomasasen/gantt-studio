@@ -136,7 +136,8 @@ export function paginatePrint(projection) {
   const heightFor=row=>{
     const label=s.names?String(row.name||''):String(row.id||'');
     const lines=Math.max(1,Math.ceil(label.length/charsPerLine));
-    const extras=(s.owners&&row.owner?4:0)+(s.dates?4:0)+(s.dependencies&&row.dependencies?.length?4:0);
+    const extras=(s.owners&&row.owner?4:0)+(s.dates?4:0)+(s.dependencies&&row.dependencies?.length?4:0)+
+      (s.progress&&row.type!=='milestone'&&row.type!=='gate'?4:0)+(s.risks&&row.risk&&row.risk!=='none'?4:0);
     return Math.max(rowHeight,2+lines*s.fontSize*.43+extras);
   };
   const bands=[];let active=[],used=0;
