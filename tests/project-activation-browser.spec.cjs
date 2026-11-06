@@ -50,12 +50,12 @@ test('held IndexedDB read cannot overtake a newer project selection',async({page
   await page.evaluate(id=>{
     const get=IDBObjectStore.prototype.get,waiting=[];
     window.__projectReadGate={
-      waiting,
-      release(){for(const resolve of waiting.splice(0))resolve();}
+      waiting, enabled:true,
+      release(){this.enabled=false;for(const resolve of waiting.splice(0))resolve();}
     };
     IDBObjectStore.prototype.get=function(key){
       const request=get.call(this,key);
-      if(this.transaction.mode!=='readonly'||String(key)!==id)return request;
+      if(this.transaction.mode!=='readonly'||String(key)!==id||!window.__projectReadGate.enabled)return request;
       return new Proxy(request,{
         get(target,property){return Reflect.get(target,property,target);},
         set(target,property,value){
