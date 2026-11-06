@@ -72,7 +72,7 @@ test('7: A3 ist physikalisch größer und Hochformat orientiert',()=>{
   assert.deepEqual([b.pageWidth,b.pageHeight],[210,297]);
 });
 test('8: eine Seite für kleine Projekte, sichere Mehrseiten-Warnung bei großen',()=>{
-  const small=fixture(1);small.planning.markers=[];
+  const small=fixture(1);small.planning.markers=[];small.planning.phases=[];small.tasks[0].phaseId='';
   const a=prepare(small,{strategy:'one-page'}).layout;
   assert.equal(a.pages.length,1);
   const b=prepare(fixture(190,5),{strategy:'one-page'}).layout;
