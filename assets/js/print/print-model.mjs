@@ -116,13 +116,30 @@ export function paginatePrint(projection) {
   // If one-page scaling is illegible, retain minimum row size and paginate vertically.
   rowHeight=Math.max(6,rowHeight);
   const perCol=Math.max(1,Math.floor(timeW/mmPerDay));
-  const perRow=Math.max(1,Math.floor((usableH-overhead)/rowHeight));
-  const horizontal=Math.ceil(dayCount/perCol),vertical=Math.max(1,Math.ceil(rows.length/perRow));
+  const horizontal=Math.ceil(dayCount/perCol);
+  // Content-aware row packing: long descriptions occupy full lines, not ellipses.
+  // The estimate intentionally over-reserves space for wide glyphs.
+  const charsPerLine=Math.max(8,Math.floor((labelW-4)/(s.fontSize*.21)));
+  const heightFor=row=>{
+    const label=s.names?String(row.name||''):String(row.id||'');
+    const lines=Math.max(1,Math.ceil(label.length/charsPerLine));
+    const extras=(s.owners&&row.owner?4:0)+(s.dates?4:0);
+    return Math.max(rowHeight,2+lines*s.fontSize*.43+extras);
+  };
+  const bands=[];let active=[],used=0;
+  const maxRowsHeight=Math.max(rowHeight,usableH-overhead);
+  for(const row of rows) {
+    const height=Math.min(maxRowsHeight,heightFor(row));
+    if(active.length&&used+height>maxRowsHeight){bands.push(active);active=[];used=0;}
+    active.push({row,height});used+=height;
+  }
+  if(active.length||!bands.length)bands.push(active);
+  const vertical=bands.length;
   const pages=[];
   for(let y=0;y<vertical;y++)for(let x=0;x<horizontal;x++){
     const from=add(projection.from,x*perCol),to=add(from,Math.min(perCol,dayCount-x*perCol)-1);
     pages.push({index:pages.length+1,x:x+1,y:y+1,from,to,
-      rows:rows.slice(y*perRow,(y+1)*perRow)});
+      rows:bands[y].map(entry=>entry.row),rowHeights:bands[y].map(entry=>entry.height)});
   }
   if(pages.length>120)warn.push('Sehr großer Ausdruck: '+pages.length+' Seiten. Zeitraum oder Aufgaben einschränken.');
   return {pages,pageCount:pages.length,horizontal,vertical,w,h,orientation,usableW,usableH,
