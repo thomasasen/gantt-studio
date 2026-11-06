@@ -84,8 +84,10 @@ test('PDF verwendet vollständige SVG-Seiten statt Viewport-Screenshots',async({
 test('Druckvorschau bleibt bei Projektwechsel stabil und ist bei 200 Prozent bedienbar',async({page})=>{
   dir();await page.setViewportSize({width:390,height:760});await page.goto('/');
   await page.locator('#loadDemoBtn').click();
+  await expect(page.locator('#projectName')).toHaveValue('Dynamisches Demo-Projekt');
   const demo=await page.locator('#projectSelect').inputValue();
   await page.locator('#loadDemoBtn').click();
+  await expect(page.locator('#projectName')).toHaveValue('Dynamisches Demo-Projekt (2)');
   await page.locator('#projectSelect').selectOption(demo);
   await expect(page.locator('#projectName')).toHaveValue('Dynamisches Demo-Projekt');
   await openPrint(page);
