@@ -50,7 +50,7 @@ jobs:
       - name: Check real export interactions in Chromium
         run: |
           mkdir -p visual-review
-          npx playwright test tests/export-format-labels.spec.cjs tests/print-image.spec.cjs --workers=1 --reporter=line
+          CI= npx playwright test tests/export-format-labels.spec.cjs tests/print-image.spec.cjs --workers=1 --reporter=line
       - name: Commit generated documentation images
         env:
           BRANCH_NAME: ${{ github.ref_name }}
