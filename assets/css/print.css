@@ -38,3 +38,47 @@
 .print-profile-save input,.print-profile-save select{border:1px solid var(--border,#cdd8dd);background:var(--panel,#fff);color:var(--ink,#253746);padding:0 8px;min-width:0}
 #printSavedProfiles{grid-column:1 / -1;width:100%}
 @media(max-width:850px){.print-profile-save{padding:8px 12px}}
+
+
+/* Aligned field and action geometry; labels always reserve their own row. */
+.print-fields{gap:12px 10px}
+.print-fields label{display:grid;grid-template-rows:18px 42px;gap:6px;align-items:stretch;min-width:0}
+.print-fields label>span{min-height:18px;line-height:18px;white-space:nowrap;text-overflow:ellipsis;overflow:hidden}
+.print-fields input,.print-fields select{height:42px;min-height:42px;box-sizing:border-box}
+.print-field-wide{grid-column:1/-1}
+.print-format-hint{font-size:12px;line-height:1.5;margin:12px 0 2px;color:var(--muted,#526b79)}
+.print-profile-save{grid-template-columns:minmax(0,1fr) minmax(88px,auto);gap:10px;align-items:end}
+.print-profile-save label{display:grid;grid-template-rows:18px 42px;gap:6px}
+.print-profile-save label>span{line-height:18px}
+.print-profile-save :is(input,select,button){height:42px;min-height:42px;box-sizing:border-box}
+.print-profile-save>button{margin:0;min-width:88px}
+#printSavedProfiles{grid-column:1/-1}
+.print-actions{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px;align-items:stretch}
+.print-actions button{min-width:0;min-height:42px;width:100%;display:inline-flex;align-items:center;justify-content:center}
+.print-export-status{font-size:12px;line-height:1.45;padding:0 20px;color:var(--muted,#526b79)}
+.print-export-status:empty{display:none}
+.print-export-status:not(:empty){padding-top:10px}
+.print-preview-head{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:8px 12px;min-height:61px}
+.print-preview-head strong{min-width:0;line-height:1.4}
+#printWarning{grid-column:1/-1;grid-row:2}
+#printWarning:empty{display:none}
+.print-page-tools{justify-content:flex-end;flex-wrap:nowrap;grid-column:2;grid-row:1;min-height:36px}
+.print-page-tools[hidden]{display:none!important}
+.print-page-tools button{height:36px;min-height:36px;min-width:36px;box-sizing:border-box}
+.print-page-tools output{height:36px;min-width:54px;display:inline-flex;align-items:center;justify-content:center}
+.print-page-tools label{height:36px}
+#printPreviewZoom{width:86px}
+@media(max-width:850px){
+ .print-profile-save{padding:10px 12px}
+ .print-actions{padding:10px 12px}
+ .print-export-status{padding-left:12px;padding-right:12px}
+}
+@media(max-width:650px){
+ .print-page-tools{width:auto;justify-content:flex-start;grid-column:1/-1;grid-row:2}
+ #printWarning:not(:empty){grid-row:3}
+ .print-preview-head{grid-template-columns:minmax(0,1fr)}
+}
+@media(max-width:430px){
+ .print-fields label>span{font-size:11px}
+ .print-fields input,.print-fields select{padding-inline:6px}
+}
