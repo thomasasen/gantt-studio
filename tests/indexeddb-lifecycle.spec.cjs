@@ -2,6 +2,7 @@ const {test,expect}=require('@playwright/test');
 
 test('repeated project listing and reading close IndexedDB connections',async({page})=>{
   await page.goto('/');
+  await expect(page.locator('#projectSelect')).not.toHaveValue('');
   const observed=await page.evaluate(async()=>{
     const {listProjects,loadProject}=await import('/assets/js/storage.js?v=2.8.0');
     const id=document.querySelector('#projectSelect').value;
