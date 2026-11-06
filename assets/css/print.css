@@ -24,3 +24,10 @@
 .print-selection-list{max-height:230px;overflow:auto;display:grid;gap:3px}
 .print-selection-item{display:flex;gap:9px;align-items:flex-start;min-height:32px;padding:6px 4px;font-size:12px;overflow-wrap:anywhere}
 .print-selection-item input{flex:none;width:16px;height:16px}
+
+.print-page-tools{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.print-page-tools button{min-width:36px;min-height:34px;padding:5px 9px}
+.print-page-tools output{font-size:12px;min-width:36px;text-align:center;font-variant-numeric:tabular-nums}
+.print-page-tools label{display:flex;align-items:center;gap:6px;font-size:12px;white-space:nowrap}
+#printPreviewZoom{width:88px;accent-color:#26778e}
+@media(max-width:650px){.print-page-tools{width:100%;justify-content:center}}
