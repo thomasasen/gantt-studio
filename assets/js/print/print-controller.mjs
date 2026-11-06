@@ -181,6 +181,9 @@ export function createPrintController(getCurrent) {
     iframe.title='Gantt-Druckdokument';iframe.setAttribute('aria-hidden','true');
     iframe.style.cssText='position:fixed;left:-10000px;top:0;width:0;height:0;border:0';
     outputFrame=iframe;
+    // Assign srcdoc before attaching the iframe: avoid printing the initial
+    // about:blank document if that navigation emits its own load event.
+    iframe.srcdoc=html;
     iframe.addEventListener('load',()=>{
       if(outputFrame!==iframe)return;
       const win=iframe.contentWindow;
@@ -188,7 +191,7 @@ export function createPrintController(getCurrent) {
       win.addEventListener('afterprint',cleanupFrame,{once:true});
       try{win.focus();win.print();}catch(error){status.textContent='Browserdruck fehlgeschlagen: '+error.message;cleanupFrame();}
     },{once:true});
-    document.body.appendChild(iframe);iframe.srcdoc=html;
+    document.body.appendChild(iframe);
     window.setTimeout(()=>{if(outputFrame===iframe)cleanupFrame();},120000);
   }
   $('printClose').addEventListener('click',close);
