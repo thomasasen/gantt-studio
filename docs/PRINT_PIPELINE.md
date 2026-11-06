@@ -2,6 +2,8 @@
 
 ## Ausgabeformate
 
+Der Export-Einstieg lautet **„Diagramm / PDF exportieren“**. Der Dialog erklärt die Ausgabearten: **„PDF drucken / speichern“** öffnet den Browserdruckdialog; **„PNG-Bild exportieren“** und **„JPG-Bild exportieren“** speichern das ganze Gantt-Diagramm als einzelne Bilddatei. Die Beschriftung des Hauptbuttons wechselt mit dem gewählten Format.
+
 - **PDF:** Mehrseitiger Ausdruck über den Browserdruckdialog, A4/A3 und Hoch-/Querformat.
 - **PNG/JPG:** Ein einziges zusammenhängendes Bild des vollständigen Gantt-Diagramms; keine Papierseiten, keine ZIP-Datei und kein Screenshot des Viewports. Aufgaben- und Zeitraumauswahl werden aus demselben unveränderlichen Projekt-Snapshot übernommen.
 - Die SVG-Bildkomposition verwendet eine eigene Aufgaben-/Zeitachsenprojektion einschließlich Phasen, Meilensteinen, Balken, Fortschritt, Markern, Baselines und Abhängigkeiten. SVG wird lokal über Canvas in PNG beziehungsweise JPG umgewandelt.
