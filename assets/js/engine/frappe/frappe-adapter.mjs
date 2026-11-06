@@ -86,7 +86,11 @@ export function createFrappeEngine({experimentalEditable=false}={}) {
       if(scroller&&Number.isFinite(next.scrollLeft))scroller.scrollLeft=next.scrollLeft;
       if(scroller&&Number.isFinite(next.scrollTop))scroller.scrollTop=next.scrollTop;
     },
-    cancelInteraction() { /* Vendor editing is disabled. */ },
+    cancelInteraction() {
+      if(experimentalEditable&&frame?.contentWindow){
+        frame.contentWindow.postMessage({channel:CHANNEL,type:'cancel',generation},location.origin);
+      }
+    },
     locateMarker(){return null;},
     focusTask(){return false;},
     destroy(){
