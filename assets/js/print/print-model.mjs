@@ -10,6 +10,7 @@ const clamp = (n,min,max) => Math.max(min,Math.min(max,n));
 const deepFreeze = value => { if(value && typeof value==='object' && !Object.isFrozen(value)){ Object.freeze(value); for(const item of Object.values(value)) deepFreeze(item); } return value; };
 export const PRINT_DEFAULTS = Object.freeze({
   profile:'detail', paper:'A4', orientation:'landscape', strategy:'readable',
+  format:'pdf', imageScope:'all', imageScale:2, jpegQuality:90,
   margin:12, scale:100, labelWidth:57, rowHeight:9, fontSize:9,
   scope:'all', selectedPhaseIds:[], selectedTaskIds:[], expandCollapsed:true, range:'full', from:'', to:'', color:true,
   names:true, owners:true, status:true, progress:true, dates:false,
@@ -22,12 +23,15 @@ export function sanitizePrintSettings(input={}) {
   const s={...PRINT_DEFAULTS,...input};
   for(const [key,values] of Object.entries({
     profile:['management','detail','custom'],paper:['A4','A3'],
+    format:['pdf','png','jpg'],imageScope:['all','current'],
     orientation:['portrait','landscape','auto'],
     strategy:['one','fitWidth','readable','manual'],
     scope:['all','filtered','milestones','phases','selected'],range:['full','custom','month','quarter']
   })) if(!values.includes(s[key])) s[key]=PRINT_DEFAULTS[key];
   for(const [key,min,max] of [['margin',5,30],['scale',30,200],['labelWidth',32,100],['rowHeight',6,16],['fontSize',7,14]])
     s[key]=clamp(Number(s[key])||PRINT_DEFAULTS[key],min,max);
+  s.imageScale=[1,2,3].includes(Number(s.imageScale))?Number(s.imageScale):PRINT_DEFAULTS.imageScale;
+  s.jpegQuality=[80,90,100].includes(Number(s.jpegQuality))?Number(s.jpegQuality):PRINT_DEFAULTS.jpegQuality;
   for(const key of ['color','names','owners','status','progress','dates','phases','milestones','dependencies','baseline','markers','weekends','holidays','buffers','risks','today','expandCollapsed','legend','header','footer'])
     s[key]=Boolean(s[key]);
   for(const key of ['selectedPhaseIds','selectedTaskIds'])s[key]=Array.isArray(s[key])?[...new Set(s[key].filter(x=>typeof x==='string').slice(0,2000))]:[];
