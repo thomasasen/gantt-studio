@@ -18,3 +18,9 @@
 .print-dialog :is(button,input,select):focus-visible{outline:3px solid #3d86c5;outline-offset:2px}
 @media(max-width:850px){.print-dialog{height:96dvh;width:98vw}.print-dialog-body{grid-template-columns:1fr;grid-template-rows:minmax(190px,1fr) minmax(180px,1fr)}.print-controls{border-right:0;border-bottom:1px solid var(--border,#d7e1e5)}.print-dialog-head{padding:12px 16px}.print-dialog-head h2{font-size:17px}.print-dialog-head p{font-size:11px}#printOptions{padding:12px}.print-actions{padding:8px 12px}.print-toggles{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:430px){.print-fields{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px 6px}.print-fields label{font-size:11px}.print-dialog-head p{display:none}}
+
+.print-selection{border:1px solid var(--border,#ccd5da);border-radius:8px;margin:18px 0 0;padding:12px}
+.print-selection legend{font-size:13px;font-weight:700;padding:0 6px}
+.print-selection-list{max-height:230px;overflow:auto;display:grid;gap:3px}
+.print-selection-item{display:flex;gap:9px;align-items:flex-start;min-height:32px;padding:6px 4px;font-size:12px;overflow-wrap:anywhere}
+.print-selection-item input{flex:none;width:16px;height:16px}
