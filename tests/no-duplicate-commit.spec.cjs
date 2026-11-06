@@ -25,6 +25,8 @@ test('rapid duplicate marker save is committed exactly once',async({page})=>{
   await page.goto('/');
   await expect(page.locator('#projectSelect')).not.toHaveValue('');
   await page.locator('#planningTabBtn').click();
+  await page.locator('#markerSection summary').click();
+  await expect(page.locator('#addMarkerBtn')).toBeVisible();
   await page.locator('#addMarkerBtn').click();
   await expect(page.locator('#entityDialog')).toBeVisible();
   await page.locator('#entityName').fill('Only one marker');
