@@ -187,9 +187,8 @@ export function createAsyncEngineController(initialFactory) {
       }
     };
   }
-  function focusAfterCommit(oldContainer, newContainer) {
+  function focusAfterCommit(oldContainer, newContainer, focused) {
     if (typeof document === 'undefined') return;
-    const focused = document.activeElement;
     if (!focused || !oldContainer?.contains(focused)) return;
     const taskId = focused.closest?.('[data-task-id]')?.dataset.taskId;
     const control = focused.closest?.('[data-gantt-order-handle]') ? 'reorder' : 'task';
@@ -312,6 +311,7 @@ export function createAsyncEngineController(initialFactory) {
             : lastViewport;
           await awaitAbortable(applyViewport(next, viewport), signal);
           if (!current(token)) return superseded();
+          const focusBeforeCommit = typeof document !== 'undefined' ? document.activeElement : null;
           const undo = staging.activate();
           try {
             engine = next;
@@ -323,7 +323,7 @@ export function createAsyncEngineController(initialFactory) {
             engine = old; activeContainer = oldContainer;
             throw error;
           }
-          focusAfterCommit(oldContainer, activeContainer);
+          focusAfterCommit(oldContainer, activeContainer, focusBeforeCommit);
           // Cleanup is post-commit. Its failure is reported, never rolled back
           // by reactivating an already destroyed / detached old engine.
           const errors = destroySafely(old);
