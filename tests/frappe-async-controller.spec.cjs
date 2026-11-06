@@ -269,19 +269,30 @@ test('commit preserves scroll and transfers keyboard focus, including 200 percen
    const originalSize={width:host.offsetWidth,height:host.offsetHeight};
    const switched=await c.switchEngine(createFrappeEngine);
    const newRoot=viewport.firstElementChild;
+   const computed=getComputedStyle(newRoot);
+   const afterEngine=document.activeElement===newRoot;
+   newRoot.tabIndex=0;newRoot.focus();
+   const afterManual=document.activeElement===newRoot;
    return {
-    switched,wasFocused,focusTransferred:document.activeElement===newRoot,
+    switched,wasFocused,focusTransferred:afterEngine,
     left:viewport.scrollLeft,top:viewport.scrollTop,
     active:newRoot.inert===false && !newRoot.hasAttribute('aria-hidden'),
     sizePreserved:newRoot.offsetWidth===originalSize.width && newRoot.offsetHeight===originalSize.height,
     frames:viewport.querySelectorAll('iframe').length,
-    oldRemoved:!viewport.contains(host)
+    oldRemoved:!viewport.contains(host),
+    debug:{afterManual,visibility:computed.visibility,display:computed.display,
+      inlineVisibility:newRoot.style.visibility,bodyVisibility:getComputedStyle(document.body).visibility,
+      viewportVisibility:getComputedStyle(viewport).visibility,
+      computedPointerEvents:computed.pointerEvents,connected:newRoot.isConnected,
+      parentInert:viewport.inert,parentAria:viewport.getAttribute('aria-hidden'),
+      tabIndex:newRoot.tabIndex,focusElement:document.activeElement?.outerHTML?.slice(0,180)}
    };
   }finally{
    c.destroy();viewport.remove();document.documentElement.style.zoom='';
   }
  });
- expect(result).toEqual({
+ console.log('FOCUS_STATE_QA '+JSON.stringify(result.debug));
+ expect(result).toMatchObject({
   switched:true,wasFocused:true,focusTransferred:true,
   left:82,top:105,active:true,sizePreserved:true,frames:1,oldRemoved:true
  });
