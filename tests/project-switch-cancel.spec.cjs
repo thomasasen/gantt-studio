@@ -46,7 +46,19 @@ test('switching projects during Gantt drag discards the preview',async({page})=>
   // is displayed before capturing its id.
   await expect(page.locator('#taskTableBody tr[data-task-row-id]')).toHaveCount(0);
   const targetId=await page.locator('#projectSelect').inputValue();
+  expect(targetId,'new project must have its own selected id').not.toBe(sourceId);
   await page.locator('#projectSelect').selectOption(sourceId);
+  const diagnostic=await page.evaluate(async source=>{
+    const {loadProject}=await import('/assets/js/storage.js?v=2.8.0');
+    return {selected:document.querySelector('#projectSelect').value,
+      options:[...document.querySelector('#projectSelect').options].map(o=>o.value),
+      name:document.querySelector('#projectName').value,
+      rows:document.querySelectorAll('#taskTableBody tr[data-task-row-id]').length,
+      bars:document.querySelectorAll('#ganttStage .gantt-bar[data-task-id]').length,
+      sourceStoredTasks:(await loadProject(source))?.tasks?.length,
+      toast:document.querySelector('#toast').textContent};
+  },sourceId);
+  console.log('PROJECT_SWITCH_PROBE '+JSON.stringify(diagnostic));
   await expect(page.locator('#projectSelect')).toHaveValue(sourceId);
   await expect(page.locator('#taskTableBody tr[data-task-row-id]')).toHaveCount(10);
   await expect(bar).toBeVisible();
