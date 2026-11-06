@@ -284,6 +284,11 @@ export function createAsyncEngineController(initialFactory) {
       return schedule(async (token, signal) => {
         const old = engine;
         const oldContainer = activeContainer;
+        // An iframe may steal browser focus while loading, even when its
+        // staging host is inert. Capture the old focus before any preparation.
+        const focusAtPrepare = typeof document !== 'undefined'
+          && oldContainer?.contains(document.activeElement)
+          ? document.activeElement : null;
         let next, staging, committed = false;
         phase = 'preparing';
         try {
@@ -314,7 +319,14 @@ export function createAsyncEngineController(initialFactory) {
             : lastViewport;
           await awaitAbortable(applyViewport(next, viewport), signal);
           if (!current(token)) return superseded();
-          const focusBeforeCommit = typeof document !== 'undefined' ? document.activeElement : null;
+          const currentFocus = typeof document !== 'undefined' ? document.activeElement : null;
+          // Respect a deliberate focus move to another UI control. Otherwise
+          // recover the original old-chart focus if the browser sent it to
+          // body or the newly loading iframe during PREPARE.
+          const focusBeforeCommit = oldContainer?.contains?.(currentFocus)
+            ? currentFocus
+            : (currentFocus === document.body || staging.node?.contains?.(currentFocus))
+              ? focusAtPrepare : null;
           const undo = staging.activate();
           try {
             engine = next;
