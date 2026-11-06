@@ -279,3 +279,46 @@ test('destroy during an uncooperative pending switch settles without stale commi
  assert.equal(a.filter(x=>x==='old:destroy').length,1);
  gate.resolve({empty:false});
 });
+
+
+test('only latest of simultaneous switch intents may publish',async()=>{
+ const old=[],first=[],second=[],started=deferred();
+ const c=createAsyncEngineController(()=>mock('native',old));
+ c.mount({container:{}});await c.render({project:project('A'),view});
+ const a=c.switchEngine(()=>mock('candidate-A',first,{
+  renderAsync(){started.resolve();return new Promise(()=>{});}
+ }));
+ await started.promise;
+ const b=c.switchEngine(()=>mock('candidate-B',second));
+ assert.deepEqual(await a,{superseded:true});
+ assert.equal(await b,true);
+ assert.equal(c.getCapabilities().id,'candidate-B');
+ assert.equal(first.filter(x=>x==='candidate-A:destroy').length,1);
+ assert.equal(old.filter(x=>x==='native:destroy').length,1);
+ c.destroy();
+});
+
+test('candidate receives frozen confirmed project even if caller mutates its original',async()=>{
+ const original=project('A'),observed=[];
+ const c=createAsyncEngineController(()=>mock('native',[]));
+ c.mount({container:{}});
+ await c.render({project:original,view});
+ original.tasks[0].start='2040-01-01';
+ const result=await c.switchEngine(()=>mock('candidate',[],{
+  renderAsync(req){
+   observed.push({
+    date:req.project.tasks[0].start,
+    projectFrozen:Object.isFrozen(req.project),
+    tasksFrozen:Object.isFrozen(req.project.tasks),
+    taskFrozen:Object.isFrozen(req.project.tasks[0]),
+    viewFrozen:Object.isFrozen(req.view)
+   });
+   return {empty:false};
+  }
+ }));
+ assert.equal(result,true);
+ assert.deepEqual(observed,[{
+  date:'2026-11-10',projectFrozen:true,tasksFrozen:true,taskFrozen:true,viewFrozen:true
+ }]);
+ c.destroy();
+});
