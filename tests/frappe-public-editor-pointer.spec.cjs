@@ -121,15 +121,30 @@ test('physical release outside the iframe never writes or duplicates',async({pag
 test('re-render during physical movement fences stale callbacks',async({page})=>{
   const frame=await fixture(page);
   const bar=frame.locator('.bar-wrapper[data-id="demo-core"] .bar');
+  // This iframe sits below the native reference chart. Without scrolling the
+  // old test passed even though no real pointerdown ever reached Frappe.
+  await bar.scrollIntoViewIfNeeded();
+  await expect(bar).toBeInViewport();
+  const previousFrame=page.frames().find(f=>f.url().includes('/spikes/frappe/frame.html'));
+  expect(previousFrame).toBeTruthy();
   const b=await bar.boundingBox();
+  expect(b).toBeTruthy();
   const x=b.x+b.width/2,y=b.y+b.height/2;
   await page.mouse.move(x,y);await page.mouse.down();
-  await page.mouse.move(x+40,y,{steps:5});
+  await page.mouse.move(x+65,y,{steps:9});
   const beforeRelease=await capture(page);
+  expect(beforeRelease.some(e=>e.type==='pointerdown'),
+    'Old iframe must receive a physical pointerdown').toBe(true);
+  expect(beforeRelease.filter(e=>e.type==='on_date_change').length,
+    'Old iframe must produce a real upstream preview before teardown').toBeGreaterThan(0);
   expect(await page.evaluate(()=>window.__frappeTestIntents.length)).toBe(0);
-  // Native/iframe lifecycle transition while a gesture is still active.
+  // Force a new browsing context while a real Frappe gesture is active.
   await page.evaluate(()=>document.getElementById('reloadBtn').click());
   await expect(page.locator('#status')).toContainText('Frappe: gerendert');
+  expect(previousFrame.isDetached(),'Old iframe must actually be destroyed').toBe(true);
+  const currentFrame=page.frames().find(f=>f.url().includes('/spikes/frappe/frame.html'));
+  expect(currentFrame).toBeTruthy();
+  expect(currentFrame).not.toBe(previousFrame);
   await page.mouse.up();
   const result=await evidence(page,'rerender-during-drag',beforeRelease);
   expect(result.intents).toEqual([]);
