@@ -25,3 +25,12 @@ The runtime application itself has no Playwright dependency.
 
 
 **CI-Referenz zum Implementierungsstand `60fb8c6` (06.11.2026):** [Static Validate](https://github.com/thomasasen/gantt-studio/actions/runs/42221973122), [103 Chromium-Tests + 20 Projektwechsel / Push](https://github.com/thomasasen/gantt-studio/actions/runs/42221972913), [103 Chromium-Tests + 20 Projektwechsel / PR-Merge-Ref](https://github.com/thomasasen/gantt-studio/actions/runs/42221986134). Alle drei Runs erfolgreich; 32/32 Unit, 103/103 Browser und 20/20 Projektwechsel. Nachfolgende Dokumentations-Commits benötigen ihre eigenen erfolgreichen CI-Runs.
+
+
+### Transactional Frappe editor contract (Draft follow-up to PR #15)
+
+- Node contract: `node --test tests/transactional-editor.spec.mjs tests/frappe-gesture-gate.spec.mjs`. Test-only `createTransactionalEditor` validates the full engine-independent edit boundary with project revision and generation fencing, allowed tasks, date-only changes and failed-save rollback. No production switch is enabled.
+- Browser probes: `tests/frappe-transactional-browser.spec.cjs` performs genuine Playwright mouse movements against the actual locally built Frappe 1.2.2 iframe; it also checks frame-message spoofing, CSS zoom, and absence of IndexedDB writes in the diagnostic spike.
+- The real-pointer probe is a **negative safety gate**, not a proof of reliably editable Frappe. The current upstream sometimes does not emit a final edit from a physical drag. Existing direct upstream callback probes are retained unchanged for timing diagnostics.
+- A verified Frappe-to-IndexedDB UI commit, keyboard/touch parity, session abort after a begun IndexedDB save and a renderer acknowledgment remain **not tested as passing**, because the Frappe editor is intentionally not wired to production.
+- CI must run both feature-branch head and PR-merge-ref against `fix/frappe-lifecycle-isolation`; a green main-only status or earlier SHA is insufficient.
