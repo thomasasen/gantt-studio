@@ -4,7 +4,12 @@ import {shiftCalendarDay} from '../frappe/independent-gesture.mjs?v=2.8.1';
 export function dateOnlyToLocalDate(iso){
   if(!isValidIsoDate(iso))throw new RangeError('Invalid ISO calendar day: '+iso);
   const [y,m,d]=iso.split('-').map(Number);
-  return new Date(y,m-1,d);
+  // new Date(y, ...) interprets 0..99 as 1900..1999. Use setFullYear
+  // to preserve the full project YYYY-MM-DD calendar domain.
+  const date=new Date(0);
+  date.setHours(0,0,0,0);
+  date.setFullYear(y,m-1,d);
+  return date;
 }
 export function localDateToDateOnly(date){
   if(!(date instanceof Date)||!Number.isFinite(date.getTime()))throw new TypeError('Expected finite local Date');

@@ -8,9 +8,22 @@ async function setup(page,editable=true){
 async function drag(page,bar,kind,delta,options={}){
  await bar.scrollIntoViewIfNeeded();
  await expect(bar).toBeInViewport();
- const b=await bar.boundingBox();expect(b).toBeTruthy();
- const x=kind==='left'?b.x+3:kind==='right'?b.x+b.width-3:kind==='progress'?b.x+b.width*.48:b.x+b.width*.6;
- const y=kind==='progress'?b.y+2:b.y+b.height/2;
+ const handles={
+   left:'.gantt_task_drag.task_start_date',
+   right:'.gantt_task_drag.task_end_date',
+   progress:'.gantt_task_progress_drag'
+ };
+ // Target the actual documented DHTMLX drag handle. Center-of-bar
+ // movement is NOT evidence for progress or edge resizing.
+ let target=bar;
+ if(Object.hasOwn(handles,kind)){
+   await bar.hover();
+   target=bar.locator(handles[kind]);
+   await expect(target,'Specific '+kind+' handle must be rendered and visible').toBeVisible();
+ }
+ const b=await target.boundingBox();expect(b).toBeTruthy();
+ const x=kind==='move'?b.x+b.width*.6:b.x+b.width/2;
+ const y=b.y+b.height/2;
  const traceBefore=await page.evaluate(()=>window.__dhtmlxTrace());
  await page.mouse.move(x,y);await page.mouse.down();
  await page.mouse.move(x+delta,y,{steps:10});
@@ -31,10 +44,16 @@ for(const [kind,delta] of [['move',75],['left',-42],['right',42],['progress',25]
    const e=await drag(page,bar,kind,delta);
    await expect.poll(()=>page.evaluate(()=>window.__dhtmlxTestIntents.length)).toBe(1);
    const result=await page.evaluate(()=>({intents:window.__dhtmlxTestIntents,commits:window.__dhtmlxCommits,after:window.__dhtmlxMemoryStore.snapshot().tasks.find(t=>t.id==='demo-core')}));
+   expect(result.commits).toHaveLength(1);
    expect(result.commits[0].result.ok).toBe(true);
    expect(result.after.revision).toBeUndefined();
-   expect(['start','end','progress'].some(k=>result.after[k]!==old[k])).toBe(true);
-   expect(e.after.some(t=>t.type==='onBeforeTaskChanged')).toBe(true);
+   const expectedMode={left:'resize',right:'resize',move:'move',progress:'progress'}[kind];
+   expect(e.moving.filter(t=>t.type==='onBeforeTaskDrag').at(-1)?.mode,
+     'Physical gesture must use the actual DHTMLX '+expectedMode+' mode').toBe(expectedMode);
+   expect(e.after.filter(t=>t.type==='onBeforeTaskChanged').at(-1)?.mode).toBe(expectedMode);
+   const changed=['start','end','progress'].filter(k=>result.after[k]!==old[k]);
+   const expectedFields={left:['start'],right:['end'],move:['start','end'],progress:['progress']}[kind];
+   expect(changed,'Only the requested field(s) may change').toEqual(expectedFields);
    // DHTMLX 10.0.3 omits onAfterTaskDrag when onBeforeTaskChanged returns false.
    expect(e.after.some(t=>t.type==='onAfterTaskDrag')).toBe(false);
    expect(await page.evaluate(()=>indexedDB.databases())).toEqual([]);
