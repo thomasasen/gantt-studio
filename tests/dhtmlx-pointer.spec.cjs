@@ -224,3 +224,18 @@ test('Escape restores visible vendor task geometry before physical pointer-up',a
  expect(await page.evaluate(()=>window.__dhtmlxTestIntents.length)).toBe(0);
  expect(await page.evaluate(()=>indexedDB.databases())).toEqual([]);
 });
+
+test('offline: no external HTTP requests or remote font imports',async({page})=>{
+ const external=[];
+ page.on('request',request=>{
+  const u=new URL(request.url());
+  if(/^https?:$/.test(u.protocol)&&u.origin!=='http://127.0.0.1:4173')
+   external.push(u.toString());
+ });
+ await setup(page,false);
+ const css=await page.request.get('/spikes/dhtmlx/vendor/dhtmlxgantt.css');
+ expect(css.ok()).toBe(true);
+ const cssText=await css.text();
+ expect(cssText).not.toMatch(/fonts\.googleapis\.com|@import\s+url\(\s*['"]?https?:\/\//i);
+ expect(external,'No runtime external dependencies, including Google Fonts').toEqual([]);
+});

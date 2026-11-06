@@ -9,7 +9,15 @@ const vendor=resolve(root,'vendor');
 await mkdir(vendor,{recursive:true});
 for(const name of ['dhtmlxgantt.js','dhtmlxgantt.css']){
   const source=resolve(home,'codebase',name);
-  await copyFile(source,join(vendor,name));
+  if(name==='dhtmlxgantt.css'){
+    const css=await readFile(source,'utf8');
+    // Upstream default skins import Google's Inter font. The spike must work
+    // with zero external runtime requests: retain system-font fallbacks.
+    const offline=css.replace(/@import\\s+url\\(\\s*(['"]?)https:\\/\\/fonts\\.googleapis\\.com[\\s\\S]*?\\1\\s*\\)\\s*;/gi,'');
+    if(/(?:url\\(\\s*['"]?|@import\\s+['"]?)https?:\\/\\//i.test(offline))
+      throw new Error('External runtime CSS URL detected: offline build blocked');
+    await writeFile(join(vendor,name),offline);
+  }else await copyFile(source,join(vendor,name));
 }
 const license=await readFile(resolve(home,'LICENSE.md'),'utf8');
 if(!license.includes('MIT'))throw new Error('MIT notice missing');
