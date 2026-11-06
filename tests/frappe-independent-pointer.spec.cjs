@@ -60,8 +60,11 @@ test('click without movement emits nothing',async({page})=>{
   await noDB(page);
 });
 test('Escape during physical drag prevents commit',async({page})=>{
-  const {handle}=await start(page);await drag(page,handle,90,{release:false});
-  await page.keyboard.press('Escape');await page.mouse.up();
+  const {handle,frame}=await start(page);await drag(page,handle,90,{release:false});
+  await page.keyboard.press('Escape');
+  await expect.poll(()=>frame.locator('#independent-gesture-preview')
+    .evaluate(el=>getComputedStyle(el).display)).toBe('none');
+  await page.mouse.up();
   expect(await page.evaluate(()=>window.__independentCommits.length)).toBe(0);
   expect(await page.evaluate(()=>window.__independentMemoryStore.snapshot().revision)).toBe(1);
   await noDB(page);
@@ -81,6 +84,25 @@ test('blur cancels an active gesture',async({page})=>{
   const {handle,frame}=await start(page);await drag(page,handle,90,{release:false});
   await frame.locator('#chart').evaluate(()=>window.dispatchEvent(new Event('blur')));
   await page.mouse.up();
+  expect(await page.evaluate(()=>window.__independentCommits.length)).toBe(0);
+  await noDB(page);
+});
+test('release outside original bar within iframe commits via captured pointer',async({page})=>{
+  const {handle}=await start(page);
+  const box=await handle.boundingBox();
+  expect(box).toBeTruthy();
+  const x=box.x+box.width/2,y=box.y+box.height/2;
+  await page.mouse.move(x,y);await page.mouse.down();
+  await page.mouse.move(x+90,y+45,{steps:7});
+  await page.mouse.up();
+  await expect.poll(()=>page.evaluate(()=>window.__independentCommits.length)).toBe(1);
+  expect(await page.evaluate(()=>window.__independentCommits[0].result.ok)).toBe(true);
+  await noDB(page);
+});
+test('leaving the iframe and releasing outside cancels without commit',async({page})=>{
+  const {handle}=await start(page);
+  await drag(page,handle,90,{release:false});
+  await page.mouse.move(2,2,{steps:6});await page.mouse.up();
   expect(await page.evaluate(()=>window.__independentCommits.length)).toBe(0);
   await noDB(page);
 });
