@@ -1,6 +1,7 @@
 // Engine-independent, single-image export of the *complete* Gantt diagram.
 // No viewport screenshot, DOM cloning, page slicing, ZIP, or external dependencies.
-import { add, days } from './print-model.mjs?v=2.10.0';
+import { add, days } from './print-model.mjs?v=2.11.0';
+import {resolveLabelConfig,barAnnotation,wrapAnnotation,planBarAnnotation} from './print-labels.mjs?v=2.11.0';
 
 const safeText=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const safeColor=(value,fallback)=>/^#[\da-f]{3}(?:[\da-f]{3})?$/i.test(String(value||''))?value:fallback;
@@ -17,15 +18,22 @@ export function createGanttChartSvg(projection){
   if(!Number.isFinite(count)||count<1||count>20000)throw new RangeError('Der Zeitraum kann nicht als Bild dargestellt werden.');
   const labelWidth=clamp(340+(s.labelWidth-57)*2.3,280,620);
   const gutter=24,header=115,footer=s.footer?32:18;
-  const rowH=clamp(s.rowHeight*4.8,38,78);
   const timeWidth=Math.min(7900-labelWidth-gutter,Math.max(250,count*12*s.scale/100));
   const dayWidth=timeWidth/count;
   const width=Math.ceil(labelWidth+timeWidth+gutter);
-  const height=Math.ceil(header+rows.length*rowH+footer);
+  const cfg=resolveLabelConfig(projection.labelConfig);
+  const annotations=rows.map(row=>barAnnotation(row,s,cfg));
+  const baseRowH=clamp(s.rowHeight*4.8,38,78);
+  const rowHeights=annotations.map(text=>text?
+    Math.max(baseRowH,38+wrapAnnotation(text,cfg.maxWidth,{fontSize:12,twoLine:cfg.twoLine,ellipsis:cfg.ellipsis}).length*15):
+    baseRowH);
+  const rowOffsets=[],bodyHeight=rowHeights.reduce((sum,h,index)=>{rowOffsets[index]=sum;return sum+h;},0);
+  const height=Math.ceil(header+bodyHeight+footer);
   const xml=[];
   const chartLeft=labelWidth;
   const chartRight=chartLeft+timeWidth;
-  const barY=index=>header+index*rowH+rowH/2;
+  const rowTop=index=>header+rowOffsets[index];
+  const barY=index=>rowTop(index)+rowHeights[index]*.58;
   const barX=date=>chartLeft+days(from,date)*dayWidth;
   const colors=projection.colors||{};
   const taskColor=(row)=>{
@@ -41,7 +49,7 @@ export function createGanttChartSvg(projection){
   const truncate=(value,max)=>{const str=String(value||'');return str.length>max?str.slice(0,max-1)+'…':str;};
 
   xml.push('<svg xmlns="http://www.w3.org/2000/svg" width="'+width+'" height="'+height+'" viewBox="0 0 '+width+' '+height+'" role="img" aria-label="'+safeText('Gantt-Diagramm '+projection.name)+'">');
-  xml.push('<defs><clipPath id="timeline-clip">'+rect(chartLeft,header,timeWidth,rows.length*rowH,'#fff')+'</clipPath>'+
+  xml.push('<defs><clipPath id="timeline-clip">'+rect(chartLeft,header,timeWidth,bodyHeight,'#fff')+'</clipPath>'+
     '<marker id="gantt-arrow" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#687b8b"/></marker></defs>');
   xml.push(rect(0,0,width,height,'#fff'));
   xml.push(rect(0,0,width,64,'#f1f6f8'));
@@ -73,7 +81,7 @@ export function createGanttChartSvg(projection){
   }
   const indices=new Map(rows.map((row,index)=>[String(row.id),index]));
   rows.forEach((row,index)=>{
-    const y=header+index*rowH,cy=barY(index),isPhase=row.type==='phase-summary';
+    const rowH=rowHeights[index],y=rowTop(index),cy=barY(index),isPhase=row.type==='phase-summary';
     if(isPhase)xml.push(rect(0,y,width,rowH,'#eaf2f5'));
     else if(index%2===1)xml.push(rect(0,y,labelWidth,rowH,'#f8fafb'));
     xml.push(line(0,y+rowH,width,y+rowH,'#e0e8ed',.9));
@@ -126,6 +134,35 @@ export function createGanttChartSvg(projection){
       xml.push(line(x,header,x,header+rows.length*rowH,'#087e75',2,'stroke-dasharray="5 3"'));
     }
   }
+  // Labels are drawn last, above bars, connectors and grid. Every label has a
+  // bounded rectangle inside its own task row: no cross-row overlap or crop.
+  rows.forEach((row,index)=>{
+    const text=annotations[index];
+    if(!text)return;
+    const start=clamp(days(from,row.start)*dayWidth,0,timeWidth);
+    const end=clamp((days(from,row.end)+1)*dayWidth,0,timeWidth);
+    const plan=planBarAnnotation({text,barStart:start,barEnd:end,timelineWidth:timeWidth,
+      rowHeight:rowHeights[index],config:cfg,isMilestone:['milestone','gate'].includes(row.type),
+      trackIndex:index,fontSize:12});
+    if(!plan)return;
+    const left=chartLeft+plan.x,top=rowTop(index)+plan.y;
+    const title='<title>'+safeText(text)+'</title>';
+    if(plan.leader){
+      const anchorX=chartLeft+clamp((start+end)/2,0,timeWidth);
+      const anchorY=barY(index);
+      const toX=plan.mode==='right'?left-2:plan.mode==='left'?left+plan.width+2:
+        clamp(anchorX,left+3,left+plan.width-3);
+      const toY=plan.mode==='above'?top+plan.height+3:
+        plan.mode==='below'?top-3:top+plan.height/2;
+      xml.push('<path class="gantt-label-leader" d="M '+anchorX+' '+anchorY+' L '+toX+' '+toY+
+        '" fill="none" stroke="#627b89" stroke-width="1" opacity=".75"/>');
+    }
+    xml.push('<g class="gantt-export-label" data-task-id="'+safeText(row.id)+'" data-placement="'+plan.mode+'">'+title+
+      rect(left-3,top-2,plan.width+6,plan.height+4,'#fff','stroke="#ccdce3" stroke-width=".6" rx="3"'));
+    for(let i=0;i<plan.lines.length;i++)
+      xml.push(label(left+3,top+12+i*15,plan.lines[i],12,'#1f3848','font-weight="600"'));
+    xml.push('</g>');
+  });
   if(s.footer){
     xml.push(line(0,height-30,width,height-30,'#d5e1e6',1));
     xml.push(label(20,height-11,projection.name+' · Revision '+(projection.revision||'–'),10,'#69808d'));
