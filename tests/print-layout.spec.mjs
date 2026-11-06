@@ -83,7 +83,9 @@ test('8: eine Seite für kleine Projekte, sichere Mehrseiten-Warnung bei großen
 test('9: eingeklappte Phasen lassen sich unabhängig von Ansichtseinstellungen erweitern',()=>{
   const p=fixture(),view={collapsedPhaseIds:['phase-1','phase-2']};
   assert.equal(createPrintProjection(p,{expandCollapsed:true},view).taskCount,10);
-  assert.equal(createPrintProjection(p,{expandCollapsed:false},view).taskCount,0);
+  const collapsed=createPrintProjection(p,{expandCollapsed:false},view);
+  assert.equal(collapsed.taskCount,0);
+  assert.equal(collapsed.rows.filter(r=>r.kind==='phase').length,2);
 });
 test('10: aktive Filterauswahl schließt nicht gefilterte Aufgaben aus',()=>{
   const p=fixture(),result=createPrintProjection(p,{scope:'filtered'},{filteredTaskIds:['task-1','task-3']});
@@ -166,4 +168,17 @@ test('24: alle Papierkombinationen erzeugen nichtleere SVG-Seiten',()=>{
     const {projection,layout,options}=prepare(fixture(),{paper,orientation});
     assert.ok(layout.pages.length>=1);assert.match(renderPrintPage(projection,layout,layout.pages[0],options),/<svg/);
   }
+});
+
+test('25: Management-Übersicht zeigt Phasen auch ohne einzelne Gates oder Meilensteine',()=>{
+  const p=fixture(3);p.tasks.forEach(t=>t.type='workstream');
+  const projection=createPrintProjection(p,{scope:'summary',elements:{phases:true,milestones:true}});
+  assert.equal(projection.taskCount,0);
+  assert.deepEqual(projection.rows.map(r=>r.name).sort(),['Umsetzung','Vorbereitung']);
+});
+test('26: begrenzte Aufgabenfilter bestimmen ihre Zeitachse ohne ganze Phasen aufzuweiten',()=>{
+  const p=fixture(2);p.planning.markers=[];
+  const selected=createPrintProjection(p,{scope:'selected',taskIds:['task-0']});
+  assert.equal(selected.start,'2024-01-01');
+  assert.ok(parse(selected.end)<parse('2025-01-01'));
 });
