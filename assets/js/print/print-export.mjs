@@ -1,7 +1,7 @@
 // Engine-independent, single-image export of the *complete* Gantt diagram.
 // No viewport screenshot, DOM cloning, page slicing, ZIP, or external dependencies.
-import { add, days } from './print-model.mjs?v=2.11.0';
-import {resolveLabelConfig,barAnnotation,wrapAnnotation,planBarAnnotation} from './print-labels.mjs?v=2.11.0';
+import { add, days } from './print-model.mjs?v=2.12.0';
+import {resolveLabelConfig,barAnnotation,wrapAnnotation,planBarAnnotation} from './print-labels.mjs?v=2.12.0';
 
 const safeText=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const safeColor=(value,fallback)=>/^#[\da-f]{3}(?:[\da-f]{3})?$/i.test(String(value||''))?value:fallback;
