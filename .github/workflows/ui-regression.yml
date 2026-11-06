@@ -32,6 +32,12 @@ jobs:
       - name: Validate JavaScript syntax
         run: |
           node --check assets/js/app.js
+          node --check assets/js/print/print-projection.mjs
+          node --check assets/js/print/print-layout.mjs
+          node --check assets/js/print/print-renderer.mjs
+          node --check assets/js/print/print-controller.mjs
+          node --check tests/print-layout.spec.mjs
+          node --check tests/print-browser.spec.cjs
           node --check assets/js/engine/dhtmlx/dhtmlx-mapper.mjs
           node --check assets/js/engine/dhtmlx/dhtmlx-adapter.mjs
           node --check spikes/dhtmlx/spike.mjs
@@ -94,6 +100,8 @@ jobs:
           node --check tests/icon-system.spec.cjs
           node --check tests/apple-design-audit.spec.cjs
           node --check playwright.config.cjs
+      - name: Verify print pagination and immutable snapshots
+        run: node --test tests/print-layout.spec.mjs
       - name: Build isolated Frappe vendor and run adapter unit tests
         run: |
           npm ci --prefix spikes/frappe --ignore-scripts --no-audit --no-fund
@@ -106,12 +114,23 @@ jobs:
           node --test tests/dhtmlx-mapper.spec.mjs
       - name: Install browser test dependency
         run: npm install --no-save --no-package-lock @playwright/test@1.56.1 @axe-core/playwright@4.11.0
+      - name: Install PDF inspection utilities
+        run: sudo apt-get update -qq && sudo apt-get install -y poppler-utils
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
       - name: Run responsive and interaction checks
         run: npx playwright test --reporter=line
       - name: Repeat the critical Gantt project-switch regression 20 times
         run: npx playwright test tests/project-switch-cancel.spec.cjs --grep "switching projects during Gantt drag" --repeat-each=20 --workers=1 --reporter=line
+      - name: Upload print/PDF inspection evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: print-pdf-qa-evidence
+          path: |
+            print-evidence
+            visual-review/print
+          if-no-files-found: ignore
       - name: Upload Frappe real-pointer evidence
         if: always()
         uses: actions/upload-artifact@v4

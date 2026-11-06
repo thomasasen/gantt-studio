@@ -22,7 +22,9 @@ test('production entrypoint versions every static ESM dependency',()=>{
   const graph=['assets/js/app.js','assets/js/gantt.js',
     'assets/js/engine/engine-controller.mjs','assets/js/engine/engine-contract.mjs',
     'assets/js/engine/native/native-adapter.mjs',
-    'assets/js/engine/native/native-interactions.mjs'];
+    'assets/js/engine/native/native-interactions.mjs',
+    'assets/js/print/print-controller.mjs','assets/js/print/print-projection.mjs',
+    'assets/js/print/print-layout.mjs','assets/js/print/print-renderer.mjs'];
   for(const moduleFile of graph){
     const source=readFileSync(moduleFile,'utf8');
     const imports=[...source.matchAll(/^import\\s+[^;]+?\\s+from\\s+['"]([^'"]+)['"]/gm)];
