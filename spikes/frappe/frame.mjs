@@ -1,22 +1,23 @@
 import {createFrappeGestureGate} from '../../assets/js/engine/frappe/frappe-gesture-gate.mjs?v=2.8.1';
 import {mapFrappeDateChange} from '../../assets/js/engine/frappe/frappe-task-mapper.mjs?v=2.8.1';
+import {mountIndependentLayer} from './frame-independent.mjs?v=2.8.1';
 
 // Disposable browsing context; no production storage or app integration.
 const CHANNEL='gantt-studio-frappe-isolated-v1';
-let initialized=false,activeGate=null,activeGeneration=null,activeSession=null;
+let initialized=false,activeGate=null,activeLayer=null,activeGeneration=null,activeSession=null;
 function reply(type,payload={}) {
   window.parent.postMessage({
     channel:CHANNEL,type,generation:activeGeneration,session:activeSession,...payload
   },location.origin);
 }
-window.addEventListener('pagehide',()=>activeGate?.destroy());
+window.addEventListener('pagehide',()=>{activeLayer?.destroy();activeGate?.destroy();});
 window.addEventListener('message',event=>{
   if(event.origin!==location.origin||event.source!==window.parent)return;
   const data=event.data;
   if(!data||data.channel!==CHANNEL)return;
   if(data.type==='cancel'&&initialized
       &&data.generation===activeGeneration&&data.session===activeSession){
-    activeGate?.cancel();
+    activeGate?.cancel();activeLayer?.cancel();
     return;
   }
   if(initialized||data.type!=='render'
@@ -28,7 +29,8 @@ window.addEventListener('message',event=>{
   activeSession=data.session;
   try{
     if(typeof globalThis.Gantt!=='function')throw new Error('Local Frappe UMD missing');
-    const editable=data.experimentalEditable===true;
+    const independent=data.experimentalIndependentLayer===true;
+    const editable=data.experimentalEditable===true||independent;
     // Opt-in diagnosis only: browser-native events and documented Frappe
     // callbacks, never private Frappe methods. No persistence or app wiring.
     const trace=[];
@@ -60,7 +62,7 @@ window.addEventListener('message',event=>{
       onError:error=>reply('error',{message:error?.message||String(error)})
     });
     activeGate=gate;
-    if(editable){
+    if(editable&&!independent){
       let pointerId=1;
       root.addEventListener('pointerdown',e=>{
         if(e.isPrimary===false||e.button!==0)return;
@@ -104,23 +106,35 @@ window.addEventListener('message',event=>{
       window.addEventListener('blur',()=>gate.cancel(),true);
     }
     const chart=new globalThis.Gantt(root,tasks,{
-      view_mode:data.viewMode,readonly:!editable,readonly_dates:!editable,
-      readonly_progress:!editable,move_dependencies:false,infinite_padding:false,
+      view_mode:data.viewMode,readonly:!editable||independent,readonly_dates:!editable||independent,
+      readonly_progress:!editable||independent,move_dependencies:false,infinite_padding:false,
       today_button:false,view_mode_select:false,scroll_to:'start',
       language:'de',popup:()=>false,
       on_click:task=>reply('selected',{id:String(task.id)}),
-      on_date_change:editable?(task,start,end)=>{
+      on_date_change:editable&&!independent?(task,start,end)=>{
         try{const change=mapFrappeDateChange(task.id,start,end);
           record('on_date_change',{change});gate.preview(change);}
         catch(error){reply('error',{message:error.message});}
       }:undefined,
-      on_progress_change:editable?(task,progress)=>{
+      on_progress_change:editable&&!independent?(task,progress)=>{
         const change={id:String(task.id),progress:Number(progress)};
         record('on_progress_change',{change});gate.preview(change);
       }:undefined
     });
+    if(independent){
+      if(data.viewMode!=='Day')throw new Error('Independent spike supports Day mode only.');
+      activeLayer=mountIndependentLayer({
+        root,tasks,projectId:data.projectId,revision:data.revision,record,
+        sendIntent:transaction=>{
+          reply('intent',{gestureId:transaction.gestureId,
+            intent:{type:'task-change',change:transaction.change},transaction});
+        },
+        sendCancel:reason=>reply('cancelled',{reason})
+      });
+      window.__independentEditor=activeLayer;
+    }
     // Diagnostic-only private reference: not part of product adapter.
-    if(editable)window.__frappeExperimental={chart,gate};
+    if(editable&&!independent)window.__frappeExperimental={chart,gate};
     reply('ready');
   }catch(error){
     reply('error',{message:error?.message||String(error)});
