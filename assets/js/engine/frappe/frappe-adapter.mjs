@@ -18,16 +18,16 @@ const VIEW_MODE=Object.freeze({day:'Day',week:'Week',month:'Month'});
 const CHANNEL='gantt-studio-frappe-isolated-v1';
 const FRAME_URL=new URL('../../../../spikes/frappe/frame.html',import.meta.url);
 
-export function createFrappeEngine() {
+export function createFrappeEngine({experimentalEditable=false}={}) {
   let container=null,frame=null,generation=0,mounted=false;
   let onSelect=()=>{},onError=()=>{},onStatus=()=>{};
-  let messageHandler=null;
+  let messageHandler=null,lastRequest=null,onIntent=()=>{};
   function detachFrame() {
     const previous=frame;
     frame=null;
     if(previous){previous.onload=null;previous.remove();}
   }
-  return {
+  const engine={
     getCapabilities:()=>CAPABILITIES,
     mount(options) {
       if(mounted)throw new Error('Frappe engine already mounted.');
@@ -35,6 +35,7 @@ export function createFrappeEngine() {
         throw new TypeError('Frappe mount container required.');
       container=options.container;
       onSelect=typeof options.onSelect==='function'?options.onSelect:()=>{};
+      onIntent=typeof options.onIntent==='function'?options.onIntent:()=>{};
       onError=typeof options.onError==='function'?options.onError:()=>{};
       onStatus=typeof options.onStatus==='function'?options.onStatus:()=>{};
       mounted=true;
@@ -45,6 +46,12 @@ export function createFrappeEngine() {
         if(data.type==='ready')onStatus('Frappe: gerendert');
         else if(data.type==='selected')onSelect({kind:'task',id:String(data.id)});
         else if(data.type==='error')onError(new Error('Frappe-Frame: '+String(data.message)));
+        else if(data.type==='cancelled' && experimentalEditable && lastRequest)
+          engine.render(lastRequest);
+        else if(data.type==='intent' && experimentalEditable) {
+          try{Promise.resolve(onIntent(data.intent)).catch(onError);}
+          catch(error){onError(error);}
+        }
       };
       window.addEventListener('message',messageHandler);
     },
@@ -52,6 +59,7 @@ export function createFrappeEngine() {
       if(!mounted)throw new Error('Frappe engine must be mounted first.');
       if(!Object.hasOwn(VIEW_MODE,view?.zoom))throw new RangeError('Unsupported zoom');
       const tasks=mapProjectToFrappeTasks(project);
+      lastRequest={project,view};
       const token=++generation;
       detachFrame();
       container.replaceChildren();
@@ -64,7 +72,8 @@ export function createFrappeEngine() {
       target.onload=()=>{
         if(!mounted||frame!==target||generation!==token)return;
         target.contentWindow?.postMessage({
-          channel:CHANNEL,type:'render',generation:token,tasks,viewMode:VIEW_MODE[view.zoom]
+          channel:CHANNEL,type:'render',generation:token,tasks,viewMode:VIEW_MODE[view.zoom],
+          experimentalEditable:Boolean(experimentalEditable)
         },location.origin);
       };
       frame=target;
@@ -86,8 +95,9 @@ export function createFrappeEngine() {
       detachFrame();
       if(messageHandler)window.removeEventListener('message',messageHandler);
       container.replaceChildren();
-      container=null;messageHandler=null;mounted=false;
-      onSelect=()=>{};onError=()=>{};onStatus=()=>{};
+      container=null;messageHandler=null;mounted=false;lastRequest=null;
+      onSelect=()=>{};onError=()=>{};onStatus=()=>{};onIntent=()=>{};
     }
   };
+  return engine;
 }
