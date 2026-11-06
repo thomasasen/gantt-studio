@@ -82,8 +82,9 @@ export function createTransactionalEditor({
     catch(error) { try { onError(error); } catch (_) {} }
   };
   function invalidate() {
-    if (session && (state === 'preview' || state === 'pending')
-        && projectMatches(session)) restore(session);
+    // An in-flight IndexedDB write cannot be rolled back by painting the
+    // previous snapshot. Only unsubmitted previews are safely reversible.
+    if (session && state === 'preview' && projectMatches(session)) restore(session);
     session = null;
     ++counter;
     notify('idle');
@@ -135,7 +136,12 @@ export function createTransactionalEditor({
           return false;
         return applyEditorIntent(next,s.intent,s.visible);
       });
-      if (!active(token)) return false; // Stale result: never touch a new UI.
+      if (!active(token) || !projectMatches(s)) {
+        // A project activation can race the save even if it forgot to
+        // call invalidate(): never publish a stale result to its UI.
+        if (active(token)) invalidate();
+        return false;
+      }
       if (!result.changed) {
         restore(s);
         notify('cancelled');
