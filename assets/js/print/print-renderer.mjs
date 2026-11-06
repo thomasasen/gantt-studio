@@ -53,7 +53,7 @@ function week(date){
 function drawRows(projection,page,layout,options,colors){
   const {labelWidth:label,timelineWidth:w,axisHeight:a,fontSize}=layout;
   const elems=options.elements||{};
-  let svg='',y=a;const centers=new Map();
+  let svg='',y=a;const centers=new Map(),progressPoints=[];
   for(const [index,row] of page.rows.entries()){
     const height=row.height,phase=row.kind==='phase';
     const bg=phase?'#E8EFF2':index%2===0?'#FFFFFF':'#F8FAFB';
@@ -111,6 +111,12 @@ function drawRows(projection,page,layout,options,colors){
       if(parse(row.start)<parse(page.start))svg+=txt(lx+.8,center+1.2,'‹',3.6,'#FFFFFF','font-weight="700"');
       if(parse(row.end)>parse(page.end))svg+=txt(lx+rw-2,center+1.2,'›',3.6,'#FFFFFF','font-weight="700"');
     }
+    if(elems.statusLine){
+      const percentage=Math.min(100,Math.max(0,Number(row.progress)||0))/100;
+      const date=parse(row.start)+(parse(row.end)-parse(row.start))*percentage;
+      if(date>=parse(page.start)&&date<=parse(page.end))
+        progressPoints.push([label+(date-parse(page.start))/DAY*page.dayWidth+page.dayWidth/2,center]);
+    }
     if(elems.risk&&['high','critical'].includes(row.risk))
       svg+=txt(label+w-3,center+1.3,'!',3.7,colors.risk,'text-anchor="end" font-weight="700"');
     y+=height;
@@ -121,8 +127,8 @@ function drawRows(projection,page,layout,options,colors){
   for(let d=0;d<page.days;d+=step) {
     const xx=label+d*page.dayWidth;svg+=line(xx,a,xx,bottom,colors.grid,.18);
   }
-  if(elems.markers!==false){
-    for(const marker of projection.markers)if(inPage(marker.date,page)){
+  if(elems.markers!==false||elems.relative){
+    for(const marker of projection.markers)if(inPage(marker.date,page)&&(marker.kind==='relative'?elems.relative:elems.markers!==false)){
       const xx=label+xOf(marker.date,page)+page.dayWidth/2;
       svg+=line(xx,a,xx,bottom,colors.marker,.4,'1.2,1');
       svg+=txt(Math.min(xx+1,label+w-2),a-1,marker.name||'Marker',2.5,colors.marker,'text-anchor="end"');
@@ -149,6 +155,10 @@ function drawRows(projection,page,layout,options,colors){
         svg+='<path d="M'+num(to-1.6)+' '+num(target.center-1)+' L'+num(to)+' '+num(target.center)+' L'+num(to-1.6)+' '+num(target.center+1)+'" stroke="#596A78" stroke-width=".5" fill="none"/>';
       }
     }
+  }
+  if(elems.statusLine&&progressPoints.length>1){
+    svg+='<polyline points="'+progressPoints.map(([x,y])=>num(x)+','+num(y)).join(' ')+'" fill="none" stroke="#BB4D37" stroke-width=".8" stroke-dasharray="2,1.1"/>';
+    for(const [x,y] of progressPoints)svg+='<circle cx="'+num(x)+'" cy="'+num(y)+'" r=".8" fill="#BB4D37"/>';
   }
   if(page.rows.length===0)svg+=txt(4,a+12,'Keine Aufgaben im gewählten Zeitraum.',4,colors.muted);
   return svg;
