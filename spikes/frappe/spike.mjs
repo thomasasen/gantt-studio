@@ -4,7 +4,10 @@ import {immutableEngineProjection} from '../../assets/js/engine/engine-contract.
 import {sortedProjectTasks} from '../../assets/js/task-order.mjs?v=2.8.1';
 const status=document.getElementById('status');
 const viewMode=document.getElementById('viewMode');
-const native=createNativeEngine(),frappe=createFrappeEngine();
+const native=createNativeEngine();
+const experimentalEditable=new URLSearchParams(location.search).get('edit')==='1';
+const frappe=createFrappeEngine({experimentalEditable});
+window.__frappeTestIntents=[];
 let project,initialized=false;
 const report=message=>{status.textContent=message;};
 function renderComparison(){
@@ -23,7 +26,12 @@ try{
   native.mount({container:document.getElementById('nativeRoot'),
     onIntent:async()=>false,onSelect:()=>{},onError:console.error,onStatus:()=>{}});
   frappe.mount({container:document.getElementById('frappeRoot'),
-    onIntent:async()=>{throw new Error('Read-only: no commit permitted');},
+    onIntent:async intent=>{
+      if(!experimentalEditable)throw new Error('Read-only: no commit permitted');
+      window.__frappeTestIntents.push(structuredClone(intent));
+      report('Vorschau-Intent (nicht gespeichert): '+intent.change.id);
+      return false;
+    },
     onSelect:selection=>report('Frappe: gerendert, Aufgabe '+selection.id),
     onError:error=>{console.error(error);report('Fehler: '+error.message);},
     onStatus:report});
