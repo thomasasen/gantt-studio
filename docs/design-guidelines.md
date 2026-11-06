@@ -113,3 +113,14 @@ Diese Datei ist **die zentrale Norm**; `AGENTS.md` verweist auf sie und der loka
 ## Atomare Engine-Umschaltung (experimenteller Async-Controller)
 
 Bei optionalen asynchronen Renderern bleibt der bestätigte Gantt-Baum bis zu einer eindeutigen Render-Ready-Bestätigung sichtbar und bedienbar. Eine neue Engine wird als inert, `aria-hidden`, `opacity:0` und für Pointer nicht erreichbares Geschwisterelement mit gültiger Geometrie vorbereitet. Sie darf bis zum Commit keine Projektänderungen auslösen, den Fokus übernehmen oder in der Screenreader-Reihenfolge erscheinen. Der Commit muss ohne Zwischenpaint erfolgen. Scrollposition und Tastaturfokus sind zu erhalten beziehungsweise sinnvoll auf den aktiven Container zu übertragen. Dekorative Übergänge sind untersagt; Reduced Motion und 200-%-Zoom sind zu prüfen.
+
+## 9. Druckdialog und PDF-Ausgabe (Design- und Funktionsvertrag)
+
+- Das produktive Diagramm ist **keine** Druckvorlage. Druckansicht und PDF entstehen aus einem unveränderlichen Projekt-Snapshot, nicht aus einem scrollbar begrenzten Viewport. Weder Scrollposition noch Displaygröße, Zoom oder Theme verändern die Druckseiten.
+- Der Dialog „Drucken & PDF“ trennt links konfigurierbare Einstellungen von rechts navigierbarer Papierseiten-Vorschau. Alle Felder einer gemeinsamen Zeile beginnen gleich hoch und haben 42 px sichtbare Höhe; Hilfe-/Statushinweise stehen darunter. Bei engen Viewports wird das Layout in gestapelte Bedien- und Vorschaubereiche überführt.
+- Druckprofile Management, Detailliert und Benutzerdefiniert sind Ausgangswerte; der Nutzer darf jederzeit abweichen. Eigene Vorlagen und letzte Einstellungen sind lokale Ansichtspräferenzen und verändern weder Projekt, Revision noch Speichermeldung.
+- PDF, Vorschau und Druck teilen sich dieselbe SVG-Darstellung und dieselbe mm-basierte Seitenberechnung. Einheiten A4/A3, Hoch/Quer, Ränder, Aufgabenlabels und lesbare Schrift haben sichtbare, überprüfbare Werte.
+- Vollständigkeit und Lesbarkeit gehen vor Einseitigkeit. Eine zu geringe Skalierung erzeugt eine Warnung und führt zu mehrseitigen Abschnitten statt unlesbaren Miniaturen. Folgen des Browser-Druckdialogs sind ausdrücklich zu kommunizieren.
+- Druckseiten sind immer hell, auch bei Dark-/Hybrid-Designs; Status und Risiko müssen neben der Farbe durch Text/Symbol transportiert werden. Tastatur, sichtbarer Fokus, Escape zum Schließen und sinnvolle Gruppenüberschriften sind Pflicht.
+- Die Vorschau wird als isoliertes Dokument angelegt und bei Schließen entfernt; keine globalen CSS-Regeln oder lang lebenden Listener dürfen die produktive Oberfläche beschädigen.
+- Die tatsächlichen PDF-Seiten müssen visuell geprüft werden. Prüfberichte und Layout-Befunde stehen in `docs/PRINT_PDF_ARCHITECTURE.md`.
