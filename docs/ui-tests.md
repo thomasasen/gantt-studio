@@ -73,3 +73,20 @@ Auf dem geprüften Stand `20b5f9b` und dem PR-Merge-Ref `be37bd2`: [CI-Run #4223
 - Real Chromium gestures: `npx playwright test tests/frappe-independent-pointer.spec.cjs --workers=1 --reporter=line`. Tests assert visible editor handles, physical `pointerdown` recorded by the isolated frame, actual preview before pointer-up, no early intent, exactly one memory CAS result (or zero for abort), no IndexedDB databases and revision increment on success. Synthetic cancellation events are used **only** for the pointercancel/blur negative paths after a physical pointer-down.
 - Full validation: `node --test` in the modified Validate workflow, plus complete `npx playwright test` and 20× critical Native project-switch stress test in the UI workflow, on both the PR head and GitHub-created merge-ref against `feature/frappe-transactional-editor`.
 - Critical review limit: the implementation-level overlay hooks into Frappe's generated SVG selectors. Passing tests do not make those selectors supported upstream APIs. The Spike is not a production-ready engine or a proven replacement for Native.
+
+### Phase 6: DHTMLX Community 10.0.3, isolierter Vergleich
+
+Die Vergleichsseite `/spikes/dhtmlx/index.html` lädt **ausschließlich nach lokalem Build** die feste Community-Version von `spikes/dhtmlx/vendor/`. Standardmäßig read-only; `?edit=1` schaltet nur auf RAM-Diagnose ohne IndexedDB, localStorage oder produktive Engine-Umschaltung. `tests/dhtmlx-mapper.spec.mjs` prüft inklusive Kalendertage, DST-Grenzen, Projekt-/Task-IDs und Links. `tests/dhtmlx-pointer.spec.cjs` erfordert echte Playwright-Gesten, Vendor-Vorschauereignisse und einen abgeschlossenen RAM-Commit, nicht bloß triviale Sicherheitsprüfungen.
+
+Lokale Befehle:
+
+```bash
+npm ci --prefix spikes/dhtmlx --ignore-scripts
+npm run build --prefix spikes/dhtmlx
+node --test tests/dhtmlx-mapper.spec.mjs
+npx playwright test tests/dhtmlx-pointer.spec.cjs --workers=1 --reporter=line
+npx playwright test
+npx playwright test tests/project-switch-cancel.spec.cjs --grep "switching projects during Gantt drag" --repeat-each=20 --workers=1
+```
+
+Ein grüner statischer Test allein ist keine Editor-Freigabe. CI-Ergebnisse auf endgültigem Head und tatsächlichem PR-Merge-Ref dokumentieren. Bei fehlschlagenden Positivtests bleiben exakt diese Fälle offen.

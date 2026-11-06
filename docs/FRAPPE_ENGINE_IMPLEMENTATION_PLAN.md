@@ -780,3 +780,34 @@ Testnachweise: `node --test tests/frappe-independent-gesture.spec.mjs`; realer C
 **Architekturentscheidung (vorbehaltlich finaler CI für sichere Diagnose): NO-GO** für eine produktive, wartbare Frappe-Schreib-Engine auf Basis des eigenen DOM-/Pointer-Layers. Das Konzept der unabhängigen Gesten-/CAS-Fachschicht ist technisch sinnvoll und sollte vendorneutral weiterverwendbar bleiben; der Frappe-Renderer ist dafür kein akzeptabler stabiler Partner. Ein technisch grüner, rein diagnostischer PR #18 darf sicher in den Feature-Branch einfließen, aber nicht nach `main` und nicht in den produktiven Editor verdrahtet werden.
 
 **Konkretes Folge-Gate:** Mit DHTMLX Gantt Community (MIT, dokumentierte `onBeforeTaskDrag`, `onTaskDrag`, `onAfterTaskDrag`) einen strikt read-only isolierten API-/Paritäts-Spike gegen dieselben Fixtures und Native-Tests aufsetzen. Eine umfassendere Bibliotheksprüfung (Lizenz, Edition, inklusive Date-only-Daten, CSS, Summaries, Reorder, A11y, Offline, Druck, Lifecycle) muss vor einer Implementierungsentscheidung erfolgen.
+
+### Phase 6 – DHTMLX Gantt Community 10.0.3 (isolierter Architektur-Spike, 06.11.2026)
+
+**Branch:** `spike/dhtmlx-community-engine` von `feature/frappe-transactional-editor@b1f32c5`; keine Änderung an `main`, Produktiv-Engine oder IndexedDB-Pfaden. Der experimentelle Adapter liegt ausschließlich unter `assets/js/engine/dhtmlx/`, die Vergleichsseite unter `spikes/dhtmlx/`.
+
+**Upstream:** [DHTMLX/gantt v10.0.3](https://github.com/DHTMLX/gantt/releases/tag/v10.0.3), veröffentlicht 03.09.2026; `dhtmlx-gantt@10.0.3` auf npm, Community Edition MIT ab v10, ältere GPL-Edition nicht verwenden. MIT-Lizenztext wird beim isolierten Build lokal als `vendor/LICENSE.dhtmlx.md` kopiert. Lokale JS/CSS-Assets werden mittels `npm ci --prefix spikes/dhtmlx && npm run build --prefix spikes/dhtmlx` erstellt, kein Laufzeit-CDN. Die Anwendung bleibt außerhalb des Experimentpfads buildfrei.
+
+**Dokumentierte APIs und Sicherheitsgrenze:** `Gantt.getGanttInstance()`, `init()`, `parse()`, `destructor()`, `attachEvent()/detachEvent()`, `onBeforeTaskDrag`, `onTaskDrag`, `onBeforeTaskChanged`, `onAfterTaskDrag`, `getTask()`, `getScrollState()/scrollTo()`. Die Herstellerdokumentation sagt: `onTaskDrag` meldet bereits die interne Mutation; `onBeforeTaskChanged` kann `false` zurückgeben und DHTMLX zurückrollen. Der Adapter verwirft die Vendor-Mutation grundsätzlich und gibt nur nach sichtbarer gültiger Freigabe einen validierten Intent aus. Pointer-/Escape-/Fokus-Verhalten ist durch dokumentierte Events allein **nicht** bewiesen; hierfür sind echte Browserprüfungen maßgeblich.
+
+**Funktionsmatrix (Community-API, keine Produktivparität behauptet):**
+
+| Bereich | Native | Frappe + eigener Layer | DHTMLX Community | Implementierungsrisiko |
+| --- | --- | --- | --- | --- |
+| Tasks/Progress/Move/Resize | produktiv | experimentell, undokumentierte SVG-Anbindung | nativ, öffentliche Drag-Events | Commit/Abbruch noch browserseitig nachzuweisen |
+| Hierarchie/Phasen/Collapse | produktiv | zusätzliche Eigenarbeit | Project-Tasks und Tree-Grid | Phasenzeitraum wird aus Kindern errechnet |
+| Links/Dependencies | produktiv | basisnahe Anzeige | vier Linktypen | keine automatische fachliche Terminverschiebung zulassen |
+| Meilensteine/Gates | projektkonform | grafischer Eigenbau | Milestone nativ, Gate nur Mapping | inklusives Gate-/Milestone-Ende und Semantik weichen ab |
+| Baselines | produktiv | eigener Layer | **PRO**; Community nur Eigenaufbau | hoch |
+| Puffer/Marker | produktiv | eigener Layer | Marker öffentliche API; Puffer eigener Layer | mittel |
+| Undo/Redo | fachlich vorhandene eigene Grenzen | eigene Logik | **PRO** | hoch |
+| Reorder / `displayOrder` | produktiv in Tabelle+Gantt | eigener Layer | Grid-Branch-Order, aber Domänenregeln eigen | hoch |
+| Day/Week/Month | produktiv | teilweise | Scales nativ | gering |
+| 11 Designs + Hybrid + Print | produktiv | erheblicher Aufwand | Skins/Templates, volle Parität eigen | hoch |
+| Offline / Lebenszyklus | produktiv | iframe-Isolation | lokal gebündelt + `destructor()` | gering bis mittel |
+| Accessibility/Tastatur | projektkonform getestet | teilweise | WAI-ARIA/Keyboard API | individuelle Abnahme ausstehend |
+
+**Technische Einschränkung:** DHTMLX nutzt ein exklusives `end_date`; Gantt Studio speichert inklusive `end`. Der Mapper addiert/subtrahiert einen lokalen Kalendertag, niemals 86400000 Millisekunden. Projekt- und Revisionsmodell bleiben unverändert. Für Meilensteine wird die grafische Punktdarstellung bewusst als Abweichung ausgewiesen. Datums-/Progress-Änderungen werden mit `validateEditorIntent` validiert und nur vom Host über den bestehenden rein speicherinternen `createMemoryRevisionStore` angenommen. Es gibt keine Verbindung zum produktiven Save-Pfad.
+
+**Red-Team-Hypothesen (zu prüfen, nicht als bestanden werten):** `onAfterTaskDrag` bei Escape trotz fehlendem `pointerup`; Reihenfolge der Browser- und Hersteller-Events; vermeintliche Progress-Handles; `destructor()` während Drag; mutiertes Vendor-Datenmodell vor Rollback; fehlende Projekt-Baselines und Workflows; unvollständige Tastaturalternativen; falsche Vergleichsbenchmarks. Sind diese Fälle nicht nachweislich bestanden, bleibt die Bewertung höchstens **CONDITIONAL GO**. Kein produktiver Wechsel ohne separate Entscheidung.
+
+**Abnahme und Score:** Node-/Playwright- und 20× Native-Switch-Gates laufen über bestehende CI. Empirische Resultate, Median-Messwerte und 0–5-Gewichtung dürfen erst nach finaler grüner CI und echten Browser-Evidenzen eingetragen werden; keine Scheinergebnisse. Harte Blocker haben Vorrang vor Scores.
