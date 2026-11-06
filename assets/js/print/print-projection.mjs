@@ -24,6 +24,7 @@ export function createPrintProjection(project,options={},view={}) {
   if(scope==='selected')tasks=tasks.filter(t=>selectedIds.has(String(t.id)));
   if(scope==='phases')tasks=tasks.filter(t=>selectedPhases.has(String(t.phaseId)));
   if(scope==='summary')tasks=tasks.filter(t=>['milestone','gate'].includes(t.type));
+  if(elements.milestones===false)tasks=tasks.filter(t=>!['milestone','gate'].includes(t.type));
   if(options.expandCollapsed===false)tasks=tasks.filter(t=>!collapsedIds.has(String(t.phaseId)));
   const originalIndex=new Map(snapshot.tasks.map((task,i)=>[String(task.id),i]));
   const sortMode=view.sortMode==='date'?'date':'manual';
@@ -39,7 +40,7 @@ export function createPrintProjection(project,options={},view={}) {
     const members=byPhase.get(String(phase.id));if(!members?.length)continue;
     members.sort(sortTasks);
     const starts=members.map(t=>t.start).sort(),ends=members.map(t=>t.end).sort();
-    rows.push({kind:'phase',id:'phase:'+phase.id,name:phase.name||'Phase',phaseId:phase.id,start:valid(phase.start)?phase.start:starts[0],end:valid(phase.end)?phase.end:ends.at(-1),progress:Math.round(members.reduce((s,t)=>s+Number(t.progress||0),0)/members.length),status:'neutral',owner:members.length+' Aufgaben',color:phase.color||'#DCE8EB'});
+    if(elements.phases!==false)rows.push({kind:'phase',id:'phase:'+phase.id,name:phase.name||'Phase',phaseId:phase.id,start:valid(phase.start)?phase.start:starts[0],end:valid(phase.end)?phase.end:ends.at(-1),progress:Math.round(members.reduce((s,t)=>s+Number(t.progress||0),0)/members.length),status:'neutral',owner:members.length+' Aufgaben',color:phase.color||'#DCE8EB'});
     if(scope!=='summary')rows.push(...members.map(t=>({...t,kind:'task'})));
     else rows.push(...members.map(t=>({...t,kind:'task'})));
   }
@@ -72,6 +73,16 @@ export function createPrintProjection(project,options={},view={}) {
   }
   const inRange=rows.filter(r=>parse(r.start)<=end&&parse(r.end)>=start);
   const activeMarkers=markers.filter(m=>parse(m.date)>=start&&parse(m.date)<=end);
+  const ps=snapshot.planning?.settings||{};
+  if(elements.relative&&ps.showRelativeToday&&Number.isFinite(Number(ps.relativeOffsetDays))){
+    let date=parse(today),step=Number(ps.relativeOffsetDays)>=0?1:-1,remaining=Math.min(3650,Math.abs(Math.trunc(Number(ps.relativeOffsetDays))));
+    const excluded=new Set(holidays.map(h=>h.date));
+    if(ps.relativeDayMode==='workdays') {
+      while(remaining>0){date+=step*DAY;const weekday=new Date(date).getUTCDay();
+        if(weekday===0||weekday===6||(ps.relativeSkipHolidays&&excluded.has(iso(date))))continue;remaining--;}
+    }else date+=step*remaining*DAY;
+    if(date>=start&&date<=end)activeMarkers.push({id:'print-relative-target',name:ps.relativeLabel||'Relativer Zieltermin',date:iso(date),kind:'relative'});
+  }
   const projected={projectName:String(snapshot.name||'Unbenanntes Projekt'),projectId:String(snapshot.id||''),revision:snapshot.revision||0,
     printedAt:new Date().toISOString(),start:iso(start),end:iso(end),rows:inRange,markers:activeMarkers,holidays,
     phases,taskCount:relevant.length,scope,options:structuredClone(options)};
