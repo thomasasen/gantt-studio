@@ -2,7 +2,7 @@ name: Validate Gantt Studio
 
 on:
   push:
-    branches: [main, refactor/engine-abstraction]
+    branches: [main, refactor/engine-abstraction, fix/frappe-lifecycle-isolation]
   workflow_dispatch:
 
 permissions:
@@ -27,6 +27,10 @@ jobs:
           node --check assets/js/core/project-activation.mjs
           node --check assets/js/engine/engine-contract.mjs
           node --check assets/js/engine/engine-controller.mjs
+          node --check assets/js/engine/engine-async-controller.mjs
+          node --check assets/js/engine/frappe/frappe-adapter.mjs
+          node --check tests/engine-async-controller.spec.mjs
+          node --check tests/frappe-async-controller.spec.cjs
           node --check assets/js/engine/native/native-adapter.mjs
           node --check assets/js/engine/native/native-interactions.mjs
           node --check assets/js/storage.js
@@ -44,6 +48,7 @@ jobs:
           test -s assets/js/core/project-activation.mjs
           test -s assets/js/engine/engine-contract.mjs
           test -s assets/js/engine/engine-controller.mjs
+          test -s assets/js/engine/engine-async-controller.mjs
           test -s assets/js/engine/native/native-adapter.mjs
           test -s assets/js/engine/native/native-interactions.mjs
           test -s assets/js/icons.mjs
@@ -101,3 +106,6 @@ jobs:
           grep -q 'const documentUrl=safeUrl(task.url)' assets/js/app.js
           grep -q 'font-size:13px' assets/css/task-table.css
           grep -q 'font-size:11px' assets/css/task-table.css
+
+      - name: Verify isolated async engine lifecycle
+        run: node --test tests/engine-async-controller.spec.mjs tests/frappe-gesture-gate.spec.mjs
