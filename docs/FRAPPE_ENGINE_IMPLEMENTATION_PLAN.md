@@ -859,3 +859,16 @@ Bei 1.000 Aufgaben gewinnt DHTMLX im synchronen Initial- und Rerendering moderat
 **Architekturentscheidung: NO-GO für DHTMLX Community als gegenwärtigen Ersatz der produktiven Native-Engine.** Die technisch sichere **isolierte Diagnose** darf separat in den Feature-Branch gemergt werden, falls auch nach diesem Dokumentations-Commit sämtliche finalen Head-/PR-Merge-Ref-Checks und Reviews grün sind. Weder `main` noch die produktive Engine- oder IndexedDB-Anbindung ändern. Neue Prüfung erst bei konkret dokumentierter Anforderung, die Native nicht wirtschaftlich erfüllt, oder wenn neue Community-Versionen fehlende Essentials ohne PRO bereitstellen.
 
 **Konkreter nächster technischer Schritt:** Native gezielt weiterpflegen und im bestehenden Feature-Branch die transaktionale Fachschicht vom Renderervertrag unabhängig stabilisieren; keine neue vollständige Gantt-Interaktionsschicht aufbauen. Die DHTMLX-Diagnose bleibt als dokumentierte Vergleichsbasis erhalten.
+
+
+### Phase 7 – Native-Engine: revisionierte Intents, rendererunabhängige Transaktionsgrenze
+
+**Ausgangspunkt:** `feature/frappe-transactional-editor@394d650` nach der abgeschlossenen DHTMLX-Evaluierung. Native bleibt produktiv; kein Engine-Switch, keine Änderung an `main`, JSON-Schema oder IndexedDB-Schreib-API.
+
+**Fehlerklasse und Korrektur:** Bisher trugen Native-Intents keinen Ursprungsstand. Ein verspäteter Callback konnte daher eine Aufgabe unter derselben ID im inzwischen gewechselten oder geänderten Projekt treffen. `assets/js/core/engine-intent-scope.mjs` ist die reine, rendererunabhängige Validierung von Projekt-ID, erwarteter Revision und Aktivierungsgeneration. Der Native-Adapter versieht Task-/Reorder-/Nudge-Intents mit dem gerenderten Ursprungsstand und entwertet alte Render-Callbacks. `app.js` prüft die Herkunft sowohl vor als auch **innerhalb** des serialisierten Projekt-Commits (CAS). Eine verworfene Native-Geste erhält ihre vorherige visuelle Geometrie zurück.
+
+**Zusätzliche P0-Abwehr:** `createProjectCommitter.remember` darf eine erfolgreich gespeicherte Revision nicht durch einen alten, verspätet gelesenen Snapshot zurücksetzen; dies führt nun zu `ConcurrentModificationError` und dem vorhandenen UI-Rollback des Projektwechsels. Schreibvorgänge bleiben transaktional pro Projekt und CAS-geschützt in IndexedDB.
+
+**Verifikation:** `tests/native-intent-scope.spec.mjs` prüft stale Projekt-/Revisions-/Generationskontexte, Queue-Supersession und monotone Baseline. `tests/native-intent-fence.spec.cjs` verwendet echte Chromium-Mausgesten, beweist Abbruch bei Renderwechsel und den Kontext eines gültigen Intents. Bestehende Node-/Native-/Frappe-/DHTMLX-Regressionen bleiben unverändert. Endgültige CI-Ergebnisse auf Feature-Head und PR-Merge-Ref müssen vor Merge separat bestätigt werden.
+
+**Red-Team-Grenzen:** Das Fencing ist eine Sicherheitsgrenze gegen verspätete Intents, kein neuer vollständiger Undo-/Redo-Mechanismus. Bereits an IndexedDB übergebene gültige Schreibvorgänge sind nicht nachträglich abbrechbar. Ein späterer produktiver Adapter muss denselben Intent-Scope-Vertrag erfüllen; im aktuellen Produktivpfad ist ausschließlich Native aktiv.

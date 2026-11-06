@@ -17,6 +17,15 @@ export function createProjectCommitter(save) {
 
   function remember(project) {
     if (!project?.id) throw new TypeError('Project id is required.');
+    const previous=committed.get(project.id);
+    // An out-of-order project read must not rewind a confirmed commit.
+    if (previous && Number.isSafeInteger(previous.revision)
+        && Number.isSafeInteger(project.revision)
+        && project.revision < previous.revision) {
+      const error=new Error('Veralteter Projektstand. Bitte Projekt erneut laden.');
+      error.name='ConcurrentModificationError';
+      throw error;
+    }
     if (!pending.has(project.id)) committed.set(project.id, clone(project));
   }
 

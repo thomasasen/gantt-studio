@@ -1,5 +1,6 @@
 import { renderGantt } from '../../gantt.js?v=2.8.1';
 import { createNativeInteractions } from './native-interactions.mjs?v=2.8.1';
+import { captureEngineIntentScope } from '../../core/engine-intent-scope.mjs?v=2.8.1';
 
 const CAPABILITIES=Object.freeze({
   id:'native', zoom:Object.freeze(['day','week','month']),
@@ -20,6 +21,12 @@ export function createNativeEngine() {
   let viewport=null;
   let interactions=null;
   let lastRequest=null;
+  let renderGeneration=0;
+  let renderScope=null;
+  const emitScopedIntent=intent=>{
+    if(!container||!renderScope)return false;
+    return onIntent({...intent,scope:renderScope});
+  };
   return {
     getCapabilities:()=>CAPABILITIES,
     mount(options) {
@@ -27,18 +34,22 @@ export function createNativeEngine() {
       if(!options?.container)throw new TypeError('Mount container required.');
       container=options.container;
       onIntent=options.onIntent;
-      interactions=createNativeInteractions({container,onIntent:options.onIntent,
+      interactions=createNativeInteractions({container,onIntent:emitScopedIntent,
         onSelect:options.onSelect,onError:options.onError,onStatus:options.onStatus});
     },
     render({project,view}) {
       if(!container)throw new Error('Native engine is not mounted.');
       lastRequest={project,view:{...view}};
       this.cancelInteraction();
+      const generation=++renderGeneration;
+      const scope=captureEngineIntentScope(project,view.activationGeneration);
+      renderScope=scope;
       interactions.update(project,view);
       activeRender=renderGantt(container,project,{
         zoom:view.zoom,
         reorderable:view.reorderable,
-        onTaskChange:change=>onIntent({type:'task-change',change})
+        onTaskChange:change=>generation===renderGeneration && container
+          ? onIntent({type:'task-change',change,scope}) : false
       });
       if(viewport) this.setViewport(viewport);
       return {empty:activeRender.empty===true};
@@ -55,6 +66,8 @@ export function createNativeEngine() {
       if(Number.isFinite(next.scrollTop)&&scroller)scroller.scrollTop=next.scrollTop;
     },
     cancelInteraction() {
+      ++renderGeneration;
+      renderScope=null;
       interactions?.cancel();
       activeRender?.destroy?.();
       activeRender=null;
