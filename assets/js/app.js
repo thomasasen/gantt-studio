@@ -32,6 +32,7 @@ let managementCriteria = { ...managementDefaults };
 let collapsedPhases = new Set();
 const projectCommitter = createProjectCommitter(saveLocal);
 const engineController = createEngineController(createNativeEngine);
+let projectSelectionSerial = 0;
 const pendingSaves = new Map();
 const lastSaveFailed = new Set();
 let toastTimer = null;
@@ -524,14 +525,14 @@ async function createProject() {
 
 async function changeProject(e) {
   const id=e.target.value;
-  // Switching projects cancels both the table drag and the active Gantt
-  // gesture before an asynchronous IndexedDB read can complete.
+  const selection=++projectSelectionSerial;
+  // Cancel both surfaces immediately. Never let an older asynchronous read
+  // overwrite a newer selection, even if a pending render repopulates select.
   cancelTaskDrag();
   engineController.cancelInteraction();
   try {
     const p=await loadProject(id);
-    // A second selection may have been made while the first read was pending.
-    if(!p || $('projectSelect').value!==id)return;
+    if(!p || selection!==projectSelectionSerial)return;
     envelope=normalizeEnvelope({schema:'gantt-studio.project',schemaVersion:1,generator:'Gantt Studio',project:p});
     projectCommitter.remember(envelope.project);
     setActiveProject(p.id);
