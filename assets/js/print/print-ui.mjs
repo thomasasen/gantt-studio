@@ -100,6 +100,7 @@ export function printHtml(projection,layout){
    if(s.owners&&row.owner)label+='<small>'+escape(row.owner)+'</small>';
    if(s.status&&row.status&&row.status!=='neutral')label+=' ['+escape(row.status)+']';
    if(s.dates)label+='<small>'+escape(fmt(row.start))+' – '+escape(fmt(row.end))+'</small>';
+    if(s.dependencies&&row.dependencies?.length)label+='<small>Vorgänger: '+escape(row.dependencies.join(', '))+'</small>';
    return '<tr style="height:'+page.rowHeights[rowIndex]+'mm"'+(row.type==='phase-summary'?' class="phase"':'')+'><td>'+label+'</td><td class="gantt">'+timeline(row,p,layout,s)+'</td></tr>';
   }).join('');
   return '<section class="sheet" style="width:'+layout.w+'mm;height:'+layout.h+'mm;--row-height:'+layout.rowHeight+'mm;--font-size:'+s.fontSize+'pt"><div class="inside" style="left:'+s.margin+'mm;top:'+s.margin+'mm;width:'+layout.usableW+'mm;height:'+layout.usableH+'mm">'+
@@ -115,10 +116,10 @@ export function createPrintController({getProject,getContext,onError=console.err
  const dialog=document.createElement('dialog');dialog.className='print-dialog';dialog.id='printPdfDialog';
  dialog.innerHTML='<header class="print-dialog-head"><div><h2>Drucken &amp; PDF</h2><p>Vollständiger Projektzeitplan, unabhängig vom sichtbaren Ausschnitt</p></div><button class="btn" type="button" data-print-close>Schließen</button></header>'+
  '<div class="print-dialog-body"><aside class="print-controls"><div id="printOptions"></div><div class="print-actions"><button class="btn" type="button" data-print-reset>Zurücksetzen</button><button class="btn primary" type="button" data-print-output>Drucken / PDF speichern</button></div></aside>'+
- '<section class="print-preview" aria-label="Druckvorschau"><div class="print-preview-head"><strong id="printCount"></strong><span id="printWarning" role="status"></span></div><iframe title="Mehrseitige Druckvorschau" id="printFrame"></iframe></section></div>';
+ '<section class="print-preview" aria-label="Druckvorschau"><div class="print-preview-head"><strong id="printCount"></strong><span id="printWarning" role="status"></span><div class="print-page-tools"><button type="button" class="btn" data-print-prev aria-label="Vorherige Druckseite">‹</button><output id="printCurrentPage">1</output><button type="button" class="btn" data-print-next aria-label="Nächste Druckseite">›</button><label>Zoom <input id="printPreviewZoom" type="range" min="35" max="100" value="65" step="5" aria-label="Vorschau-Zoom in Prozent"></label></div></div><iframe title="Mehrseitige Druckvorschau" id="printFrame"></iframe></section></div>';
  document.body.append(dialog);
  const options=dialog.querySelector('#printOptions'),frame=dialog.querySelector('#printFrame'),storageKey='gantt-studio.print-preferences-v1';
- let settings={...PRINT_DEFAULTS},snapshot,contextSnapshot,html='',pending=null;
+ let settings={...PRINT_DEFAULTS},snapshot,contextSnapshot,html='',pending=null,currentPage=1,pageCount=1;
  const update=()=>{
   try{
    const projection=projectForPrint(snapshot,settings,contextSnapshot);
@@ -129,6 +130,20 @@ export function createPrintController({getProject,getContext,onError=console.err
    dialog.querySelector('#printWarning').textContent=layout.warnings.join(' ');
   }catch(error){onError(error);dialog.querySelector('#printWarning').textContent='Fehler beim Erstellen der Druckseiten.';}
  };
+ const showPage=index=>{
+  currentPage=Math.max(1,Math.min(pageCount,index));
+  dialog.querySelector('#printCurrentPage').textContent=currentPage+' / '+pageCount;
+  const selected=frame.contentDocument?.querySelectorAll('.sheet')[currentPage-1];
+  selected?.scrollIntoView({block:'start',behavior:'instant'});
+ };
+ const zoomPreview=()=>{
+  const zoom=Number(dialog.querySelector('#printPreviewZoom').value)/100;
+  if(frame.contentDocument?.body)frame.contentDocument.body.style.zoom=String(zoom);
+ };
+ frame.addEventListener('load',()=>{zoomPreview();showPage(currentPage);});
+ dialog.querySelector('#printPreviewZoom').addEventListener('input',zoomPreview);
+ dialog.querySelector('[data-print-prev]').addEventListener('click',()=>showPage(currentPage-1));
+ dialog.querySelector('[data-print-next]').addEventListener('click',()=>showPage(currentPage+1));
  const draw=()=>{options.innerHTML=fields(settings,snapshot);update();};
  const persist=()=>{try{localStorage.setItem(storageKey,JSON.stringify(settings));}catch{/* preferences are optional */}};
  options.addEventListener('change',event=>{
