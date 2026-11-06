@@ -90,26 +90,39 @@ export function createDhtmlxEngine({diagnosticEditable=false,factory=()=>globalT
           try{gesture.preview=dhtmlxTaskToChange(task);}catch(error){cancel('invalid-preview');onError(error);}
         }
       });
-      event('onBeforeTaskChanged',(id,mode,original)=>{
+      event('onBeforeTaskChanged',(id,mode,_original)=>{
         record('onBeforeTaskChanged',{id:String(id),mode,released:!!gesture?.released});
-        if(gesture&&!gesture.cancelled&&gesture.id===String(id)&&gesture.stamp===generation){
+        // Empirical DHTMLX 10.0.3 result: returning false rolls back the vendor
+        // mutation and suppresses onAfterTaskDrag entirely. This event is the
+        // last public and synchronous boundary where the preview is available.
+        const current=gesture;
+        if(current&&!current.cancelled&&current.released
+            &&current.id===String(id)&&current.stamp===generation){
+          let change=null;
           try{
-            const change=dhtmlxTaskToChange(g.getTask(id));
+            change=dhtmlxTaskToChange(g.getTask(id));
             validateEditorIntent({type:'task-change',change},project,visibleIds);
-            if(['start','end','progress'].some(k=>gesture.before[k]!==change[k]))gesture.pending=change;
           }catch(error){record('rejected-change',{message:error.message});onError(error);}
+          gesture=null; // Consume at most once, even if the vendor fires again.
+          if(change&&['start','end','progress'].some(k=>current.before[k]!==change[k])){
+            const intent={type:'task-change',projectId:current.projectId,
+              expectedRevision:current.revision,gestureId:current.gestureId,
+              kind:mode,before:current.before,change};
+            // Let the documented return-false rollback complete before
+            // notifying the memory-only host. A new project/render fences
+            // this pending microtask.
+            queueMicrotask(()=>{
+              if(generation!==current.stamp||!host)return;
+              record('intent',{id:String(id),gestureId:current.gestureId});
+              Promise.resolve(onIntent(intent)).catch(onError);
+            });
+          }
         }
-        return false; // Public API: revert ALL vendor mutations; canonical remains authoritative.
+        return false; // Documented DHTMLX rollback, NOT a canonical commit.
       });
       event('onAfterTaskDrag',(id,mode)=>{
-        record('onAfterTaskDrag',{id:String(id),mode,released:!!gesture?.released});
-        const pending=gesture;gesture=null;
-        if(!pending||!pending.released||pending.cancelled||!pending.pending||pending.stamp!==generation)return;
-        const intent={type:'task-change',projectId:pending.projectId,
-          expectedRevision:pending.revision,gestureId:pending.gestureId,
-          kind:mode,before:pending.before,change:pending.pending};
-        record('intent',{id:String(id),gestureId:pending.gestureId});
-        Promise.resolve(onIntent(intent)).catch(onError);
+        // Observability only: DHTMLX 10.0.3 does not call this after rollback.
+        record('onAfterTaskDrag',{id:String(id),mode});
       });
       const target=document.createElement('div');
       target.style.cssText='height:480px;min-width:0;width:100%';
