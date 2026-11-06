@@ -42,6 +42,10 @@ async function noStorage(page){
 }
 async function physicalGesture(page,locator,delta,{cancel=false}={}){
   await expect(locator).toBeVisible();
+  // The Frappe comparison is BELOW a tall native chart: ensure physical
+  // Chromium coordinates are in the actual visible iframe viewport.
+  await locator.scrollIntoViewIfNeeded();
+  await expect(locator).toBeInViewport();
   const b=await locator.boundingBox();
   expect(b).toBeTruthy();
   const x=b.x+b.width/2,y=b.y+b.height/2;
@@ -93,6 +97,8 @@ test('physical Escape during movement rejects the pending gesture',async({page})
 test('physical release outside the iframe never writes or duplicates',async({page})=>{
   const frame=await fixture(page);
   const bar=frame.locator('.bar-wrapper[data-id="demo-core"] .bar');
+  await bar.scrollIntoViewIfNeeded();
+  await expect(bar).toBeInViewport();
   const b=await bar.boundingBox();
   const x=b.x+b.width/2,y=b.y+b.height/2;
   await page.mouse.move(x,y);await page.mouse.down();
