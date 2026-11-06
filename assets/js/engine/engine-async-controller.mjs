@@ -113,8 +113,10 @@ export function createAsyncEngineController(initialFactory) {
     if (!parent || !active.isConnected || !parent.isConnected)
       throw new Error('Engine staging requires an attached DOM mount container.');
     const rect = active.getBoundingClientRect();
-    const width = Math.max(1, rect.width || active.clientWidth || parent.clientWidth);
-    const height = Math.max(0, rect.height || active.offsetHeight);
+    // offset* measurements stay in layout CSS pixels at 200% browser/CSS zoom.
+    // Bounding rectangles may already be zoom-scaled; use them only as fallback.
+    const width = Math.max(1, active.offsetWidth || active.clientWidth || parent.clientWidth || rect.width);
+    const height = Math.max(0, active.offsetHeight || active.clientHeight || rect.height);
     const liveWidth = active.style.width;
     const node = document.createElement(active.tagName.toLowerCase());
     node.className = active.className;
