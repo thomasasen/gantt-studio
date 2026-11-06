@@ -132,9 +132,13 @@ export function createPrintController(getCurrent) {
       pages.textContent=layout.pages.length+' Seite(n) · '+layout.timePages+' Zeitabschnitt(e) × '+layout.rowPages+' Zeilenabschnitt(e)';
       status.textContent=layout.warnings.join(' ')||'Vollständiger Projektplan. Kein Viewport-Ausschnitt.';
       status.classList.toggle('warning',layout.warnings.length>0);
-      const css=printStyles(layout);
-      preview.innerHTML='<style>'+css+'</style>'+renderPrintPage(projection,layout,page,options);
-      preview.firstElementChild.nextElementSibling.style.zoom=zoom+'%';
+      const frame=document.createElement('iframe');
+      frame.title='Druckvorschau Seite '+page.number;
+      frame.className='print-preview-frame';
+      frame.style.width=layout.pageWidth+'mm';frame.style.height=layout.pageHeight+'mm';
+      frame.style.zoom=zoom+'%';
+      frame.srcdoc='<!doctype html><html lang="de"><head><meta charset="utf-8"><style>'+printStyles(layout)+'</style></head><body>'+renderPrintPage(projection,layout,page,options)+'</body></html>';
+      preview.replaceChildren(frame);
       $('printExecute').disabled=false;
     }catch(error){
       projection=null;layout=null;preview.textContent='Keine gültige Druckvorschau verfügbar.';
