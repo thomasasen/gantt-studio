@@ -27,7 +27,7 @@ const sheetCss = [
  '.inside{position:absolute;overflow:hidden}.title{font-size:13pt;font-weight:700;border-bottom:.2mm solid #bdcbd4;padding-bottom:2mm}',
  '.meta{font-size:8pt;margin:2mm 0 3mm;display:flex;justify-content:space-between;color:#516b79}',
  'table{border-collapse:collapse;table-layout:fixed;width:100%}th{background:#eaf1f5;text-align:left;font-size:8pt;padding:1mm 2mm;border:.2mm solid #cdd8df;vertical-align:top}',
- 'td{border-bottom:.2mm solid #e0e7eb;height:var(--row-height);padding:0 1mm;white-space:nowrap;text-overflow:ellipsis;overflow:hidden;font-size:var(--font-size)}tr.phase{background:#edf3f6;font-weight:700}',
+ 'td{border-bottom:.2mm solid #e0e7eb;height:var(--row-height);padding:1mm;white-space:normal;overflow-wrap:anywhere;overflow:hidden;font-size:var(--font-size)}tr.phase{background:#edf3f6;font-weight:700}',
  'td.gantt{padding:0}svg{display:block;width:100%;height:8mm}small{display:block;color:#647884;font-size:7pt}',
  '.footer{position:absolute;bottom:0;left:0;right:0;border-top:.2mm solid #ccd8df;padding-top:2mm;display:flex;justify-content:space-between;font-size:8pt;color:#516b79}',
  '.legend{margin-top:3mm;font-size:8pt;color:#516b79}',
@@ -64,12 +64,12 @@ export function printHtml(projection,layout){
   const markers=projection.markers.filter(m=>m.date>=page.from&&m.date<=page.to);
   const p={...page,markers};
   const headers='<thead><tr><th style="width:'+layout.labelW+'mm">Aufgabe</th><th>Zeitraum '+escape(fmt(page.from))+' – '+escape(fmt(page.to))+timeHeader(page,layout)+'</th></tr></thead>';
-  const body=page.rows.map(row=>{
+  const body=page.rows.map((row,rowIndex)=>{
    let label=s.names?escape(row.name):escape(row.id);
    if(s.owners&&row.owner)label+='<small>'+escape(row.owner)+'</small>';
    if(s.status&&row.status&&row.status!=='neutral')label+=' ['+escape(row.status)+']';
    if(s.dates)label+='<small>'+escape(fmt(row.start))+' – '+escape(fmt(row.end))+'</small>';
-   return '<tr'+(row.type==='phase-summary'?' class="phase"':'')+'><td title="'+escape(row.name)+'">'+label+'</td><td class="gantt">'+timeline(row,p,layout,s)+'</td></tr>';
+   return '<tr style="height:'+page.rowHeights[rowIndex]+'mm"'+(row.type==='phase-summary'?' class="phase"':'')+'><td>'+label+'</td><td class="gantt">'+timeline(row,p,layout,s)+'</td></tr>';
   }).join('');
   return '<section class="sheet" style="width:'+layout.w+'mm;height:'+layout.h+'mm;--row-height:'+layout.rowHeight+'mm;--font-size:'+s.fontSize+'pt"><div class="inside" style="left:'+s.margin+'mm;top:'+s.margin+'mm;width:'+layout.usableW+'mm;height:'+layout.usableH+'mm">'+
   (s.header?'<div class="title">'+escape(s.title||projection.name)+'</div><div class="meta"><span>'+escape(fmt(projection.from))+' – '+escape(fmt(projection.to))+'</span><span>Projektplan · Revision '+escape(projection.revision||'–')+'</span></div>':'')+
