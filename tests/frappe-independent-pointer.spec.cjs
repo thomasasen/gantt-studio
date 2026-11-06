@@ -117,6 +117,22 @@ test('real drag followed by iframe rerender has no stale intent',async({page})=>
   expect(await page.evaluate(()=>window.__independentCommits.length)).toBe(0);
   await noDB(page);
 });
+test('project activation during real physical drag discards old frame and intent',async({page})=>{
+  const {handle}=await start(page);
+  const previousFrame=page.frames().find(f=>f.url().includes('/spikes/frappe/frame.html'));
+  await drag(page,handle,90,{release:false});
+  const before=await previousFrame.evaluate(()=>window.__frappeInteractionTrace);
+  expect(before.some(e=>e.type==='independent-pointerdown')).toBe(true);
+  expect(before.some(e=>e.type==='independent-preview')).toBe(true);
+  await page.evaluate(()=>window.__independentSwitchProject());
+  await expect(page.locator('#status')).toContainText('Frappe: gerendert');
+  expect(previousFrame.isDetached()).toBe(true);
+  await page.mouse.up();
+  expect(await page.evaluate(()=>window.__independentCommits.length)).toBe(0);
+  expect(await page.evaluate(()=>window.__independentMemoryStore.snapshot().id))
+    .toBe('independent-other-project');
+  await noDB(page);
+});
 test('canonical project activation rejects stale pointer result',async({page})=>{
   const {handle}=await start(page);
   await drag(page,handle,90,{release:false});
