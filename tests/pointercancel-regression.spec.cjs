@@ -6,14 +6,18 @@ async function loadDemo(page){
   await expect(page.locator('#taskTableBody tr[data-task-row-id]')).toHaveCount(10);
   return page.locator('#projectSelect').inputValue();
 }
-const savedTasks=(page,id)=>page.evaluate(async projectId=>{
+const savedProject=(page,id)=>page.evaluate(async projectId=>{
   const {loadProject}=await import('/assets/js/storage.js?v=2.8.1');
-  return (await loadProject(projectId)).tasks;
+  return await loadProject(projectId);
 },id);
 
 async function cancelPointerDrag(page,handleSelector,dragClass){
   const handle=page.locator(handleSelector).first();
   await expect(handle).toBeVisible();
+  // BoundingBox alone does not scroll offscreen handles into the viewport.
+  // Hover performs a real hit-tested scroll before mouse.down and pointermove.
+  await handle.scrollIntoViewIfNeeded();
+  await handle.hover();
   await handle.evaluate(node=>{
     node.addEventListener('pointerdown',event=>{
       window.__qaPointerId=event.pointerId;
@@ -44,20 +48,20 @@ async function cancelPointerDrag(page,handleSelector,dragClass){
 
 test('table pointercancel discards reorder and releases pointer capture without a commit',async({page})=>{
   const id=await loadDemo(page);
-  const original=await savedTasks(page,id);
+  const original=await savedProject(page,id);
   await cancelPointerDrag(page,'#taskTableBody [data-task-drag-handle]','.task-row-dragging');
-  expect(await savedTasks(page,id)).toEqual(original);
+  expect(await savedProject(page,id)).toEqual(original);
   await page.reload();
   await expect(page.locator('#taskTableBody tr[data-task-row-id]')).toHaveCount(10);
-  expect(await savedTasks(page,id)).toEqual(original);
+  expect(await savedProject(page,id)).toEqual(original);
 });
 
 test('Gantt pointercancel discards reorder and releases pointer capture without a commit',async({page})=>{
   const id=await loadDemo(page);
-  const original=await savedTasks(page,id);
+  const original=await savedProject(page,id);
   await cancelPointerDrag(page,'#ganttStage [data-gantt-order-handle]','.gantt-row-dragging');
-  expect(await savedTasks(page,id)).toEqual(original);
+  expect(await savedProject(page,id)).toEqual(original);
   await page.reload();
   await expect(page.locator('#taskTableBody tr[data-task-row-id]')).toHaveCount(10);
-  expect(await savedTasks(page,id)).toEqual(original);
+  expect(await savedProject(page,id)).toEqual(original);
 });
