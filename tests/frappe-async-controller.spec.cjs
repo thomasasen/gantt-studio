@@ -266,6 +266,13 @@ test('commit preserves scroll and transfers keyboard focus, including 200 percen
    viewport.scrollLeft=82;viewport.scrollTop=105;
    host.querySelector('button').focus({preventScroll:true});
    const wasFocused=document.activeElement.textContent==='Old focused task';
+   const focusTrace=[];
+   const focusOriginal=HTMLElement.prototype.focus;
+   HTMLElement.prototype.focus=function(...args){
+    focusTrace.push({tag:this.tagName,id:this.id,tabindex:this.getAttribute('tabindex'),
+     hidden:this.getAttribute('aria-hidden'),inert:this.inert,connected:this.isConnected});
+    return focusOriginal.apply(this,args);
+   };
    const originalSize={width:host.offsetWidth,height:host.offsetHeight};
    const switched=await c.switchEngine(createFrappeEngine);
    const newRoot=viewport.firstElementChild;
@@ -274,14 +281,20 @@ test('commit preserves scroll and transfers keyboard focus, including 200 percen
     left:viewport.scrollLeft,top:viewport.scrollTop,
     active:newRoot.inert===false && !newRoot.hasAttribute('aria-hidden'),
     sizePreserved:newRoot.offsetWidth===originalSize.width && newRoot.offsetHeight===originalSize.height,
+    focusTrace,
+    activeElementTag:document.activeElement?.tagName,
+    activeElementId:document.activeElement?.id,
+    focusTargetTag:newRoot.tagName,
     frames:viewport.querySelectorAll('iframe').length,
     oldRemoved:!viewport.contains(host)
    };
   }finally{
+   HTMLElement.prototype.focus=focusOriginal;
    c.destroy();viewport.remove();document.documentElement.style.zoom='';
   }
  });
- expect(result).toEqual({
+ console.log('ENGINE_FOCUS_DIAGNOSTICS '+JSON.stringify(result));
+ expect(result).toMatchObject({
   switched:true,wasFocused:true,focusTransferred:true,
   left:82,top:105,active:true,sizePreserved:true,frames:1,oldRemoved:true
  });
