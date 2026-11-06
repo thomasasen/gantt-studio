@@ -14,8 +14,8 @@ test('actual Chromium PDF contains every selected task and correct page dimensio
   await page.locator('[data-print="strategy"]').selectOption('readable');
   const {html,expected}=await page.evaluate(()=>{
     const frame=document.querySelector('#printFrame');
-    const document=frame.contentDocument;
-    return {html:frame.srcdoc,expected:document.querySelectorAll('.sheet').length};
+    const printDocument=frame.contentDocument;
+    return {html:frame.srcdoc,expected:printDocument.querySelectorAll('.sheet').length};
   });
   expect(expected).toBeGreaterThan(0);
   mkdirSync('visual-review',{recursive:true});
