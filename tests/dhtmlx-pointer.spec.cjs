@@ -199,3 +199,22 @@ test('read-only DHTMLX renders across responsive widths, CSS zoom and reduced mo
  expect(await page.evaluate(()=>window.__dhtmlxTestIntents.length)).toBe(0);
  expect(await page.evaluate(()=>indexedDB.databases())).toEqual([]);
 });
+
+test('Escape restores visible vendor task geometry before physical pointer-up',async({page})=>{
+ const bar=await setup(page);
+ await bar.scrollIntoViewIfNeeded();const original=await bar.boundingBox();
+ expect(original).toBeTruthy();
+ const x=original.x+original.width*.6,y=original.y+original.height/2;
+ await page.mouse.move(x,y);await page.mouse.down();await page.mouse.move(x+80,y,{steps:10});
+ expect((await page.evaluate(()=>window.__dhtmlxTrace())).some(e=>e.type==='onTaskDrag')).toBe(true);
+ const preview=await bar.boundingBox();
+ expect(Math.abs(preview.x-original.x),'Physical drag must visibly move the vendor bar').toBeGreaterThan(5);
+ await page.keyboard.press('Escape');
+ await expect.poll(()=>page.evaluate(()=>window.__dhtmlxTrace().some(e=>e.type==='rollback-render'&&e.reason==='escape'))).toBe(true);
+ const restored=await page.locator('.gantt_task_line[task_id="demo-core"]').boundingBox();
+ expect(restored).toBeTruthy();
+ expect(Math.abs(restored.x-original.x),'Escape must restore the original date geometry').toBeLessThan(3);
+ await page.mouse.up();
+ expect(await page.evaluate(()=>window.__dhtmlxTestIntents.length)).toBe(0);
+ expect(await page.evaluate(()=>indexedDB.databases())).toEqual([]);
+});

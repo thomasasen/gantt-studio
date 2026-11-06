@@ -2,7 +2,7 @@ import {mapProjectToDhtmlx,dhtmlxTaskToChange} from './dhtmlx-mapper.mjs';
 import {validateEditorIntent} from '../../core/transactional-editor.mjs?v=2.8.1';
 const CAPABILITIES=Object.freeze({id:'dhtmlx-community-spike',zoom:Object.freeze(['day','week','month']),
   taskMove:true,resizeStart:true,resizeEnd:true,progress:true,reorder:false,
-  keyboardReorder:false,phaseRows:true,baseline:false,buffer:false,markers:true,
+  keyboardReorder:false,phaseRows:true,baseline:false,buffer:false,markers:false,
   holidays:false,dependencies:true,themes:0,print:false,offline:true});
 const SCALES=Object.freeze({
   day:[{unit:'month',step:1,format:'%F %Y'},{unit:'day',step:1,format:'%d'}],
@@ -21,11 +21,26 @@ export function createDhtmlxEngine({diagnosticEditable=false,factory=()=>globalT
   const cancel=(reason)=>{
     if(gesture){gesture.cancelled=true;record('cancel',{reason,id:gesture.id});gesture=null;}
   };
-  const down=e=>{if(gesture&&e.pointerId!==gesture.pointerId){cancel('second-pointer');}};
+  const rollback=(reason)=>{
+    const current=gesture;
+    cancel(reason);
+    if(!current||!host||!chart)return false;
+    const stamp=generation;
+    const request={project:structuredClone(project),view:{...view}};
+    // No private vendor drag state: destroy and reconstruct the isolated
+    // public instance from the canonical, immutable projection.
+    queueMicrotask(()=>{
+      if(stamp!==generation||!host||!chart||gesture)return;
+      try{api.render(request);record('rollback-render',{reason});}
+      catch(error){onError(error);}
+    });
+    return true;
+  };
+  const down=e=>{if(gesture&&e.pointerId!==gesture.pointerId){rollback('second-pointer');}};
   const up=e=>{if(gesture&&e.pointerId===gesture.pointerId){gesture.released=true;record('pointerup',{id:gesture.id});}};
-  const escape=e=>{if(e.key==='Escape'){cancel('escape');}};
-  const focus=()=>cancel('focus-lost');
-  const pointercancel=()=>cancel('pointercancel');
+  const escape=e=>{if(e.key==='Escape'){rollback('escape');}};
+  const focus=()=>rollback('focus-lost');
+  const pointercancel=()=>rollback('pointercancel');
   const clear=()=>{
     cancel('destroy-or-render');generation++;
     if(chart){
@@ -142,9 +157,10 @@ export function createDhtmlxEngine({diagnosticEditable=false,factory=()=>globalT
           Number.isFinite(next.scrollTop)?next.scrollTop:pos.y);
       }
     },
-    cancelInteraction:()=>cancel('explicit-cancel'),
+    cancelInteraction:()=>rollback('explicit-cancel'),
     locateMarker:()=>null,
-    focusTask(id){if(!chart)return false;return Boolean(chart.isTaskExists(id));},
+    // Returning true without moving keyboard focus would violate the contract.
+    focusTask:()=>false,
     destroy(){
       clear();
       if(host){
