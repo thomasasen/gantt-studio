@@ -1,5 +1,5 @@
 import { PRINT_DEFAULTS, sanitizePrintSettings, projectForPrint, paginatePrint, days, add } from './print-model.mjs?v=2.10.0';
-import { createImageExport, downloadPrintExport } from './print-export.mjs?v=2.10.0';
+import { createGanttChartSvg, createChartImage, downloadPrintExport } from './print-export.mjs?v=2.10.0';
 const escape = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const printColor=(value,fallback)=>/^#[0-9a-f]{3}(?:[0-9a-f]{3})?$/i.test(String(value||''))?value:fallback;
 const fmt = s => new Intl.DateTimeFormat('de-DE',{timeZone:'UTC',day:'2-digit',month:'2-digit',year:'numeric'}).format(new Date(s+'T00:00:00Z'));
@@ -7,27 +7,28 @@ const choices = (key,label,values,s) => '<label><span>'+label+'</span><select da
 const numeric = (key,label,s,min,max) => '<label><span>'+label+'</span><input type="number" min="'+min+'" max="'+max+'" data-print="'+key+'" value="'+s[key]+'"></label>';
 const toggle = (key,label,s) => '<label class="print-toggle"><input type="checkbox" data-print="'+key+'"'+(s[key]?' checked':'')+'><span>'+label+'</span></label>';
 function fields(s,project){
- return '<div class="print-fields">'+
+ const image=s.format!=='pdf';
+ const main='<div class="print-fields">'+
+ choices('format','Ausgabeformat',[['pdf','PDF · Druckseiten'],['png','PNG · Diagramm'],['jpg','JPG · Diagramm']],s)+
  choices('profile','Profil',[['management','Management'],['detail','Detaillierter Projektplan'],['custom','Benutzerdefiniert']],s)+
- choices('strategy','Skalierung',[['one','Eine Seite'],['fitWidth','Breite anpassen'],['readable','Lesbarkeit optimieren'],['manual','Manuell']],s)+
- choices('paper','Papierformat',[['A4','A4'],['A3','A3']],s)+
- choices('orientation','Ausrichtung',[['auto','Automatisch'],['portrait','Hochformat'],['landscape','Querformat']],s)+
  choices('scope','Aufgaben',[['all','Alle Gantt-Aufgaben'],['filtered','Aktuelle Filterauswahl'],['milestones','Meilensteine / Gates'],['phases','Ausgewählte Phasen'],['selected','Ausgewählte Aufgaben']],s)+
  choices('range','Zeitraum',[['full','Projektgrenzen'],['custom','Datumsbereich'],['month','Aktueller Monat'],['quarter','Aktuelles Quartal']],s)+
  '<label><span>Von</span><input type="date" data-print="from" value="'+escape(s.from)+'"></label>'+
- '<label><span>Bis</span><input type="date" data-print="to" value="'+escape(s.to)+'"></label>'+
- numeric('margin','Rand (mm)',s,5,30)+numeric('labelWidth','Aufgabenspalte (mm)',s,32,100)+
- numeric('rowHeight','Zeilenhöhe (mm)',s,6,16)+numeric('fontSize','Schrift (pt)',s,7,14)+
- numeric('scale','Zeitskala (%)',s,30,200)+
- '<label><span>Berichtstitel</span><input type="text" data-print="title" maxlength="120" value="'+escape(s.title)+'"></label>'+
- choices('format','Ausgabeformat',[['pdf','PDF'],['png','PNG'],['jpg','JPG']],s)+
- (s.format==='pdf'?'<div class="print-format-hint">PDF über den Browserdruckdialog speichern</div>':
-  choices('imageScope','Bildseiten',[['all','Alle Seiten (ZIP)'],['current','Aktuelle Seite']],s)+
-  choices('imageScale','Bildauflösung',[['1','1× (96 dpi)'],['2','2× (192 dpi)'],['3','3× (288 dpi)']],{imageScale:String(s.imageScale)})+
-  (s.format==='jpg'?choices('jpegQuality','JPG-Qualität',[['80','80 %'],['90','90 %'],['100','100 %']],{jpegQuality:String(s.jpegQuality)}):'<div class="print-format-hint">Verlustfreie Bildqualität</div>'))+
- '</div>'+
+ '<label><span>Bis</span><input type="date" data-print="to" value="'+escape(s.to)+'"></label>';
+ const layout=image?
+   choices('imageScale','Bildauflösung',[['1','1× (Standard)'],['2','2× (Scharf)'],['3','3× (Sehr scharf)']],{imageScale:String(s.imageScale)})+
+   choices('scale','Breite der Zeitachse (%)',[['50','50 %'],['75','75 %'],['100','100 %'],['125','125 %'],['150','150 %'],['200','200 %']],{scale:String(s.scale)})+
+   (s.format==='jpg'?choices('jpegQuality','JPG-Qualität',[['80','80 %'],['90','90 %'],['100','100 %']],{jpegQuality:String(s.jpegQuality)}):''):
+   choices('strategy','Skalierung',[['one','Eine Seite'],['fitWidth','Breite anpassen'],['readable','Lesbarkeit optimieren'],['manual','Manuell']],s)+
+   choices('paper','Papierformat',[['A4','A4'],['A3','A3']],s)+
+   choices('orientation','Ausrichtung',[['auto','Automatisch'],['portrait','Hochformat'],['landscape','Querformat']],s)+
+   numeric('margin','Rand (mm)',s,5,30)+numeric('labelWidth','Aufgabenspalte (mm)',s,32,100)+
+   numeric('rowHeight','Zeilenhöhe (mm)',s,6,16)+numeric('fontSize','Schrift (pt)',s,7,14)+numeric('scale','Zeitskala (%)',s,30,200);
+ const extra='<label class="print-field-wide"><span>Berichtstitel</span><input type="text" data-print="title" maxlength="120" value="'+escape(s.title)+'"></label></div>'+
+ (image?'<p class="print-format-hint">PNG und JPG speichern das vollständige Gantt-Diagramm als ein zusammenhängendes Bild. Der sichtbare Bildschirmausschnitt spielt keine Rolle.</p>':'')+
  '<fieldset class="print-toggles"><legend>Inhalte</legend>'+
  [['names','Aufgabennamen'],['owners','Verantwortliche'],['status','Status'],['progress','Fortschritt'],['dates','Datumsangaben'],['phases','Phasen'],['milestones','Meilensteine und Gates'],['baseline','Baselines'],['markers','Marker'],['dependencies','Abhängigkeiten'],['buffers','Puffer'],['risks','Risiken'],['weekends','Wochenenden'],['holidays','Feiertage'],['today','Heute-Linie'],['expandCollapsed','Eingeklappte Phasen erweitern'],['legend','Legende'],['header','Kopfzeile'],['footer','Fußzeile'],['color','Farben']].map(([k,v])=>toggle(k,v,s)).join('')+'</fieldset>'+selectionFields(s,project);
+ return main+layout+extra;
 }
 function selectionFields(s,project){
  if(!project||!['phases','selected'].includes(s.scope))return '';
@@ -134,23 +135,34 @@ export function createPrintController({getProject,getContext,onError=console.err
  const update=()=>{
   try{
    const projection=projectForPrint(snapshot,settings,contextSnapshot);
-   const layout=paginatePrint(projection);
-   html=printHtml(projection,layout);
-   pageCount=layout.pageCount;
-   currentPage=Math.max(1,Math.min(currentPage,pageCount));
+   const image=settings.format!=='pdf';
+   const tools=dialog.querySelector('.print-page-tools');
+   tools.hidden=image;
+   if(image){
+    const chart=createGanttChartSvg(projection);
+    html='<!doctype html><html lang="de"><head><meta charset="utf-8"><style>body{margin:0;padding:20px;background:#e9eef2}svg{display:block;margin:auto;box-shadow:0 4px 18px #20304022}</style></head><body>'+chart.svg+'</body></html>';
+    pageCount=1;currentPage=1;
+    dialog.querySelector('#printCount').textContent='Vollständiges Diagramm · '+chart.width+' × '+chart.height+' Pixel (1×)';
+    dialog.querySelector('#printWarning').textContent='';
+   }else{
+    const layout=paginatePrint(projection);
+    html=printHtml(projection,layout);
+    pageCount=layout.pageCount;
+    currentPage=Math.max(1,Math.min(currentPage,pageCount));
+    dialog.querySelector('#printCount').textContent=layout.pageCount+' Seiten · '+layout.horizontal+' Zeitabschnitte × '+layout.vertical+' Aufgabenabschnitte';
+    dialog.querySelector('#printWarning').textContent=layout.warnings.join(' ');
+   }
    dialog.querySelector('#printCurrentPage').textContent=currentPage+' / '+pageCount;
-  dialog.querySelector('[data-print-prev]').disabled=currentPage<=1;
-  dialog.querySelector('[data-print-next]').disabled=currentPage>=pageCount;
    dialog.querySelector('[data-print-prev]').disabled=currentPage<=1;
    dialog.querySelector('[data-print-next]').disabled=currentPage>=pageCount;
    frame.srcdoc=html;
-   dialog.querySelector('#printCount').textContent=layout.pageCount+' Seiten · '+layout.horizontal+' Zeitabschnitte × '+layout.vertical+' Aufgabenabschnitte';
-   dialog.querySelector('#printWarning').textContent=layout.warnings.join(' ');
   }catch(error){onError(error);dialog.querySelector('#printWarning').textContent='Fehler beim Erstellen der Druckseiten.';}
  };
  const showPage=index=>{
   currentPage=Math.max(1,Math.min(pageCount,index));
   dialog.querySelector('#printCurrentPage').textContent=currentPage+' / '+pageCount;
+  dialog.querySelector('[data-print-prev]').disabled=currentPage<=1;
+  dialog.querySelector('[data-print-next]').disabled=currentPage>=pageCount;
   const selected=frame.contentDocument?.querySelectorAll('.sheet')[currentPage-1];
   selected?.scrollIntoView({block:'start',behavior:'instant'});
  };
@@ -207,11 +219,10 @@ export function createPrintController({getProject,getContext,onError=console.err
   exportButton.disabled=true;
   exportButton.textContent='Export läuft…';
   try{
-   const doc=frame.contentDocument;
-   if(!doc?.querySelector('.sheet')||doc.readyState!=='complete')throw new Error('Vorschau ist noch nicht fertig geladen.');
-   const result=await createImageExport(doc,{format:settings.format,scale:settings.imageScale,jpegQuality:settings.jpegQuality,scope:settings.imageScope,currentPage,projectName:snapshot?.name||settings.title});
+   const projection=projectForPrint(snapshot,settings,contextSnapshot);
+   const result=await createChartImage(projection,{format:settings.format,scale:settings.imageScale,jpegQuality:settings.jpegQuality});
    downloadPrintExport(result);
-   outputStatus.textContent=result.pages>1?result.pages+' Bildseiten als ZIP exportiert.':'Bildseite exportiert.';
+   outputStatus.textContent='Gantt-Diagramm als '+settings.format.toUpperCase()+' exportiert ('+result.width+' × '+result.height+' Pixel).';
   }catch(error){
    onError(error);
    outputStatus.textContent='Export fehlgeschlagen: '+error.message;
