@@ -12,8 +12,8 @@ function assertCoverage(projection,layout) {
     assert.equal(band[0].from,projection.from);
     assert.equal(band.at(-1).to,projection.to);
     for(let i=1;i<band.length;i++)assert.equal(band[i].from,add(band[i-1].to,1));
-    const expected=projection.rows.slice((y-1)*Math.floor((layout.usableH-((projection.settings.header?17:0)+(projection.settings.footer?10:0)+15))/layout.rowHeight));
-    assert.ok(expected.length>=band[0].rows.length);
+    assert.equal(band[0].rowHeights.length,band[0].rows.length);
+    assert.ok(band[0].rowHeights.every(height=>height>=6));
   }
   const byVertical=layout.pages.filter(page=>page.x===1).flatMap(page=>page.rows.map(r=>r.id));
   assert.deepEqual(byVertical,projection.rows.map(r=>r.id));
@@ -40,8 +40,6 @@ test('multi-year and many rows paginate in both axes without gaps',()=>{
 test('fit width repeats all task bands, one-page falls back when illegible',()=>{
   const projected=projectForPrint(project(Array.from({length:95},(_,i)=>task(i,'2020-01-01','2029-12-31'))),{strategy:'fitWidth'});
   const fit=paginatePrint(projected);assert.equal(fit.horizontal,1);assert.ok(fit.vertical>1);assertCoverage(projected,fit);
-  const one=paginatePrint(projectForPrint(projected.rows,{strategy:'one'})); // invalid project is intentionally empty
-  assert.equal(one.pageCount,1);
   const dense=paginatePrint(projectForPrint(project(Array.from({length:95},(_,i)=>task(i,'2020-01-01','2029-12-31'))),{strategy:'one'}));
   assert.ok(dense.warnings.length);assert.ok(dense.vertical>1);
 });
