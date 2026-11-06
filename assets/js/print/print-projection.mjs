@@ -19,13 +19,13 @@ export function createPrintProjection(project,options={},view={}) {
   const filteredIds=asSet(view.filteredTaskIds);
   const collapsedIds=asSet(view.collapsedPhaseIds);
   const scope=options.scope||'all';
-  let tasks=snapshot.tasks.filter(t=>t.showInGantt!==false&&valid(t.start)&&valid(t.end)&&parse(t.start)<=parse(t.end));
+  const baseTasks=snapshot.tasks.filter(t=>t.showInGantt!==false&&valid(t.start)&&valid(t.end)&&parse(t.start)<=parse(t.end));
+  let tasks=baseTasks;
   if(scope==='filtered')tasks=tasks.filter(t=>filteredIds.has(String(t.id)));
   if(scope==='selected')tasks=tasks.filter(t=>selectedIds.has(String(t.id)));
   if(scope==='phases')tasks=tasks.filter(t=>selectedPhases.has(String(t.phaseId)));
   if(scope==='summary')tasks=tasks.filter(t=>['milestone','gate'].includes(t.type));
   if(elements.milestones===false)tasks=tasks.filter(t=>!['milestone','gate'].includes(t.type));
-  if(options.expandCollapsed===false)tasks=tasks.filter(t=>!collapsedIds.has(String(t.phaseId)));
   const originalIndex=new Map(snapshot.tasks.map((task,i)=>[String(task.id),i]));
   const sortMode=view.sortMode==='date'?'date':'manual';
   const sortTasks=(a,b)=>sortMode==='date'
@@ -33,16 +33,30 @@ export function createPrintProjection(project,options={},view={}) {
     : (Number.isFinite(Number(a.displayOrder))?Number(a.displayOrder):originalIndex.get(String(a.id)))
        -(Number.isFinite(Number(b.displayOrder))?Number(b.displayOrder):originalIndex.get(String(b.id)))
        ||originalIndex.get(String(a.id))-originalIndex.get(String(b.id));
-  const byPhase=new Map(phases.map(p=>[String(p.id),[]])),unphased=[];
+  const byPhase=new Map(phases.map(p=>[String(p.id),[]]));
+  const allByPhase=new Map(phases.map(p=>[String(p.id),[]])),unphased=[];
+  for(const task of baseTasks){const bucket=allByPhase.get(String(task.phaseId));if(bucket)bucket.push(task);}
   for(const task of tasks){const bucket=byPhase.get(String(task.phaseId));(bucket||unphased).push(task);}
   const rows=[];
   for(const phase of phases) {
-    const members=byPhase.get(String(phase.id));if(!members?.length)continue;
+    const members=byPhase.get(String(phase.id))||[];
+    // Management summaries must show ALL actual project phases, not only
+    // phases whose milestones pass the management task filter.
+    const summaryMembers=scope==='summary'?(allByPhase.get(String(phase.id))||[]):members;
+    if(!summaryMembers.length)continue;
     members.sort(sortTasks);
-    const starts=members.map(t=>t.start).sort(),ends=members.map(t=>t.end).sort();
-    if(elements.phases!==false)rows.push({kind:'phase',id:'phase:'+phase.id,name:phase.name||'Phase',phaseId:phase.id,start:valid(phase.start)?phase.start:starts[0],end:valid(phase.end)?phase.end:ends.at(-1),progress:Math.round(members.reduce((s,t)=>s+Number(t.progress||0),0)/members.length),status:'neutral',owner:members.length+' Aufgaben',color:phase.color||'#DCE8EB'});
-    if(scope!=='summary')rows.push(...members.map(t=>({...t,kind:'task'})));
-    else rows.push(...members.map(t=>({...t,kind:'task'})));
+    const starts=summaryMembers.map(t=>t.start).sort(),ends=summaryMembers.map(t=>t.end).sort();
+    const fullPhase=scope==='summary'||scope==='all';
+    if(elements.phases!==false)rows.push({
+      kind:'phase',id:'phase:'+phase.id,name:phase.name||'Phase',phaseId:phase.id,
+      start:fullPhase&&valid(phase.start)?phase.start:starts[0],
+      end:fullPhase&&valid(phase.end)?phase.end:ends.at(-1),
+      progress:Math.round(summaryMembers.reduce((s,t)=>s+Number(t.progress||0),0)/summaryMembers.length),
+      status:'neutral',owner:summaryMembers.length+' Aufgaben',color:phase.color||'#DCE8EB'
+    });
+    // Collapsed phases retain their printable summary row.
+    if(options.expandCollapsed!==false||!collapsedIds.has(String(phase.id)))
+      rows.push(...members.map(t=>({...t,kind:'task'})));
   }
   rows.push(...unphased.sort(sortTasks).map(t=>({...t,kind:'task'})));
   const relevant=rows.filter(r=>r.kind==='task');
