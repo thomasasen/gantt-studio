@@ -1,4 +1,4 @@
-import { assertEngineContract, immutableEngineProjection } from './engine-contract.mjs?v=2.8.2';
+import { assertEngineContract, immutableEngineProjection } from './engine-contract.mjs?v=2.9.0';
 
 /**
  * Opt-in coordinator only. Production uses the synchronous Native controller.
