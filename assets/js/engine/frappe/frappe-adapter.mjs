@@ -1,4 +1,5 @@
 import {mapProjectToFrappeTasks} from './frappe-task-mapper.mjs?v=2.8.1';
+import {validateEditorIntent} from '../../core/transactional-editor.mjs?v=2.8.1';
 
 /*
  * Frappe 1.2.2 installs a global document mouseup handler per Gantt instance
@@ -28,7 +29,8 @@ export function createFrappeEngine({experimentalEditable=false,readyTimeoutMs=15
   let container=null,frame=null,generation=0,mounted=false;
   let onSelect=()=>{},onError=()=>{},onStatus=()=>{};
   let messageHandler=null,lastRequest=null,onIntent=()=>{};
-  let pendingRender=null;
+  let pendingRender=null,frameSession=null,renderReady=false;
+  let allowedIds=new Set(),seenGestures=new Set();
   function finishPending(token,value,error=null){
     if(!pendingRender || (token!==null && pendingRender.token!==token))return;
     const pending=pendingRender;
@@ -58,22 +60,31 @@ export function createFrappeEngine({experimentalEditable=false,readyTimeoutMs=15
       messageHandler=event=>{
         if(event.origin!==location.origin||event.source!==frame?.contentWindow)return;
         const data=event.data;
-        if(!data||data.channel!==CHANNEL||data.generation!==generation)return;
+        if(!data||data.channel!==CHANNEL||data.generation!==generation
+          || data.session!==frameSession)return;
         if(data.type==='ready'){
+          if(renderReady)return;
+          renderReady=true;
           finishPending(generation,{empty:false});
           onStatus('Frappe: gerendert');
         }
-        else if(data.type==='selected')onSelect({kind:'task',id:String(data.id)});
+        else if(data.type==='selected'&&renderReady&&allowedIds.has(data.id))
+          onSelect({kind:'task',id:data.id});
         else if(data.type==='error'){
           const error=new Error('Frappe-Frame: '+String(data.message));
           finishPending(generation,null,error);
           onError(error);
         }
-        else if(data.type==='cancelled' && experimentalEditable && lastRequest)
+        else if(data.type==='cancelled' && experimentalEditable && renderReady && lastRequest)
           engine.render(lastRequest);
-        else if(data.type==='intent' && experimentalEditable) {
-          try{Promise.resolve(onIntent(data.intent)).catch(onError);}
-          catch(error){onError(error);}
+        else if(data.type==='intent' && experimentalEditable && renderReady && lastRequest) {
+          try{
+            if(!Number.isSafeInteger(data.gestureId)||data.gestureId<1
+                || seenGestures.has(data.gestureId))return;
+            const change=validateEditorIntent(data.intent,lastRequest.project,allowedIds);
+            seenGestures.add(data.gestureId);
+            Promise.resolve(onIntent({type:'task-change',change})).catch(onError);
+          }catch(error){onError(error);}
         }
       };
       window.addEventListener('message',messageHandler);
@@ -82,7 +93,11 @@ export function createFrappeEngine({experimentalEditable=false,readyTimeoutMs=15
       if(!mounted)throw new Error('Frappe engine must be mounted first.');
       if(!Object.hasOwn(VIEW_MODE,view?.zoom))throw new RangeError('Unsupported zoom');
       const tasks=mapProjectToFrappeTasks(project);
-      lastRequest={project,view};
+      lastRequest={project:structuredClone(project),view:{...view}};
+      allowedIds=new Set(tasks.map(task=>task.id));
+      seenGestures=new Set();
+      frameSession=crypto.randomUUID();
+      renderReady=false;
       const token=++generation;
       finishPending(null,{superseded:true});
       detachFrame();
@@ -96,7 +111,8 @@ export function createFrappeEngine({experimentalEditable=false,readyTimeoutMs=15
       target.onload=()=>{
         if(!mounted||frame!==target||generation!==token)return;
         target.contentWindow?.postMessage({
-          channel:CHANNEL,type:'render',generation:token,tasks,viewMode:VIEW_MODE[view.zoom],
+          channel:CHANNEL,type:'render',generation:token,session:frameSession,
+          tasks,viewMode:VIEW_MODE[view.zoom],
           experimentalEditable:Boolean(experimentalEditable)
         },location.origin);
       };
@@ -130,7 +146,8 @@ export function createFrappeEngine({experimentalEditable=false,readyTimeoutMs=15
     },
     cancelInteraction() {
       if(experimentalEditable&&frame?.contentWindow){
-        frame.contentWindow.postMessage({channel:CHANNEL,type:'cancel',generation},location.origin);
+        frame.contentWindow.postMessage({channel:CHANNEL,type:'cancel',generation,
+          session:frameSession},location.origin);
       }
     },
     locateMarker(){return null;},
@@ -143,6 +160,7 @@ export function createFrappeEngine({experimentalEditable=false,readyTimeoutMs=15
       if(messageHandler)window.removeEventListener('message',messageHandler);
       container.replaceChildren();
       container=null;messageHandler=null;mounted=false;lastRequest=null;
+      frameSession=null;renderReady=false;allowedIds.clear();seenGestures.clear();
       onSelect=()=>{};onError=()=>{};onStatus=()=>{};onIntent=()=>{};
     }
   };
