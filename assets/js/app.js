@@ -1,14 +1,14 @@
-import { createPrintController } from './print/print-ui.mjs?v=2.9.0';
-import { createEngineController } from './engine/engine-controller.mjs?v=2.9.0';
-import { createNativeEngine } from './engine/native/native-adapter.mjs?v=2.9.0';
-import { createProjectCommitter } from './core/project-commits.mjs?v=2.9.0';
-import { createProjectActivationCoordinator } from './core/project-activation.mjs?v=2.9.0';
-import { matchesEngineIntentScope } from './core/engine-intent-scope.mjs?v=2.9.0';
-import { localTodayIso, isValidIsoDate } from './core/date-only.mjs?v=2.9.0';
-import { icon, hydrateIcons } from './icons.mjs?v=2.9.0';
-import { saveLocal, loadActive, loadProject, listProjects, deleteProject, setActiveProject } from './storage.js?v=2.9.0';
-import { normalizeTaskOrder, nextDisplayOrder, sortedProjectTasks, phaseKey, reorderTask, nudgeTask } from './task-order.mjs?v=2.9.0';
-import { DESIGN_COLOR_FIELDS, DESIGN_PRESETS, findDesignPreset, matchDesignPreset, designThemeMode } from './design-presets.mjs?v=2.9.0';
+import { createPrintController } from './print/print-ui.mjs?v=2.10.0';
+import { createEngineController } from './engine/engine-controller.mjs?v=2.10.0';
+import { createNativeEngine } from './engine/native/native-adapter.mjs?v=2.10.0';
+import { createProjectCommitter } from './core/project-commits.mjs?v=2.10.0';
+import { createProjectActivationCoordinator } from './core/project-activation.mjs?v=2.10.0';
+import { matchesEngineIntentScope } from './core/engine-intent-scope.mjs?v=2.10.0';
+import { localTodayIso, isValidIsoDate } from './core/date-only.mjs?v=2.10.0';
+import { icon, hydrateIcons } from './icons.mjs?v=2.10.0';
+import { saveLocal, loadActive, loadProject, listProjects, deleteProject, setActiveProject } from './storage.js?v=2.10.0';
+import { normalizeTaskOrder, nextDisplayOrder, sortedProjectTasks, phaseKey, reorderTask, nudgeTask } from './task-order.mjs?v=2.10.0';
+import { DESIGN_COLOR_FIELDS, DESIGN_PRESETS, findDesignPreset, matchDesignPreset, designThemeMode } from './design-presets.mjs?v=2.10.0';
 
 const $ = (id) => document.getElementById(id);
 const clone = (x) => JSON.parse(JSON.stringify(x));

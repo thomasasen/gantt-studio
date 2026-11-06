@@ -1,4 +1,5 @@
-import { PRINT_DEFAULTS, sanitizePrintSettings, projectForPrint, paginatePrint, days, add } from './print-model.mjs?v=2.9.0';
+import { PRINT_DEFAULTS, sanitizePrintSettings, projectForPrint, paginatePrint, days, add } from './print-model.mjs?v=2.10.0';
+import { createGanttChartSvg, createChartImage, downloadPrintExport } from './print-export.mjs?v=2.10.0';
 const escape = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const printColor=(value,fallback)=>/^#[0-9a-f]{3}(?:[0-9a-f]{3})?$/i.test(String(value||''))?value:fallback;
 const fmt = s => new Intl.DateTimeFormat('de-DE',{timeZone:'UTC',day:'2-digit',month:'2-digit',year:'numeric'}).format(new Date(s+'T00:00:00Z'));
@@ -6,21 +7,28 @@ const choices = (key,label,values,s) => '<label><span>'+label+'</span><select da
 const numeric = (key,label,s,min,max) => '<label><span>'+label+'</span><input type="number" min="'+min+'" max="'+max+'" data-print="'+key+'" value="'+s[key]+'"></label>';
 const toggle = (key,label,s) => '<label class="print-toggle"><input type="checkbox" data-print="'+key+'"'+(s[key]?' checked':'')+'><span>'+label+'</span></label>';
 function fields(s,project){
- return '<div class="print-fields">'+
+ const image=s.format!=='pdf';
+ const main='<div class="print-fields">'+
+ choices('format','Ausgabeformat',[['pdf','PDF · Druckseiten'],['png','PNG · Diagramm'],['jpg','JPG · Diagramm']],s)+
  choices('profile','Profil',[['management','Management'],['detail','Detaillierter Projektplan'],['custom','Benutzerdefiniert']],s)+
- choices('strategy','Skalierung',[['one','Eine Seite'],['fitWidth','Breite anpassen'],['readable','Lesbarkeit optimieren'],['manual','Manuell']],s)+
- choices('paper','Papierformat',[['A4','A4'],['A3','A3']],s)+
- choices('orientation','Ausrichtung',[['auto','Automatisch'],['portrait','Hochformat'],['landscape','Querformat']],s)+
  choices('scope','Aufgaben',[['all','Alle Gantt-Aufgaben'],['filtered','Aktuelle Filterauswahl'],['milestones','Meilensteine / Gates'],['phases','Ausgewählte Phasen'],['selected','Ausgewählte Aufgaben']],s)+
  choices('range','Zeitraum',[['full','Projektgrenzen'],['custom','Datumsbereich'],['month','Aktueller Monat'],['quarter','Aktuelles Quartal']],s)+
  '<label><span>Von</span><input type="date" data-print="from" value="'+escape(s.from)+'"></label>'+
- '<label><span>Bis</span><input type="date" data-print="to" value="'+escape(s.to)+'"></label>'+
- numeric('margin','Rand (mm)',s,5,30)+numeric('labelWidth','Aufgabenspalte (mm)',s,32,100)+
- numeric('rowHeight','Zeilenhöhe (mm)',s,6,16)+numeric('fontSize','Schrift (pt)',s,7,14)+
- numeric('scale','Zeitskala (%)',s,30,200)+
- '<label><span>Berichtstitel</span><input type="text" data-print="title" maxlength="120" value="'+escape(s.title)+'"></label></div>'+
+ '<label><span>Bis</span><input type="date" data-print="to" value="'+escape(s.to)+'"></label>';
+ const layout=image?
+   choices('imageScale','Bildauflösung',[['1','1× (Standard)'],['2','2× (Scharf)'],['3','3× (Sehr scharf)']],{imageScale:String(s.imageScale)})+
+   choices('scale','Breite der Zeitachse (%)',[['50','50 %'],['75','75 %'],['100','100 %'],['125','125 %'],['150','150 %'],['200','200 %']],{scale:String(s.scale)})+
+   (s.format==='jpg'?choices('jpegQuality','JPG-Qualität',[['80','80 %'],['90','90 %'],['100','100 %']],{jpegQuality:String(s.jpegQuality)}):''):
+   choices('strategy','Skalierung',[['one','Eine Seite'],['fitWidth','Breite anpassen'],['readable','Lesbarkeit optimieren'],['manual','Manuell']],s)+
+   choices('paper','Papierformat',[['A4','A4'],['A3','A3']],s)+
+   choices('orientation','Ausrichtung',[['auto','Automatisch'],['portrait','Hochformat'],['landscape','Querformat']],s)+
+   numeric('margin','Rand (mm)',s,5,30)+numeric('labelWidth','Aufgabenspalte (mm)',s,32,100)+
+   numeric('rowHeight','Zeilenhöhe (mm)',s,6,16)+numeric('fontSize','Schrift (pt)',s,7,14)+numeric('scale','Zeitskala (%)',s,30,200);
+ const extra='<label class="print-field-wide"><span>Berichtstitel</span><input type="text" data-print="title" maxlength="120" value="'+escape(s.title)+'"></label></div>'+
+ (image?'<p class="print-format-hint">PNG und JPG speichern das vollständige Gantt-Diagramm als ein zusammenhängendes Bild. Der sichtbare Bildschirmausschnitt spielt keine Rolle.</p>':'')+
  '<fieldset class="print-toggles"><legend>Inhalte</legend>'+
  [['names','Aufgabennamen'],['owners','Verantwortliche'],['status','Status'],['progress','Fortschritt'],['dates','Datumsangaben'],['phases','Phasen'],['milestones','Meilensteine und Gates'],['baseline','Baselines'],['markers','Marker'],['dependencies','Abhängigkeiten'],['buffers','Puffer'],['risks','Risiken'],['weekends','Wochenenden'],['holidays','Feiertage'],['today','Heute-Linie'],['expandCollapsed','Eingeklappte Phasen erweitern'],['legend','Legende'],['header','Kopfzeile'],['footer','Fußzeile'],['color','Farben']].map(([k,v])=>toggle(k,v,s)).join('')+'</fieldset>'+selectionFields(s,project);
+ return main+layout+extra;
 }
 function selectionFields(s,project){
  if(!project||!['phases','selected'].includes(s.scope))return '';
@@ -116,8 +124,8 @@ export function printHtml(projection,layout){
 }
 export function createPrintController({getProject,getContext,onError=console.error}){
  const dialog=document.createElement('dialog');dialog.className='print-dialog';dialog.id='printPdfDialog';
- dialog.innerHTML='<header class="print-dialog-head"><div><h2>Drucken &amp; PDF</h2><p>Vollständiger Projektzeitplan, unabhängig vom sichtbaren Ausschnitt</p></div><button class="btn" type="button" data-print-close>Schließen</button></header>'+
- '<div class="print-dialog-body"><aside class="print-controls"><div id="printOptions"></div><div class="print-profile-save"><label><span>Eigenes Druckprofil</span><input id="printProfileName" maxlength="50" placeholder="Profilname"></label><button type="button" class="btn" data-print-save-profile>Speichern</button><select id="printSavedProfiles" aria-label="Gespeichertes Druckprofil auswählen"><option value="">Gespeicherte Profile…</option></select></div><div class="print-actions"><button class="btn" type="button" data-print-reset>Zurücksetzen</button><button class="btn primary" type="button" data-print-output>Drucken / PDF speichern</button></div></aside>'+
+ dialog.innerHTML='<header class="print-dialog-head"><div><h2>Drucken &amp; Exportieren</h2><p>Vollständiger Projektzeitplan, unabhängig vom sichtbaren Ausschnitt</p></div><button class="btn" type="button" data-print-close>Schließen</button></header>'+
+ '<div class="print-dialog-body"><aside class="print-controls"><div id="printOptions"></div><div class="print-profile-save"><label><span>Eigenes Druckprofil</span><input id="printProfileName" maxlength="50" placeholder="Profilname"></label><button type="button" class="btn" data-print-save-profile>Speichern</button><select id="printSavedProfiles" aria-label="Gespeichertes Druckprofil auswählen"><option value="">Gespeicherte Profile…</option></select></div><div class="print-export-status" id="printExportStatus" role="status" aria-live="polite"></div><div class="print-actions"><button class="btn" type="button" data-print-reset>Zurücksetzen</button><button class="btn primary" type="button" data-print-output>Exportieren</button></div></aside>'+
  '<section class="print-preview" aria-label="Druckvorschau"><div class="print-preview-head"><strong id="printCount"></strong><span id="printWarning" role="status"></span><div class="print-page-tools"><button type="button" class="btn" data-print-prev aria-label="Vorherige Druckseite">‹</button><output id="printCurrentPage">1</output><button type="button" class="btn" data-print-next aria-label="Nächste Druckseite">›</button><label>Zoom <input id="printPreviewZoom" type="range" min="35" max="100" value="65" step="5" aria-label="Vorschau-Zoom in Prozent"></label></div></div><iframe title="Mehrseitige Druckvorschau" id="printFrame"></iframe></section></div>';
  document.body.append(dialog);
  const options=dialog.querySelector('#printOptions'),frame=dialog.querySelector('#printFrame'),storageKey='gantt-studio.print-preferences-v1';
@@ -127,28 +135,46 @@ export function createPrintController({getProject,getContext,onError=console.err
  const update=()=>{
   try{
    const projection=projectForPrint(snapshot,settings,contextSnapshot);
-   const layout=paginatePrint(projection);
-   html=printHtml(projection,layout);
+   const image=settings.format!=='pdf';
+   const tools=dialog.querySelector('.print-page-tools');
+   tools.hidden=image;
+   if(image){
+    const chart=createGanttChartSvg(projection);
+    html='<!doctype html><html lang="de"><head><meta charset="utf-8"><style>body{margin:0;padding:20px;background:#e9eef2}svg{display:block;margin:auto;max-width:100%;height:auto;box-shadow:0 4px 18px #20304022}</style></head><body>'+chart.svg+'</body></html>';
+    pageCount=1;currentPage=1;
+    dialog.querySelector('#printCount').textContent='Vollständiges Diagramm · '+chart.width+' × '+chart.height+' Pixel (1×)';
+    dialog.querySelector('#printWarning').textContent='';
+   }else{
+    const layout=paginatePrint(projection);
+    html=printHtml(projection,layout);
+    pageCount=layout.pageCount;
+    currentPage=Math.max(1,Math.min(currentPage,pageCount));
+    dialog.querySelector('#printCount').textContent=layout.pageCount+' Seiten · '+layout.horizontal+' Zeitabschnitte × '+layout.vertical+' Aufgabenabschnitte';
+    dialog.querySelector('#printWarning').textContent=layout.warnings.join(' ');
+   }
+   dialog.querySelector('#printCurrentPage').textContent=currentPage+' / '+pageCount;
+   dialog.querySelector('[data-print-prev]').disabled=currentPage<=1;
+   dialog.querySelector('[data-print-next]').disabled=currentPage>=pageCount;
    frame.srcdoc=html;
-   dialog.querySelector('#printCount').textContent=layout.pageCount+' Seiten · '+layout.horizontal+' Zeitabschnitte × '+layout.vertical+' Aufgabenabschnitte';
-   dialog.querySelector('#printWarning').textContent=layout.warnings.join(' ');
   }catch(error){onError(error);dialog.querySelector('#printWarning').textContent='Fehler beim Erstellen der Druckseiten.';}
  };
  const showPage=index=>{
   currentPage=Math.max(1,Math.min(pageCount,index));
   dialog.querySelector('#printCurrentPage').textContent=currentPage+' / '+pageCount;
+  dialog.querySelector('[data-print-prev]').disabled=currentPage<=1;
+  dialog.querySelector('[data-print-next]').disabled=currentPage>=pageCount;
   const selected=frame.contentDocument?.querySelectorAll('.sheet')[currentPage-1];
   selected?.scrollIntoView({block:'start',behavior:'instant'});
  };
  const zoomPreview=()=>{
   const zoom=Number(dialog.querySelector('#printPreviewZoom').value)/100;
-  if(frame.contentDocument?.body)frame.contentDocument.body.style.zoom=String(zoom);
+  if(frame.contentDocument?.body)frame.contentDocument.body.style.zoom=settings.format==='pdf'?String(zoom):'1';
  };
  frame.addEventListener('load',()=>{zoomPreview();showPage(currentPage);});
  dialog.querySelector('#printPreviewZoom').addEventListener('input',zoomPreview);
  dialog.querySelector('[data-print-prev]').addEventListener('click',()=>showPage(currentPage-1));
  dialog.querySelector('[data-print-next]').addEventListener('click',()=>showPage(currentPage+1));
- const draw=()=>{options.innerHTML=fields(settings,snapshot);update();};
+ const draw=()=>{options.innerHTML=fields(settings,snapshot);dialog.querySelector('#printExportStatus').textContent='';update();};
  const persist=()=>{try{localStorage.setItem(storageKey,JSON.stringify(settings));}catch{/* preferences are optional */}};
  options.addEventListener('change',event=>{
   const selected=event.target.closest('[data-print-select]');
@@ -175,13 +201,36 @@ export function createPrintController({getProject,getContext,onError=console.err
  });
  dialog.querySelector('[data-print-close]').addEventListener('click',()=>dialog.close());
  dialog.querySelector('[data-print-reset]').addEventListener('click',()=>{settings={...PRINT_DEFAULTS};persist();draw();});
- dialog.querySelector('[data-print-output]').addEventListener('click',()=>{
-  if(!html)return;
-  if(pending){pending.remove();pending=null;}
-  const iframe=document.createElement('iframe');iframe.title='Druckdokument';iframe.style.cssText='position:fixed;left:-10000px;top:0;opacity:0;width:1px;height:1px;border:0;';
-  pending=iframe;document.body.append(iframe);
-  iframe.addEventListener('load',()=>{try{iframe.contentWindow.addEventListener('afterprint',()=>{iframe.remove();if(pending===iframe)pending=null;},{once:true});iframe.contentWindow.focus();iframe.contentWindow.print();}catch(error){onError(error);iframe.remove();}},{once:true});
-  iframe.srcdoc=html;
+ const exportButton=dialog.querySelector('[data-print-output]');
+ const outputStatus=dialog.querySelector('#printExportStatus');
+ let exporting=false;
+ dialog.querySelector('[data-print-output]').addEventListener('click',async()=>{
+  if(!html||exporting)return;
+  outputStatus.textContent='';
+  if(settings.format==='pdf'){
+   if(pending){pending.remove();pending=null;}
+   const iframe=document.createElement('iframe');iframe.title='Druckdokument';iframe.style.cssText='position:fixed;left:-10000px;top:0;opacity:0;width:1px;height:1px;border:0;';
+   pending=iframe;document.body.append(iframe);
+   iframe.addEventListener('load',()=>{try{iframe.contentWindow.addEventListener('afterprint',()=>{iframe.remove();if(pending===iframe)pending=null;},{once:true});iframe.contentWindow.focus();iframe.contentWindow.print();}catch(error){onError(error);outputStatus.textContent='Druckdialog konnte nicht geöffnet werden.';iframe.remove();}},{once:true});
+   iframe.srcdoc=html;
+   return;
+  }
+  exporting=true;
+  exportButton.disabled=true;
+  exportButton.textContent='Export läuft…';
+  try{
+   const projection=projectForPrint(snapshot,settings,contextSnapshot);
+   const result=await createChartImage(projection,{format:settings.format,scale:settings.imageScale,jpegQuality:settings.jpegQuality});
+   downloadPrintExport(result);
+   outputStatus.textContent='Gantt-Diagramm als '+settings.format.toUpperCase()+' exportiert ('+result.width+' × '+result.height+' Pixel).';
+  }catch(error){
+   onError(error);
+   outputStatus.textContent='Export fehlgeschlagen: '+error.message;
+  }finally{
+   exporting=false;
+   exportButton.disabled=false;
+   exportButton.textContent='Exportieren';
+  }
  });
  dialog.addEventListener('close',()=>{snapshot=null;contextSnapshot=null;html='';frame.removeAttribute('srcdoc');if(pending){pending.remove();pending=null;}});
  return {open(){

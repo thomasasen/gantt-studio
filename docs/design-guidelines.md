@@ -122,3 +122,12 @@ Bei optionalen asynchronen Renderern bleibt der bestätigte Gantt-Baum bis zu ei
 - Druckseiten besitzen einen hellen Papierhintergrund in allen Designs, klar abgesetzte Aufgabenbezeichnungen und wiederholte Zeitachsen. PDF-/Druckseitenorientierung ist aus dem tatsächlichen Dokumentlayout abgeleitet.
 - Vor der Produktivfreigabe müssen erzeugte PDF-Dateien auf Seitengröße, Vollständigkeit, Aufgabentext und visuelle Lesbarkeit geprüft werden. CSS- oder JavaScript-Syntaxtests ersetzen diesen Nachweis nicht.
 - Druckprofile und Benutzerauswahl liegen getrennt vom Projektmodell in lokalen Ansichtspräferenzen. Drucken verändert weder Projekt-Revision noch IndexedDB.
+
+
+## Bildexport des vollständigen Gantt-Diagramms
+
+- Die Formate PNG und JPG exportieren das vollständige Gantt-Diagramm als **ein zusammenhängendes Bild**, einschließlich aller im gewählten Zeitraum ausgewählten Gantt-Aufgaben und Phasen. Eine Folge von papiergroßen Druckseiten ist ausdrücklich kein Bildexport.
+- Der Bildexport wird aus dem unveränderlichen Projekt-/Filter-Snapshot und einer engineunabhängigen SVG-Diagrammprojektion erstellt. Es darf keine bloße Bildschirmaufnahme des aktuell sichtbaren Ausschnitts geben; weder Gantt-Scrollposition noch Browserbreite dürfen Daten abschneiden.
+- Bildauflösung 1×/2×/3× und JPG-Qualität sind separat wählbar. Browser-Canvas-Limits dürfen niemals stillschweigend zu abgeschnittenen Bildern führen: stattdessen klare Fehlermeldung und Empfehlung zur Reduktion.
+- PDF verwendet weiterhin die zweidimensional paginierte Druckansicht. Formatabhängige Felder erscheinen nur, wenn sie für das ausgewählte Format wirken.
+- Eingaben, Selektoren und Buttons in derselben Zeile bleiben unabhängig von Hilfetexten und Ausgabeformat bündig und gleich hoch; die Vorschau stellt die tatsächlich exportierte Bildkomposition dar.

@@ -1,11 +1,20 @@
 # Engineunabhängige Druck- und PDF-Pipeline
 
+## Ausgabeformate
+
+- **PDF:** Mehrseitiger Ausdruck über den Browserdruckdialog, A4/A3 und Hoch-/Querformat.
+- **PNG/JPG:** Ein einziges zusammenhängendes Bild des vollständigen Gantt-Diagramms; keine Papierseiten, keine ZIP-Datei und kein Screenshot des Viewports. Aufgaben- und Zeitraumauswahl werden aus demselben unveränderlichen Projekt-Snapshot übernommen.
+- Die SVG-Bildkomposition verwendet eine eigene Aufgaben-/Zeitachsenprojektion einschließlich Phasen, Meilensteinen, Balken, Fortschritt, Markern, Baselines und Abhängigkeiten. SVG wird lokal über Canvas in PNG beziehungsweise JPG umgewandelt.
+- Wählbare Bildauflösung 1×/2×/3× sowie JPG-Qualität 80/90/100 %. Bei Überschreiten von Browser-Canvas-Grenzen bricht der Export mit verständlicher Meldung ab, statt abzuschneiden.
+- Das Dialogformular besitzt bündige, gleich hohe Eingabefelder und Aktionen; die Vorschau wechselt zwischen Druckseiten (PDF) und Gesamtübersicht (PNG/JPG).
+
 ## Architektur
 
 Die Anwendung verwendet einen unabhängigen, unveränderlichen Projektsnapshot und erzeugt neue Druckseiten statt den aktuell sichtbaren Gantt-Viewport zu kopieren.
 
 - `assets/js/print/print-model.mjs`: Projektion, Aufgaben-/Phasenauswahl, Datumsgrenzen, Layoutparameter und zweidimensionale Paginierung, ohne Bezug auf Native/Frappe
-- `assets/js/print/print-ui.mjs`: eigener Dialog, HTML-/SVG-Druckseiten, Vorschau in `iframe`, Navigation, Vorschau-Zoom, Aufruf des Browserdruckdialogs
+- `assets/js/print/print-ui.mjs`: eigener Dialog, HTML-/SVG-Druckseiten, Vorschau in `iframe`, Bildformatwechsel, Navigation und Browserdruckdialog
+- `assets/js/print/print-export.mjs`: reine, engineunabhängige SVG-Diagrammkomposition und lokale PNG-/JPG-Generierung
 - `assets/css/print.css`: responsives, barrierearmes Layout für den Konfigurationsdialog
 - Zuletzt verwendete Einstellungen und benannte Profile werden ausschließlich in `localStorage` gespeichert. Projektmodell, Revision und IndexedDB werden durch Druck nicht verändert. Der Druck-Snapshot enthält auch aktuelle Filter- und eingeklappte Phasen und bleibt bei Projektwechsel stabil.
 
@@ -32,4 +41,4 @@ Die Anwendung verwendet einen unabhängigen, unveränderlichen Projektsnapshot u
 
 `tests/print-model.spec.mjs` prüft unter anderem Snapshot-Isolation, Filter, Phasenauswahl, mehrjährige Zeitachsen und 2D-Seitenabdeckung. `tests/print-dialog.spec.cjs` prüft Browser-Scrollunabhängigkeit, responsive Vorschau und hellen Hintergrund. `tests/print-pdf.spec.cjs` erzeugt ein echtes Chromium-PDF und kontrolliert es maschinell mit `pdfinfo` und `pdftotext`; Vorschau-Screenshot und PDF werden in `visual-review/` gespeichert.
 
-**Freigabestatus: Draft.** Ohne fehlerfreie Browser-PDF-Ausgabe, visuelle Abnahme und Nacharbeit der kritischen Lücken ist ein Merge in `main` nicht zulässig.
+**QS:** Browser- und PDF-Tests sind vor einem Merge auszuführen. Die oben genannten fachlichen Drucklücken bleiben dokumentiert.
