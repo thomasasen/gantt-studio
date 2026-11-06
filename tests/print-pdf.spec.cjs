@@ -29,7 +29,7 @@ test('actual Chromium PDF contains every selected task and correct page dimensio
   const text=execFileSync('pdftotext',['-','-'],{input:pdf,encoding:'utf8'});
   const pages=Number(info.match(/^Pages:\s+(\d+)/m)?.[1]);
   expect(pages).toBe(expected);
-  const size=info.match(/^Page size:\\s+([\\d.]+) x ([\\d.]+) pts/m);
+  const size=info.match(/Page size:\s+([0-9.]+)\s+x\s+([0-9.]+)\s+pts/);
   expect(size,'Expected PDF page dimensions from pdfinfo').not.toBeNull();
   // Chromium rounds CSS millimetres through device/PDF units. Accept < 1 mm.
   expect(Math.abs(Number(size[1])-420*72/25.4)).toBeLessThan(72/25.4);
