@@ -73,9 +73,16 @@ for(const [scenario,part,delta] of [
     const bar=frame.locator('.bar-wrapper[data-id="demo-core"]');
     const handle=bar.locator(part);
     const gesture=await physicalGesture(page,handle,delta);
+    // A green safety-only test must not disguise a vendor that never
+    // produces a date/progress change for an actual physical gesture.
+    await expect.poll(()=>page.evaluate(()=>window.__frappeTestIntents.length)).toBe(1);
     const result=await evidence(page,scenario,gesture.beforeRelease);
     expect(result.initialPointer,'Real pointerdown must reach the iframe').not.toBeNull();
-    expect(result.intents.length).toBeLessThanOrEqual(1);
+    const callbackType=scenario==='progress'?'on_progress_change':'on_date_change';
+    const callbacks=result.callbacksAfterRelease.filter(e=>e.type===callbackType);
+    expect(callbacks.length,'A real Frappe edit callback is required').toBeGreaterThan(0);
+    expect(result.intents).toHaveLength(1);
+    expect(result.intents[0].change).toEqual(callbacks.at(-1).change);
     await noStorage(page);
   });
 }
