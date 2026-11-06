@@ -140,7 +140,7 @@ export function createPrintController({getProject,getContext,onError=console.err
    tools.hidden=image;
    if(image){
     const chart=createGanttChartSvg(projection);
-    html='<!doctype html><html lang="de"><head><meta charset="utf-8"><style>body{margin:0;padding:20px;background:#e9eef2}svg{display:block;margin:auto;box-shadow:0 4px 18px #20304022}</style></head><body>'+chart.svg+'</body></html>';
+    html='<!doctype html><html lang="de"><head><meta charset="utf-8"><style>body{margin:0;padding:20px;background:#e9eef2}svg{display:block;margin:auto;max-width:100%;height:auto;box-shadow:0 4px 18px #20304022}</style></head><body>'+chart.svg+'</body></html>';
     pageCount=1;currentPage=1;
     dialog.querySelector('#printCount').textContent='Vollständiges Diagramm · '+chart.width+' × '+chart.height+' Pixel (1×)';
     dialog.querySelector('#printWarning').textContent='';
@@ -168,7 +168,7 @@ export function createPrintController({getProject,getContext,onError=console.err
  };
  const zoomPreview=()=>{
   const zoom=Number(dialog.querySelector('#printPreviewZoom').value)/100;
-  if(frame.contentDocument?.body)frame.contentDocument.body.style.zoom=String(zoom);
+  if(frame.contentDocument?.body)frame.contentDocument.body.style.zoom=settings.format==='pdf'?String(zoom):'1';
  };
  frame.addEventListener('load',()=>{zoomPreview();showPage(currentPage);});
  dialog.querySelector('#printPreviewZoom').addEventListener('input',zoomPreview);
