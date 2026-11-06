@@ -75,8 +75,9 @@ test('switch failure after async frame rejection restores old engine and data',a
  await assert.rejects(c.switchEngine(()=>mock('frappe',b,{renderAsync(){throw Error('frame rejected');}})),/frame rejected/);
  assert.equal(c.getCapabilities().id,'native');
  assert.ok(a.includes('native:renderAsync:A'));
- assert.ok(a.filter(x=>x==='native:renderAsync:A').length>=2);
- assert.ok(a.filter(x=>x==='native:viewport:32').length>=2);
+ assert.equal(a.filter(x=>x==='native:renderAsync:A').length,1);
+ assert.equal(a.filter(x=>x==='native:destroy').length,0);
+ assert.equal(a.filter(x=>x==='native:mount').length,1);
  await c.render({project:project('B'),view});c.destroy();
 });
 test('superseding a pending switch restores old engine before executing newest request',async()=>{
@@ -90,7 +91,8 @@ test('superseding a pending switch restores old engine before executing newest r
  assert.deepEqual(await sw,{superseded:true});
  assert.deepEqual(await newRequest,{empty:false});
  assert.equal(c.getCapabilities().id,'native');
- assert.equal(a.filter(x=>x==='native:renderAsync:A').length,2);
+ assert.equal(a.filter(x=>x==='native:renderAsync:A').length,1);
+ assert.equal(a.filter(x=>x==='native:destroy').length,0);
  assert.ok(a.includes('native:renderAsync:B'));
  c.destroy();
 });
@@ -107,16 +109,21 @@ test('destroy during pending switch forbids stale activation and cleans both eng
  assert.ok(b.includes('frappe:destroy'));
  await assert.rejects(c.render({project:project('B'),view}),/mounted/);
 });
-test('switch restoration fails closed with explicit aggregate errors',async()=>{
- const a=[],b=[];let mountCount=0;
- const c=createAsyncEngineController(()=>mock('native',a,{mount(){if(++mountCount>1)throw Error('restore fails');}}));
+test('failed prepare does not remount or destroy the visible old engine',async()=>{
+ const a=[],b=[];let mounts=0;
+ const c=createAsyncEngineController(()=>mock('native',a,{mount(){++mounts;}}));
  c.mount({container:{}});await c.render({project:project('A'),view});
- let err;try{await c.switchEngine(()=>mock('frappe',b,{renderAsync(){throw Error('candidate fails');}}));}catch(e){err=e;}
- assert.equal(err instanceof AggregateError,true);
- assert.ok(err.errors.map(x=>x.message).includes('candidate fails'));
- assert.ok(err.errors.map(x=>x.message).includes('restore fails'));
- await assert.rejects(c.render({project:project('B'),view}),/mounted/);
+ await assert.rejects(c.switchEngine(()=>mock('frappe',b,{
+   renderAsync(){throw Error('candidate fails');}
+ })),/candidate fails/);
+ assert.equal(mounts,1);
+ assert.equal(a.filter(x=>x==='native:destroy').length,0);
+ assert.equal(c.getStatus(),'active');
+ assert.equal(c.getCapabilities().id,'native');
+ await c.render({project:project('B'),view});
+ c.destroy();
 });
+
 test('stale failures from superseded render do not roll back newer successful render',async()=>{
  const log=[],gate=deferred();let first=true;
  const c=createAsyncEngineController(()=>mock('native',log,{renderAsync(){if(first){first=false;return gate.promise;}return {empty:false};}}));
@@ -190,7 +197,85 @@ test('invalid async engine factory restores last confirmed projection after abor
  await Promise.resolve();await Promise.resolve();
  await assert.rejects(c.switchEngine(()=>({})),/contract|missing/);
  assert.deepEqual(await interrupted,{superseded:true});
- assert.ok(log.filter(x=>x==='native:renderAsync:A').length>=2);
+ assert.equal(log.filter(x=>x==='native:renderAsync:A').length,1);
  assert.equal(c.getCapabilities().id,'native');
  c.destroy();
+});
+
+
+test('prepare retains the old engine and publishes only after readiness',async()=>{
+ const a=[],b=[],ready=deferred();
+ const c=createAsyncEngineController(()=>mock('native',a));
+ c.mount({container:{}});await c.render({project:project('A'),view});
+ const transition=c.switchEngine(()=>mock('frappe',b,{renderAsync:()=>ready.promise}));
+ await Promise.resolve();await Promise.resolve();await Promise.resolve();
+ assert.equal(c.getStatus(),'preparing');
+ assert.equal(c.getCapabilities().id,'native');
+ assert.equal(a.includes('native:destroy'),false);
+ assert.equal(b.includes('frappe:mount'),true);
+ ready.resolve({empty:false});
+ assert.equal(await transition,true);
+ assert.equal(c.getStatus(),'active');
+ assert.equal(a.filter(x=>x==='native:destroy').length,1);
+ c.destroy();
+ assert.equal(b.filter(x=>x==='frappe:destroy').length,1);
+});
+
+test('abort unblocks a candidate that ignores AbortSignal and destroys it once',async()=>{
+ const old=[],pending=[],started=deferred();
+ const c=createAsyncEngineController(()=>mock('native',old));
+ c.mount({container:{}});await c.render({project:project('A'),view});
+ const slow=c.switchEngine(()=>mock('stuck',pending,{
+  renderAsync(){started.resolve();return new Promise(()=>{});}
+ }));
+ await started.promise;
+ const newest=c.render({project:project('B'),view});
+ assert.deepEqual(await slow,{superseded:true});
+ assert.deepEqual(await newest,{empty:false});
+ assert.equal(c.getCapabilities().id,'native');
+ assert.equal(old.filter(x=>x==='native:destroy').length,0);
+ assert.equal(pending.filter(x=>x==='stuck:destroy').length,1);
+ c.destroy();
+});
+
+test('failed factory and mount keep original instance and snapshot without rollback draw',async()=>{
+ const log=[];
+ const c=createAsyncEngineController(()=>mock('native',log));
+ c.mount({container:{}});await c.render({project:project('A'),view});
+ await assert.rejects(c.switchEngine(()=>{throw Error('factory');}),/factory/);
+ await assert.rejects(c.switchEngine(()=>mock('bad',[],{
+  mount(){throw Error('mount');}
+ })),/mount/);
+ assert.deepEqual(log.filter(x=>x==='native:renderAsync:A'),['native:renderAsync:A']);
+ assert.equal(log.filter(x=>x==='native:destroy').length,0);
+ c.destroy();
+});
+
+test('postcommit destroy exception is reported while new engine stays active',async()=>{
+ const errors=[],log=[];
+ const c=createAsyncEngineController(()=>mock('old',log,{
+  destroy(){throw Error('old cleanup');}
+ }));
+ c.mount({container:{},onError:e=>errors.push(e.message)});
+ await c.render({project:project('A'),view});
+ const result=await c.switchEngine(()=>mock('new',[]));
+ assert.equal(result,true);
+ assert.equal(c.getCapabilities().id,'new');
+ assert.deepEqual(errors,['old cleanup']);
+ c.destroy();
+});
+
+test('destroy during an uncooperative pending switch settles without stale commit',async()=>{
+ const gate=deferred(),started=deferred(),a=[],b=[];
+ const c=createAsyncEngineController(()=>mock('old',a));
+ c.mount({container:{}});await c.render({project:project('A'),view});
+ const slow=c.switchEngine(()=>mock('new',b,{
+  renderAsync(){started.resolve();return gate.promise;}
+ }));
+ await started.promise;
+ c.destroy();
+ assert.deepEqual(await slow,{superseded:true});
+ assert.equal(b.filter(x=>x==='new:destroy').length,1);
+ assert.equal(a.filter(x=>x==='old:destroy').length,1);
+ gate.resolve({empty:false});
 });
