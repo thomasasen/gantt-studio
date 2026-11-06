@@ -129,7 +129,7 @@ export function createPrintController(getCurrent) {
       const page=layout.pages[currentPage];
       $('printPageNumber').max=layout.pages.length;$('printPageNumber').value=currentPage+1;
       $('printPagePrevious').disabled=currentPage===0;$('printPageNext').disabled=currentPage>=layout.pages.length-1;
-      pages.textContent=layout.pages.length+' Seite(n) · '+layout.timePages+' Zeitabschnitt(e) × '+layout.rowPages+' Zeilenabschnitt(e)';
+      pages.textContent=layout.pages.length+' Druckseite(n) · '+layout.timePages+' Zeitabschnitt(e) · '+layout.rowPages+' Aufgabenabschnitt(e)';
       status.textContent=layout.warnings.join(' ')||'Vollständiger Projektplan. Kein Viewport-Ausschnitt.';
       status.classList.toggle('warning',layout.warnings.length>0);
       const frame=document.createElement('iframe');
