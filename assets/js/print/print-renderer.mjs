@@ -36,7 +36,11 @@ function drawAxis(page,layout,colors,options){
     const following=Date.UTC(new Date(cursor).getUTCFullYear(),new Date(cursor).getUTCMonth()+1,1);
     const from=Math.max(cursor,first),to=Math.min(following,last+DAY);
     const px=(from-first)/DAY*page.dayWidth,wide=(to-from)/DAY*page.dayWidth;
-    if(wide>=10)svg+=txt(label+px+wide/2,5,month(cursor),3.2,colors.text,'text-anchor="middle" font-weight="700"');
+    // Month cells on long project plans can be only ~15 mm wide.
+    // Do not draw a long "Jan. 2024" label across neighboring month cells.
+    const labelText=wide>=21?month(cursor)
+      :new Date(cursor).toLocaleDateString('de-DE',{month:'short',timeZone:'UTC'}).replace(/\.$/,'');
+    if(wide>=10)svg+=txt(label+px+wide/2,5,labelText,3.2,colors.text,'text-anchor="middle" font-weight="700"');
     svg+=line(label+px,0,label+px,a,colors.grid,.3);
     cursor=following;
   }
@@ -180,7 +184,7 @@ export function renderPrintPage(projection,layout,page,options={}){
   const c=colorsFor(projection,options),w=layout.usableWidth,h=layout.axisHeight+layout.rowSpace;
   const title=options.reportTitle||projection.projectName;
   const header=layout.settings.header
-    ?'<header class="print-header"><div><strong>'+esc(title)+'</strong><small>'+esc(projection.projectName)+' · '+day(projection.start)+' – '+day(projection.end)+'</small></div><span>Revision '+esc(projection.revision)+' · Stand '+day(projection.printedAt.slice(0,10))+'</span></header>'
+    ?'<header class="print-header"><div><strong>'+esc(title)+'</strong><small>'+esc(projection.projectName)+' · Gesamt: '+day(projection.start)+' – '+day(projection.end)+' · Blatt: '+day(page.start)+' – '+day(page.end)+'</small></div><span>Revision '+esc(projection.revision)+' · Stand '+day(projection.printedAt.slice(0,10))+'</span></header>'
     :'<div class="print-spacer"></div>';
   const footer=layout.settings.footer
     ?'<footer class="print-footer"><span>'+esc(options.footerNote||projection.projectName)+'</span><span>Abschnitt '+(page.timeIndex+1)+'/'+page.timeCount+' · Zeilen '+(page.rowIndex+1)+'/'+page.rowCount+' · Seite '+page.number+'/'+page.total+'</span></footer>':'';
