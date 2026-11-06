@@ -271,13 +271,23 @@ test('commit preserves scroll and transfers keyboard focus, including 200 percen
    HTMLElement.prototype.focus=function(...args){
     focusTrace.push({tag:this.tagName,id:this.id,tabindex:this.getAttribute('tabindex'),
      hidden:this.getAttribute('aria-hidden'),inert:this.inert,connected:this.isConnected});
-    return focusOriginal.apply(this,args);
+    const value=focusOriginal.apply(this,args);
+    focusTrace[focusTrace.length-1].afterFocus=document.activeElement?.tagName;
+    focusTrace[focusTrace.length-1].afterIsTarget=document.activeElement===this;
+    focusTrace[focusTrace.length-1].computedVisibility=getComputedStyle(this).visibility;
+    focusTrace[focusTrace.length-1].computedDisplay=getComputedStyle(this).display;
+    focusTrace[focusTrace.length-1].computedPointerEvents=getComputedStyle(this).pointerEvents;
+    focusTrace[focusTrace.length-1].parentInert=this.parentElement?.inert;
+    return value;
    };
    const originalSize={width:host.offsetWidth,height:host.offsetHeight};
    const switched=await c.switchEngine(createFrappeEngine);
    const newRoot=viewport.firstElementChild;
+   const focusBeforeManual=document.activeElement===newRoot;
+   newRoot.focus({preventScroll:true});
+   const manualFocusWorks=document.activeElement===newRoot;
    return {
-    switched,wasFocused,focusTransferred:document.activeElement===newRoot,
+    switched,wasFocused,focusTransferred:focusBeforeManual,manualFocusWorks,
     left:viewport.scrollLeft,top:viewport.scrollTop,
     active:newRoot.inert===false && !newRoot.hasAttribute('aria-hidden'),
     sizePreserved:newRoot.offsetWidth===originalSize.width && newRoot.offsetHeight===originalSize.height,
