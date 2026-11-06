@@ -91,12 +91,33 @@ export function computePrintLayout(projection,options={}){
   }
   if(timePages.length*rowPages.length>600)throw new RangeError('Über 600 Druckseiten. Bitte ein größeres Format oder einen eingeschränkten Zeitraum wählen.');
   const pages=[];
-  for(const time of timePages)for(const lines of rowPages){
-    pages.push({number:pages.length+1,total:timePages.length*rowPages.length,
-      timeIndex:time.index,rowIndex:lines.index,timeCount:timePages.length,rowCount:rowPages.length,
-      start:time.start,end:time.end,rows:lines.rows,dayWidth});
+  // Avoid blank sheets from a rectangular time-by-row grid. Every period
+  // remains represented, even when all its activities are outside the slice.
+  for(const time of timePages) {
+    const from=parse(time.start),to=parse(time.end);
+    const containsMarker=projection.markers.some(m=>parse(m.date)>=from&&parse(m.date)<=to);
+    let added=0;
+    for(const lines of rowPages) {
+      const active=lines.rows.some(row=>{
+        if(parse(row.start)<=to&&parse(row.end)>=from)return true;
+        if(options.elements?.baselines!==false&&row.baselineStart&&row.baselineEnd
+           &&parse(row.baselineStart)<=to&&parse(row.baselineEnd)>=from)return true;
+        if(options.elements?.buffer!==false&&Number(row.bufferDays)>0
+           &&parse(row.end)+Math.min(365,Number(row.bufferDays))*DAY>=from&&parse(row.end)<=to)return true;
+        return false;
+      });
+      if(!active&&!(added===0&&containsMarker)&&rows.length!==0)continue;
+      pages.push({timeIndex:time.index,rowIndex:lines.index,
+        timeCount:timePages.length,rowCount:rowPages.length,
+        start:time.start,end:time.end,rows:lines.rows,dayWidth,days:time.days});
+      added++;
+    }
+    if(!added)pages.push({timeIndex:time.index,rowIndex:0,
+      timeCount:timePages.length,rowCount:rowPages.length,
+      start:time.start,end:time.end,rows:rowPages[0].rows,dayWidth,days:time.days});
   }
-  if(pages.length>1)warnings.push(pages.length+' Seiten: '+timePages.length+' Zeitabschnitt(e) × '+rowPages.length+' Aufgabenabschnitt(e).');
+  pages.forEach((page,i)=>{page.number=i+1;page.total=pages.length;});
+  if(pages.length>1)warnings.push(pages.length+' Seiten: '+timePages.length+' Zeitabschnitt(e), '+rowPages.length+' Aufgabenabschnitt(e), leere Kombinationen ausgelassen.');
   return {pageWidth,pageHeight,usableWidth,usableHeight,margin:settings.margin,labelWidth,timelineWidth,
     topHeight,axisHeight,bottomHeight,legendHeight,rowSpace,fontSize:font,settings,pages,warnings,
     timePages:timePages.length,rowPages:rowPages.length,taskCount:projection.taskCount};
