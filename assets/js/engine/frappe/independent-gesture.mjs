@@ -4,12 +4,17 @@ const DAY=86400000;
 function dayNumber(iso){
   if(!isValidIsoDate(iso))throw new RangeError('Invalid calendar date: '+iso);
   const [y,m,d]=iso.split('-').map(Number);
-  return Date.UTC(y,m-1,d)/DAY;
+  const date=new Date(0);
+  date.setUTCHours(0,0,0,0);
+  date.setUTCFullYear(y,m-1,d);
+  return date.getTime()/DAY;
 }
 function dateFromDay(n){
   const d=new Date(n*DAY);
-  return [d.getUTCFullYear(),String(d.getUTCMonth()+1).padStart(2,'0'),
+  const iso=[String(d.getUTCFullYear()).padStart(4,'0'),String(d.getUTCMonth()+1).padStart(2,'0'),
     String(d.getUTCDate()).padStart(2,'0')].join('-');
+  if(!isValidIsoDate(iso))throw new RangeError('Calendar shift out of range');
+  return iso;
 }
 export function inclusiveDays(start,end){return dayNumber(end)-dayNumber(start)+1;}
 export function shiftCalendarDay(iso,delta){return dateFromDay(dayNumber(iso)+delta);}
@@ -60,7 +65,8 @@ export function createIndependentGesture({emit=()=>{},onPreview=()=>{},onCancel=
     },
     move(pointerId,dx){
       if(destroyed||!active||pointerId!==active.pointerId||!Number.isFinite(dx))return null;
-      active.dx=dx;active.after=preview(active,dx);
+      try{active.dx=dx;active.after=preview(active,dx);}
+      catch(_){cancel('invalid-calendar-range');return null;}
       onPreview({...active.after,id:active.id,kind:active.kind,dx});
       return {...active.after};
     },
