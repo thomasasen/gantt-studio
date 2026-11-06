@@ -122,7 +122,7 @@ export function createAsyncEngineController(initialFactory) {
     node.className = active.className;
     node.setAttribute('aria-hidden', 'true');
     node.inert = true;
-    node.style.cssText = 'position:absolute;visibility:hidden;pointer-events:none;'
+    node.style.cssText = 'position:absolute;opacity:0;pointer-events:none;'
       + 'overflow:hidden;box-sizing:border-box;'
       + 'left:0;top:0;'
       + 'width:' + width + 'px;min-height:' + height + 'px;';
@@ -144,6 +144,7 @@ export function createAsyncEngineController(initialFactory) {
           // remains present (but inert) until successful publication.
           active.style.position = 'absolute';
           active.style.visibility = 'hidden';
+          active.style.opacity = '0';
           active.style.pointerEvents = 'none';
           active.setAttribute('aria-hidden', 'true');
           active.inert = true;
@@ -153,8 +154,9 @@ export function createAsyncEngineController(initialFactory) {
           // Honor an explicit size on the original mount root. Clearing this
           // width would clamp horizontal scroll during an atomic switch.
           node.style.width = liveWidth;
-          // Explicitly show the committed tree; merely removing the hidden
-          // declaration can leave computed visibility inherited as hidden.
+          // opacity avoids Chromium retaining the hidden computed visibility
+          // of a staged iframe. There is no transition: one synchronous swap.
+          node.style.opacity = '1';
           node.style.visibility = 'visible';
           node.style.pointerEvents = '';
           node.style.overflow = '';

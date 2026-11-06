@@ -186,7 +186,7 @@ test('atomic stage preserves visible DOM until a real frame is allowed to load',
   await expect(stage).toHaveCount(1);
   await expect(old).toHaveText('CONFIRMED CHART');
   await expect(old).toBeVisible();
-  await expect(stage).toBeHidden();
+  expect(await stage.evaluate(el=>getComputedStyle(el).opacity)).toBe('0');
   expect(await stage.evaluate(el=>el.inert)).toBe(true);
   expect(await old.evaluate(el=>el.getBoundingClientRect().height)).toBeGreaterThan(0);
   expect(await old.evaluate(el=>el.parentElement.style.position)).toBe('');
@@ -269,41 +269,19 @@ test('commit preserves scroll and transfers keyboard focus, including 200 percen
    const originalSize={width:host.offsetWidth,height:host.offsetHeight};
    const switched=await c.switchEngine(createFrappeEngine);
    const newRoot=viewport.firstElementChild;
-   const computed=getComputedStyle(newRoot);
-   const afterEngine=document.activeElement===newRoot;
-   newRoot.tabIndex=0;newRoot.focus();
-   const afterManual=document.activeElement===newRoot;
-   const ancestorChain=[];
-   for(let el=newRoot;el;el=el.parentElement)ancestorChain.push({
-     tag:el.tagName,id:el.id,class:el.className,
-     computedVisibility:getComputedStyle(el).visibility,
-     inlineVisibility:el.style.visibility,inert:el.inert,hasHidden:el.hidden,
-     inlinePriority:el.style.getPropertyPriority('visibility')
-   });
-   newRoot.style.setProperty('visibility','visible','important');
-   const afterImportantVisibility=getComputedStyle(newRoot).visibility;
-   newRoot.focus({preventScroll:true});
-   const afterImportantFocus=document.activeElement===newRoot;
    return {
-    switched,wasFocused,focusTransferred:afterEngine,
+    switched,wasFocused,focusTransferred:document.activeElement===newRoot,
     left:viewport.scrollLeft,top:viewport.scrollTop,
     active:newRoot.inert===false && !newRoot.hasAttribute('aria-hidden'),
     sizePreserved:newRoot.offsetWidth===originalSize.width && newRoot.offsetHeight===originalSize.height,
     frames:viewport.querySelectorAll('iframe').length,
     oldRemoved:!viewport.contains(host),
-    debug:{afterManual,afterImportantVisibility,afterImportantFocus,ancestorChain,visibility:computed.visibility,display:computed.display,
-      inlineVisibility:newRoot.style.visibility,bodyVisibility:getComputedStyle(document.body).visibility,
-      viewportVisibility:getComputedStyle(viewport).visibility,
-      computedPointerEvents:computed.pointerEvents,connected:newRoot.isConnected,
-      parentInert:viewport.inert,parentAria:viewport.getAttribute('aria-hidden'),
-      tabIndex:newRoot.tabIndex,focusElement:document.activeElement?.outerHTML?.slice(0,180)}
    };
   }finally{
    c.destroy();viewport.remove();document.documentElement.style.zoom='';
   }
  });
- console.log('FOCUS_STATE_QA '+JSON.stringify(result.debug));
- expect(result).toMatchObject({
+ expect(result).toEqual({
   switched:true,wasFocused:true,focusTransferred:true,
   left:82,top:105,active:true,sizePreserved:true,frames:1,oldRemoved:true
  });
