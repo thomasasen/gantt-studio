@@ -24,9 +24,12 @@ export function createGanttChartSvg(projection){
   const cfg=resolveLabelConfig(projection.labelConfig);
   const annotations=rows.map(row=>barAnnotation(row,s,cfg));
   const baseRowH=clamp(s.rowHeight*4.8,38,78);
-  const rowHeights=annotations.map(text=>text?
-    Math.max(baseRowH,38+wrapAnnotation(text,cfg.maxWidth,{fontSize:12,twoLine:cfg.twoLine,ellipsis:cfg.ellipsis}).length*15):
-    baseRowH);
+  const rowHeights=annotations.map((text,index)=>{
+    const row=rows[index],hasMeta=(s.owners&&row.owner)||(s.status&&row.status&&row.status!=='neutral')||
+      (s.risks&&row.risk&&row.risk!=='none');
+    const textH=text?38+wrapAnnotation(text,cfg.maxWidth,{fontSize:12,twoLine:cfg.twoLine,ellipsis:cfg.ellipsis}).length*15:0;
+    return Math.max(baseRowH,textH,hasMeta?64:0);
+  });
   const rowOffsets=[],bodyHeight=rowHeights.reduce((sum,h,index)=>{rowOffsets[index]=sum;return sum+h;},0);
   const height=Math.ceil(header+bodyHeight+footer);
   const xml=[];
@@ -87,8 +90,15 @@ export function createGanttChartSvg(projection){
     xml.push(line(0,y+rowH,width,y+rowH,'#e0e8ed',.9));
     const fontColor=isPhase?'#244457':'#263c4c';
     const maxLabel=Math.max(22,Math.floor((labelWidth-38)/7.2));
-    xml.push(label(18,y+(s.owners&&row.owner?rowH*.43:rowH*.59),truncate(s.names?row.name:row.id,maxLabel),isPhase?13:12,fontColor,isPhase?'font-weight="700"':'font-weight="600"'));
-    if(s.owners&&row.owner)xml.push(label(18,y+rowH*.75,truncate(row.owner,maxLabel),10,'#6b7e87'));
+    const statusNames={green:'Grün',amber:'Gelb',red:'Rot',neutral:'Neutral'};
+    const riskNames={low:'Risiko niedrig',medium:'Risiko mittel',high:'Risiko hoch',critical:'Risiko kritisch'};
+    const status=s.status&&row.status&&row.status!=='neutral'?statusNames[row.status]||row.status:'';
+    const risk=s.risks&&row.risk&&row.risk!=='none'?riskNames[row.risk]||row.risk:'';
+    const information=[status,risk].filter(Boolean).join(' · ');
+    const owner=s.owners&&row.owner?String(row.owner):'';
+    xml.push(label(18,y+rowH*.32,truncate(s.names?row.name:row.id,maxLabel),isPhase?13:12,fontColor,isPhase?'font-weight="700"':'font-weight="600"'));
+    if(owner)xml.push(label(18,y+rowH*.61,truncate(owner,maxLabel),10,'#607b88'));
+    if(information)xml.push(label(18,y+rowH*.83,truncate(information,maxLabel),10,'#455f70'));
     const start=clamp(days(from,row.start)*dayWidth,0,timeWidth);
     const end=clamp((days(from,row.end)+1)*dayWidth,0,timeWidth);
     if(end>start){
