@@ -161,3 +161,36 @@ test('newer render aborts previous asynchronous render signal',async()=>{
  assert.equal(seen[0].aborted,true);
  c.destroy();
 });
+
+test('stale viewport work cannot mutate a new mount session after destroy and remount',async()=>{
+ const first=[],second=[];
+ let calls=0;
+ const c=createAsyncEngineController(()=>mock('session-'+(++calls),calls===1?first:second));
+ c.mount({container:{}});await c.render({project:project('A'),view});
+ const stale=c.setViewport({scrollLeft:999});
+ c.destroy();
+ c.mount({container:{}});await c.render({project:project('B'),view});
+ assert.deepEqual(await stale,{superseded:true});
+ assert.equal(second.some(s=>s.includes('999')),false);
+ c.destroy();
+});
+test('invalid async engine factory restores last confirmed projection after aborting in-flight work',async()=>{
+ const log=[],block=deferred();
+ const c=createAsyncEngineController(()=>mock('native',log,{
+  renderAsync(req,signal){
+   if(req.project.id==='B'){
+    signal?.addEventListener('abort',()=>block.reject(new Error('aborted')), {once:true});
+    return block.promise;
+   }
+   return {empty:false};
+  }
+ }));
+ c.mount({container:{}});await c.render({project:project('A'),view});
+ const interrupted=c.render({project:project('B'),view});
+ await Promise.resolve();await Promise.resolve();
+ await assert.rejects(c.switchEngine(()=>({})),/contract|missing/);
+ assert.deepEqual(await interrupted,{superseded:true});
+ assert.ok(log.filter(x=>x==='native:renderAsync:A').length>=2);
+ assert.equal(c.getCapabilities().id,'native');
+ c.destroy();
+});

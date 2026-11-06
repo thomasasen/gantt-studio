@@ -19,6 +19,7 @@ export function createAsyncEngineController(initialFactory) {
   let lastRequest = null;
   let lastViewport = null;
   let generation = 0;
+  let mountSession = 0;
   let queue = Promise.resolve();
   let activeAbort = null;
   let switchingCandidate = null;
@@ -37,6 +38,7 @@ export function createAsyncEngineController(initialFactory) {
     if (viewport) await candidate.setViewport(viewport);
   }
   function reset() {
+    ++mountSession;
     engine = null; mounted = false; mountOptions = null;
     lastRequest = null; lastViewport = null; switchingCandidate = null;
   }
@@ -82,6 +84,7 @@ export function createAsyncEngineController(initialFactory) {
       engine = candidate;
       mountOptions = {...options};
       mounted = true;
+      ++mountSession;
     },
     render({project, view}) {
       // Clone at intent time, not after another async transition has run.
@@ -116,24 +119,25 @@ export function createAsyncEngineController(initialFactory) {
     setViewport(viewport) {
       if (!mounted) return Promise.reject(new Error('Engine must be mounted first.'));
       const patch = {...viewport};
+      const session = mountSession;
       // Scrolling is not a new rendering intent. In particular it must not
       // abort a frame while the first async render is becoming ready.
       const scheduled = queue.then(async () => {
-        if (!mounted) return superseded();
+        if (!mounted || session !== mountSession) return superseded();
         const next = {...lastViewport, ...patch};
         try {
           await engine.setViewport(next);
-          if (!mounted) return superseded();
+          if (!mounted || session !== mountSession) return superseded();
           lastViewport = next;
           return true;
         } catch (error) {
-          if (!mounted) return superseded();
+          if (!mounted || session !== mountSession) return superseded();
           if (!lastViewport) throw error;
           try { await engine.setViewport(lastViewport); }
           catch (rollbackError) {
             failClosed([error, rollbackError], [engine]);
           }
-          if (!mounted) return superseded();
+          if (!mounted || session !== mountSession) return superseded();
           throw error;
         }
       });
@@ -144,7 +148,21 @@ export function createAsyncEngineController(initialFactory) {
       if (typeof nextFactory !== 'function')
         return Promise.reject(new TypeError('Engine factory required.'));
       return schedule(async (token, signal) => {
-        const next = assertEngineContract(nextFactory());
+        let next;
+        try { next = assertEngineContract(nextFactory()); }
+        catch (error) {
+          if (!current(token)) return superseded();
+          if (!lastRequest) failClosed([error], [engine]);
+          try {
+            await draw(engine, lastRequest, signal);
+            await applyViewport(engine, lastViewport);
+          } catch (rollbackError) {
+            if (!current(token)) return superseded();
+            failClosed([error, rollbackError], [engine]);
+          }
+          if (!current(token)) return superseded();
+          throw error;
+        }
         const old = engine;
         switchingCandidate = next;
         let cause = null;
