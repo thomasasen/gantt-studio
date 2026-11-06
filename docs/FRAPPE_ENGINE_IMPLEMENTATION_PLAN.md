@@ -396,3 +396,52 @@ Messung B: [Chromium #42133839035](https://github.com/thomasasen/gantt-studio/ac
 ### Merge-Readiness / noch offene Gate-Bedingungen
 
 **Bis zur letzten grünen CI: NOT READY.** Ein Merge ist ausdrücklich nicht genehmigt. Nach bestandenen vollständigen Tests sind verbleibende P2-Risiken gesondert zu bewerten; P0/P1 dürfen dann nicht mehr offen sein. **Kein noch so erfolgreicher CI-Lauf ersetzt den vom Auftraggeber ausdrücklich freizugebenden Merge nach `main`.**
+
+
+## 12. P1-Projektwechsel-Race: forensische Ursachenanalyse und Härtung (06.11.2026)
+
+**Geltungsbereich:** Nur Draft-PR #13 / `refactor/engine-abstraction`. `main@1ef29c9388b555308242bb6174ff6ed60127ea5d` und der separate Frappe-NO-GO-Spike PR #14 wurden nicht verändert. Projektdatei-Schema v1, Native als alleinige Engine und lokale Datenhaltung bleiben unverändert.
+
+### Tatsächlich nachgewiesene Ursache
+
+Der intermittierende Fehler von `switching projects during Gantt drag discards the preview` war **zunächst ein fehlerhaft synchronisierter Test**. Unmittelbar nach `click('#loadDemoBtn')` ermittelte nur der zweite der beiden Project-Switch-Tests die Quell-ID, **ohne das asynchrone Laden des Demoprojekts und dessen zehn Aufgaben abzuwarten**. So wurde sporadisch die ID des anfänglichen leeren Projekts als `sourceId` gespeichert. Nach Neuanlage eines zweiten Projekts wurde nicht etwa das Demoprojekt, sondern der ursprüngliche Leerstand ausgewählt. Die Assertion mit zehn Aufgaben war dann unmöglich.
+
+Nachweise: fehlgeschlagene [CI #42135853385](https://github.com/thomasasen/gantt-studio/actions/runs/42135853385), [#42134910879](https://github.com/thomasasen/gantt-studio/actions/runs/42134910879) und [#42135276018](https://github.com/thomasasen/gantt-studio/actions/runs/42135276018); Playwright-Trace aus dem Failure-Artefakt von #42135853385: `loadDemoBtn` wurde geklickt und die Quell-ID unmittelbar danach abgefragt. `PROJECT_SWITCH_PROBE` ergab `sourceStoredTasks:0`, `rows:0`, `bars:0`, `name:"Neues Projekt"`. Dies widerlegt für **diesen** Fehlversuch die Annahme, dass ein bestehendes Zehn-Aufgaben-Demoprojekt von IndexedDB gelöscht wurde. Der Test wartet jetzt ausdrücklich auf zehn sichtbare Tabellenzeilen, überprüft zusätzlich zehn persistierte Quellaufgaben und hält die fachliche Erwartung an den Drag-Abbruch vollständig aufrecht (`4a5e3d53`).
+
+### Unabhängig aufgedecktes Anwendungsrisiko und Architekturentscheidung
+
+Der bisherige `projectSelectionSerial` schützte nur `changeProject()`. Demo-Laden, Projektanlage, Import und Löschen konnten parallel aktivieren; ältere `renderPortfolio()`-/`renderAll()`-Aufrufe konnten nach einer neuen Auswahl das `select` erneut aufbauen. Das waren eigenständige, durch Codeprüfung belegte Race-Risiken, auch wenn sie nicht die Primärursache des obigen Trace waren.
+
+**Lösung:** `assets/js/core/project-activation.mjs` führt eine monotone Aktivierungsgeneration für alle Projektaktivierungen ein. Asynchrone IndexedDB-Leseantworten, Portfolioabfragen und Fehlerbehandlungen dürfen nur bei aktuell gültiger Generation veröffentlichen. Der Übergang von validiertem Projektsnapshot zu UI, Engine, aktivem Projekt und localStorage erfolgt synchron ohne `await` innerhalb des Publikationsschritts; bei Fehlern wird der vorherige Zustand gerendert und die aktive Auswahl nicht als erfolgreich ausgegeben. Vor erneuter Aktivierung desselben Projekts wird `projectCommitter.whenIdle(id)` abgewartet. Native- und Tabellen-Drag werden beim beginnenden Wechsel abgebrochen, eine Engine speichert niemals eigenständig. Projektlöschung blockiert neue Commits auf das betroffene Projekt.
+
+**Verworfene Alternativen:** Eine pauschale FIFO-Warteschlange für sämtliche UI-Projektaktionen würde neuere Benutzerauswahlen unnötig hinter veralteten Lesevorgängen stauen; blindes Mehrfachrendern, Sleeps und zusätzliche Zeitlimits beseitigen keine Ursache. Ein bloßer AbortController genügt für bereits laufende IndexedDB-Transaktionen nicht. Der Generation-Guard plus synchroner Commit-Punkt ist gegenüber diesen Ansätzen deterministisch und begrenzt auf den P1-Pfad.
+
+### Änderungen, Tests und bekannte Ausfälle
+
+| Gegenstand | Umsetzung |
+| --- | --- |
+| Projektaktivierung | `assets/js/core/project-activation.mjs`, `assets/js/app.js` (`9c10cefb`, `49ea2da1`, `34f5d16d`) |
+| Korrigierte Testannahme | `tests/project-switch-cancel.spec.cjs` (`4a5e3d53`) |
+| Deterministische Unit-Races | `tests/project-activation.spec.cjs`: kontrollierte Promises, A→B→A, verspätete Antworten, Fehler/Retry, Speicher-Commit, Generation `4a6d1542` |
+| Browser-Projektwechsel | `tests/project-activation-browser.spec.cjs`: schnelle Wechsel, gehaltene IDB-Reads, neuerer Wechsel vor altem Resultat, geladene/gespeicherte Aufgaben, Ladefehler, Retry, Reload und veraltete Portfolioantworten (`aa03f892`, `71fff3f0`, `67b08682`) |
+| IndexedDB-Cleanup | `assets/js/storage.js` schließt Verbindungen zusätzlich bei synchronen Fehlern in `get` und `getAll` (`468b8156`) |
+| CI-Härtung | `.github/workflows/ui-regression.yml`: kompletter Browserlauf **plus 20 Einzeltest-Wiederholungen**; die neuen Tests werden syntaktisch geprüft (`045fa10b`) |
+| ESM-Cache | `index.html`, `assets/js/app.js`, `assets/js/gantt.js`, Engine-Module, `.github/workflows/validate.yml`: konsistente `?v=2.8.1`-Versionierung (`d56f94c4`, `c5f9b02f`) |
+| WCAG-Red-Team | `assets/css/design-system.css`, `docs/design-guidelines.md`, `tests/toast-accessibility.spec.cjs`: sichtbare Toasts bleiben deckend/kontrastfähig und verschwinden ohne Halbtransparenz-Phase (`ddfc4488`) |
+
+**Fehler ausdrücklich nicht verworfen:** Frühe Branch-/PR-Läufe auf `34f5d16d` und `4a6d1542` schlugen noch am ursprünglichen unsynchronisierten Test fehl. Auf `aa03f892` scheiterte der neue gehaltene-IDB-Read-Test, weil sein eigener Stub auch den abschließenden Prüf-Read blockierte; der Stub wurde in `71fff3f0` gezielt repariert (keine abgeschwächte Assertion). Auf `d56f94c4` deckte der bestehende Modulcache-Test gemischte Import-Versionen auf; korrigiert mit `c5f9b02f`. Ein Browserlauf auf `c5f9b02f` zeigte im Hybrid-Mobile-Axe-Test vorübergehend ungenügenden Toast-Kontrast; ohne Änderung an der Axe-Assertion wurde die sichtbare Transparenzanimation entfernt und ein eigener Toast-WCAG-Test ergänzt (`ddfc4488`). Jeder Fehler ist als realer Lauf dokumentiert und erfordert eine neue vollständige CI auf dem finalen SHA.
+
+### Nachgewiesene Zwischenstände (nicht als Finalfreigabe zählen)
+
+- [UI-CI #42195837576](https://github.com/thomasasen/gantt-studio/actions/runs/42195837576) auf `4a5e3d53`: **71/71** Browserprüfungen erfolgreich, einschließlich korrigiertem kritischem Projektwechseltest.
+- [UI-CI #42196100407](https://github.com/thomasasen/gantt-studio/actions/runs/42196100407) auf `468b8156`: komplette Suite erfolgreich (vor der 20x-Wiederholung).
+- [UI-CI #42196216834](https://github.com/thomasasen/gantt-studio/actions/runs/42196216834) auf `045fa10b`: **82/82** komplette Browsertests und zusätzlich **20/20** Wiederholungen des kritischen Tests erfolgreich. Die gleichzeitig laufenden PR- und Push-Läufe müssen je nach tatsächlich ausgechecktem Head-/Merge-SHA gesondert betrachtet werden.
+- [Fehler #42195981100](https://github.com/thomasasen/gantt-studio/actions/runs/42195981100): selbstblockierender neuer Teststub, behoben. [Fehler #42196336543](https://github.com/thomasasen/gantt-studio/actions/runs/42196336543): ESM-Versionen gemischt, behoben. [Fehler #42196914928](https://github.com/thomasasen/gantt-studio/actions/runs/42196914928): Toast-Kontrast bei Axe-Prüfung, daraufhin WCAG-Korrektur implementiert.
+
+### Performance, Red-Team und verbleibende Risiken
+
+Same-run-Baseline [#42196216834](https://github.com/thomasasen/gantt-studio/actions/runs/42196216834), identischer GitHub-Chromium-Runner, gemessene Medianwerte in ms: 0 Aufgaben Main/Native 0,0/0,0; 1 Aufgabe 3,0/3,2; 25 Aufgaben 17,9/18,6; 250 Aufgaben 161,5/151,1; **1.000 Aufgaben 604,0/608,3 (+0,7 %)**. Das sind Renderer-Messungen, keine End-to-End-Projektwechselzeiten. Weitere Messungen und der Native-Performance-Matrix-Test sind in CI-Artefakten enthalten; Hardware-/Runner-Schwankungen verbieten einen absoluten Vergleich mit früheren, anders ausgelasteten Läufen.
+
+Red-Team: P1-Test-Synchronisation, Generation-übergreifende Aktivierung, IDB-Fehler-Cleanup, gemischter Modulcache und WCAG-Toast-Kontrast identifiziert und korrigiert. Der bestehende Engine-Lifecycle inklusive Pointer/Window-Listener-Cleanup, Escape/Pointer-Cancel, Revisionsschutz, Gantt-/Tabellen-Reorder, alle elf Themes, 390/768/1024/1440 px, Print, 200-%-Zoom und Reduced Motion bleiben Gegenstand der kompletten Suite. Restrisiken P2: Mehrtab-Löschkonflikte, native Großprojekt-Vollrenders, echte Touch-/Screenreader-/Safari-/Firefox-Geräte sowie bei von einer neueren Auswahl überholten Importen eventuell ungenutzte, aber gespeicherte Projektkopien. Keine dieser Grenzen wird als bereits abgeprüft ausgegeben.
+
+**Merge-Gate:** `READY FOR MERGE` nur bei nachweislich 0 offenen P0/P1, vollständiger Datenintegrität und Parität, keiner A11y-/Performance-Regression und mindestens **drei vollständig erfolgreichen CI-Durchläufen auf demselben letzten Commit-SHA** inklusive 20 kritischen Wiederholungen. Nach weiteren Commits ist die Abnahme neu erforderlich. Bis dahin ausdrücklich **NOT READY**; PR #13 bleibt Draft, die finale Merge-Freigabe liegt ausschließlich beim Auftraggeber.
