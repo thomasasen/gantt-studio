@@ -6,8 +6,9 @@ on:
       - main
       - refactor/engine-abstraction
       - fix/frappe-lifecycle-isolation
+      - feature/frappe-transactional-editor
   pull_request:
-    branches: [main]
+    branches: [main, fix/frappe-lifecycle-isolation]
   workflow_dispatch:
 
 permissions:
@@ -35,6 +36,9 @@ jobs:
           node --check assets/js/gantt.js
           node --check assets/js/core/date-only.mjs
           node --check assets/js/core/project-commits.mjs
+          node --check assets/js/core/transactional-editor.mjs
+          node --check tests/transactional-editor.spec.mjs
+          node --check tests/frappe-transactional-browser.spec.cjs
           node --check assets/js/core/project-activation.mjs
           node --check assets/js/engine/engine-contract.mjs
           node --check assets/js/engine/engine-controller.mjs
@@ -75,7 +79,7 @@ jobs:
         run: |
           npm ci --prefix spikes/frappe --ignore-scripts --no-audit --no-fund
           npm run build --prefix spikes/frappe
-          node --test tests/frappe-spike.spec.mjs tests/frappe-gesture-gate.spec.mjs tests/engine-async-controller.spec.mjs
+          node --test tests/frappe-spike.spec.mjs tests/frappe-gesture-gate.spec.mjs tests/engine-async-controller.spec.mjs tests/transactional-editor.spec.mjs
       - name: Install browser test dependency
         run: npm install --no-save --no-package-lock @playwright/test@1.56.1 @axe-core/playwright@4.11.0
       - name: Install Chromium
