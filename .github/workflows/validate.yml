@@ -26,6 +26,7 @@ jobs:
           node --check assets/js/print/print-export.mjs
           node --check assets/js/print/print-labels.mjs
           node --check tests/print-labels.spec.mjs
+          node --check tests/registered-icons.spec.mjs
           node --check tests/print-image-model.spec.mjs
           node --check tests/print-model.spec.mjs
           node --check assets/js/engine/dhtmlx/dhtmlx-mapper.mjs
@@ -136,6 +137,8 @@ jobs:
           grep -q 'font-size:13px' assets/css/task-table.css
           grep -q 'font-size:11px' assets/css/task-table.css
 
+      - name: Prevent unregistered HTML icons from blocking app startup
+        run: node --test tests/registered-icons.spec.mjs
       - name: Verify print projection and pagination
         run: node --test tests/print-model.spec.mjs tests/print-image-model.spec.mjs tests/print-labels.spec.mjs
       - name: Verify DHTMLX mapper and exact version lock
