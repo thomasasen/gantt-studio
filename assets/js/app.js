@@ -1,12 +1,12 @@
-import { createEngineController } from './engine/engine-controller.mjs?v=2.8.0';
-import { createNativeEngine } from './engine/native/native-adapter.mjs?v=2.8.0';
-import { createProjectCommitter } from './core/project-commits.mjs?v=2.8.0';
-import { createProjectActivationCoordinator } from './core/project-activation.mjs?v=2.8.0';
-import { localTodayIso, isValidIsoDate } from './core/date-only.mjs?v=2.8.0';
-import { icon, hydrateIcons } from './icons.mjs?v=2.8.0';
+import { createEngineController } from './engine/engine-controller.mjs?v=2.8.1';
+import { createNativeEngine } from './engine/native/native-adapter.mjs?v=2.8.1';
+import { createProjectCommitter } from './core/project-commits.mjs?v=2.8.1';
+import { createProjectActivationCoordinator } from './core/project-activation.mjs?v=2.8.1';
+import { localTodayIso, isValidIsoDate } from './core/date-only.mjs?v=2.8.1';
+import { icon, hydrateIcons } from './icons.mjs?v=2.8.1';
 import { saveLocal, loadActive, loadProject, listProjects, deleteProject, setActiveProject } from './storage.js?v=2.8.1';
-import { normalizeTaskOrder, nextDisplayOrder, sortedProjectTasks, phaseKey, reorderTask, nudgeTask } from './task-order.mjs?v=2.8.0';
-import { DESIGN_COLOR_FIELDS, DESIGN_PRESETS, findDesignPreset, matchDesignPreset, designThemeMode } from './design-presets.mjs?v=2.8.0';
+import { normalizeTaskOrder, nextDisplayOrder, sortedProjectTasks, phaseKey, reorderTask, nudgeTask } from './task-order.mjs?v=2.8.1';
+import { DESIGN_COLOR_FIELDS, DESIGN_PRESETS, findDesignPreset, matchDesignPreset, designThemeMode } from './design-presets.mjs?v=2.8.1';
 
 const $ = (id) => document.getElementById(id);
 const clone = (x) => JSON.parse(JSON.stringify(x));

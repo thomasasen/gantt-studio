@@ -1,5 +1,5 @@
-import { renderGantt } from '../../gantt.js?v=2.8.0';
-import { createNativeInteractions } from './native-interactions.mjs?v=2.8.0';
+import { renderGantt } from '../../gantt.js?v=2.8.1';
+import { createNativeInteractions } from './native-interactions.mjs?v=2.8.1';
 
 const CAPABILITIES=Object.freeze({
   id:'native', zoom:Object.freeze(['day','week','month']),

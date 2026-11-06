@@ -1,4 +1,4 @@
-import { assertEngineContract, immutableEngineProjection } from './engine-contract.mjs?v=2.8.0';
+import { assertEngineContract, immutableEngineProjection } from './engine-contract.mjs?v=2.8.1';
 
 /**
  * Owns the active adapter and the last successfully rendered immutable view.
