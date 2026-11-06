@@ -2,9 +2,9 @@ name: Validate Gantt Studio
 
 on:
   push:
-    branches: [main, refactor/engine-abstraction, fix/frappe-lifecycle-isolation, feature/frappe-transactional-editor]
+    branches: [main, refactor/engine-abstraction, fix/frappe-lifecycle-isolation, feature/frappe-transactional-editor, spike/frappe-public-editor-api]
   pull_request:
-    branches: [fix/frappe-lifecycle-isolation]
+    branches: [fix/frappe-lifecycle-isolation, feature/frappe-transactional-editor]
   workflow_dispatch:
 
 permissions:
@@ -28,6 +28,7 @@ jobs:
           node --check assets/js/core/project-commits.mjs
           node --check assets/js/core/transactional-editor.mjs
           node --check tests/transactional-editor.spec.mjs
+          node --check tests/frappe-public-editor-pointer.spec.cjs
           node --check assets/js/core/project-activation.mjs
           node --check assets/js/engine/engine-contract.mjs
           node --check assets/js/engine/engine-controller.mjs
