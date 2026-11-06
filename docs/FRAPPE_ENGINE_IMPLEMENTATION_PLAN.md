@@ -1,6 +1,6 @@
 # Gantt Studio: Engine-Abstraktion und optionaler Frappe-Gantt-Adapter
 
-> **Status:** Phasen A und B abgeschlossen und regressionsgeprüft. Architektur-PR als Review-Vorbereitung; Phase C benötigt Freigabe des Abstraktionsstands.
+> **Status:** Phasen A und B implementiert; Phase C im getrennten Draft-PR #14 mit **NO-GO für Frappe Gantt 1.2.2** abgeschlossen. Phase-B-PR #13 befindet sich in der abschließenden Härtung und Merge-Readiness-Prüfung. Native bleibt der einzige unterstützte Renderer.
 >
 > **Arbeitsbranch:** `refactor/engine-abstraction`  
 > **Repository:** https://github.com/thomasasen/gantt-studio  
@@ -342,3 +342,57 @@ Das Gesamtvorhaben ist nur dann „abgeschlossen“, wenn
 6. die Entscheidung über einen möglichen Default-Wechsel **separat** getroffen wurde und keine unauthorisierte Produktionsänderung erfolgt ist.
 
 **Erfolg heißt ausdrücklich nicht zwingend, Frappe zu verwenden.** Erfolg heißt: eine belastbar austauschbare Engine-Architektur, ein sicherer Datenkern und eine überprüfbare Entscheidung über Frappe-Gantt.
+
+
+## 11. Abschluss-Audit der Native-Engine-Architektur (06.11.2026)
+
+### Scope und Branch-Schutz
+
+Der Audit läuft ausschließlich auf `refactor/engine-abstraction` in [PR #13](https://github.com/thomasasen/gantt-studio/pull/13). Vergleichsbasis bleibt `main@1ef29c9388b555308242bb6174ff6ed60127ea5d`; der Frappe-Spike [PR #14](https://github.com/thomasasen/gantt-studio/pull/14) bleibt separat und unberührt. **Frappe 1.2.2: NO-GO** wegen nicht zuverlässig bereinigter globaler Listener, asynchroner Callback-Auslösung während einer Drag-Vorschau, nicht nachgewiesenem Commit-Once-/Cancel-Vertrag und fehlender Native-Funktionsparität. Keine produktive Frappe-Abhängigkeit, keine Schemaänderung, kein Merge nach `main`.
+
+### Unabhängiges Red-Team: Befunde, Einstufung und Änderungen
+
+| Nr. | Klasse | Red-Team-Befund | Abhilfe / Prüfnachweis |
+| --- | --- | --- | --- |
+| RT-01 | P1, behoben | Controller veröffentlichte eine Renderprojektion vor dem erfolgreichen Rendern. Nach Fehler konnte ein Switch den fehlgeschlagenen Zustand wiederverwenden. | Erfolgszustand erst nach Renderbestätigung; Rollback auf letzten gültigen Stand; bei gescheitertem Rollback AggregateError und Fail-Closed. `7ec32e35`; sechs neue Lifecycle-Tests in `tests/engine-resilience.spec.cjs`. |
+| RT-02 | P1, behoben | Konkurrierende Projektwechsel und laufende Drags konnten sich gegenseitig überholen; DOM-Selektorauswertung allein genügt bei asynchronen Renders nicht. | Laufende Tisch-/Gantt-Drags beim Projektwechsel abbrechen; sequenzierte Projektwahl `projectSelectionSerial`; `bc4c5110`, `e1a60199`; neue Browser-Regressionen. |
+| RT-03 | P1, behoben | Zwei unmittelbar ausgelöste Speichern-Aktionen in Task-/Planungsdialogen konnten zwei IDs und doppelte Datensätze erzeugen. | Reentrancy-Guards und deaktivierte Speicherschaltflächen bis zum Abschluss: `90288047`, `tests/no-duplicate-commit.spec.cjs`. |
+| RT-04 | P2, behoben | Relative Kalenderziellinie verwendete UTC-Tagesdatum statt des lokalen `date-only`-Tages. | Anker `localTodayIso()`; `ad104c72`, Zeitzonen-Test Berlin/New York/Auckland `4378a926`. |
+| RT-05 | P2, behoben | IndexedDB-Connections blieben bei Lesen/Listen/Löschen offen. | Explizites `db.close()` auf Success/Abort/Error, `459db413`; Lifecycle-Tests `dd66fc49`. |
+| RT-06 | P2, verbleibend | Native-Renderer skaliert mit großen Datenmengen annähernd linear; bei 1.000 sichtbaren Aufgaben entstehen blockierende Renderzeiten. | Reproduzierbare Adapter-Messung und gleicher Chromium-Runner-Baseline-Vergleich hinzugefügt; vor einer späteren Virtualisierung konkrete Nutzerlast und neue Benchmarks erheben. Kein riskanter Rewrite im Härtungs-PR. |
+| RT-07 | P2, verbleibend | Physischer Touch, echte Screenreader, Firefox/Safari, unterschiedliche GPU-/Endgeräte und manuell kontrollierter Druck sind nicht vollständig automatisiert abgedeckt. | Chromium-, Axe-, CSS-Print-, Viewport-/Reduced-Motion- und 200-%-CSS-Zoom-Suiten bestehen bereits; begrenzte manuelle Abnahme bleibt explizites Restrisiko. |
+| RT-08 | P2, verbleibend | Gleichzeitiges Projektlöschen in einer anderen Browser-Tab-Sitzung unterliegt nicht demselben Optimistic-Locking-Vertrag wie das Aktualisieren von Aufgaben. | Bestehender Revisionstest verhindert stilles Überschreiben beim Speichern; Lösch-Sonderfall separat dokumentiert und noch nicht als vollständig abgesichert behauptet. |
+
+### Testabdeckung und Arbeitsartefakte
+
+- `tests/engine-resilience.spec.cjs`: Mount-Fehlschlag und Cleanup, Render-Rollback, Switch-/Viewport-Rollback, doppelte Fehler und Fail-Closed.
+- `tests/relative-date-timezone.spec.cjs`: gleicher tatsächlicher UTC-Zeitpunkt in Europe/Berlin, America/New_York und Pacific/Auckland.
+- `tests/project-switch-cancel.spec.cjs`: Tabellen- und Gantt-Drag mit Projektwechsel, kein unerwünschter Commit.
+- `tests/indexeddb-lifecycle.spec.cjs`: wiederholte Reads und Lösch-Transaktion schließen Datenbankverbindungen.
+- `tests/no-duplicate-commit.spec.cjs`: Task- und Markeranlage mit zweimaliger Save-Auslösung.
+- `tests/theme-geometry-matrix.spec.cjs`: alle **elf Vorlagen × 390/768/1024/1440 px**; Row-Geometrie, Overflow, Timeline und Screenshot-Review-Artefakte.
+- `tests/native-performance.spec.cjs`: 0/1/25/250/1000 Tasks, drei Wiederholungen, Median für sieben Messgrößen; maschinenlesbares JSON.
+- `tests/native-main-comparison.spec.cjs`: Main-Renderer vs Native-Adapter auf demselben Chromium-Runner, fünf Wechselmessungen je Taskzahl; maschinenlesbares JSON; Workflow mit kompletter `main`-History.
+- `.github/workflows/ui-regression.yml`: neue Tests werden ausgeführt und syntaktisch geprüft; Benchmark-JSON als `native-engine-performance`, Screenshot-Artefakte unter `design-visual-review`.
+
+**Verifizierte Zwischenstände:** [Workflow #42133240847](https://github.com/thomasasen/gantt-studio/actions/runs/42133240847): **63/63 Chromium-Tests bestanden**. [Workflow #42134208818](https://github.com/thomasasen/gantt-studio/actions/runs/42134208818) auf `4a1b6ac3`: **68/68 Chromium-Tests bestanden**. Diese Zwischenstände sind nicht als Erfolg aller späteren Commits zu verstehen. Statische GitHub-Workflow-Prüfungen waren über mehrere Folge-Commits erfolgreich. Die abschließende vollständige CI des letzten Branch-Commits muss unabhängig davon erfolgreich sein; vorher kein positiver Merge-Status.
+
+### Gemessene Performance, kein Schätzwert
+
+Messung A: [Chromium #42133240847](https://github.com/thomasasen/gantt-studio/actions/runs/42133240847), drei Wiederholungen, Median in ms. Es handelt sich um **Adapter-Mikrobenchmarks**, nicht um vollständige Interaktionszeiten inklusive Projektkommandos/IndexedDB:
+
+| Aufgaben | Initial | Re-Render | Zoom | Filter | Task-Änderung | Mount/Destroy |
+| ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 0 | 0.0 | 0.0 | 0.1 | 0.1 | 0.0 | 0.0 |
+| 1 | 5.1 | 4.4 | 1.1 | 1.4 | 1.3 | 1.4 |
+| 25 | 12.5 | 18.7 | 12.9 | 5.8 | 10.8 | 14.9 |
+| 250 | 144.2 | 136.1 | 138.4 | 71.1 | 122.6 | 133.8 |
+| 1.000 | 527.1 | 501.5 | 611.8 | 325.3 | 530.0 | 514.0 |
+
+Der Keyboard-Intent-Dispatch im gleichen Test dauerte für vorhandene Reorder-Griffe zwischen 0 und 0,1 ms. Dieser Wert erfasst **nicht** die anschließende IndexedDB-Latenz.
+
+Messung B: [Chromium #42133839035](https://github.com/thomasasen/gantt-studio/actions/runs/42133839035), im selben Runner abwechselnd fünf Renderdurchläufe je Implementierung. Dieser Workflow enthielt noch einen fehlgeschlagenen IndexedDB-Test, die separat protokollierten Benchmark-Messwerte sind aber tatsächlich ausgeführt worden: Main/Native in ms = **1 Task 1,6/2,3**, **25 Tasks 10,0/10,6**, **250 Tasks 73,2/77,2**, **1.000 Tasks 281,7/298,6**. Bei 1.000 Tasks lag der neue Adapter dort ca. **6 %** über dem bisherigen Renderer, ohne belastbare Hinweise auf eine unvertretbare strukturelle Regression. Die Werte schwanken wegen Hardware-Auslastung; deshalb kein universeller Performance-Grenzwert.
+
+### Merge-Readiness / noch offene Gate-Bedingungen
+
+**Bis zur letzten grünen CI: NOT READY.** Ein Merge ist ausdrücklich nicht genehmigt. Nach bestandenen vollständigen Tests sind verbleibende P2-Risiken gesondert zu bewerten; P0/P1 dürfen dann nicht mehr offen sein. **Kein noch so erfolgreicher CI-Lauf ersetzt den vom Auftraggeber ausdrücklich freizugebenden Merge nach `main`.**
