@@ -50,7 +50,7 @@ export function createFrappeGestureGate({emit,rollback=()=>{},onError=()=>{}}) {
           pending=true;
           void Promise.resolve(result).then(
             ()=>{if(!destroyed){pending=false;state='dispatched';}},
-            error=>{pending=false;if(!destroyed){state='failed';undo();}fail(error);}
+            error=>{pending=false;if(!destroyed){state='failed';undo();fail(error);}}
           );
         } else state='dispatched';
         return true;
