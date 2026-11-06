@@ -18,6 +18,8 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Allow same-run baseline comparison against origin/main
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -40,6 +42,8 @@ jobs:
           node --check tests/engine-resilience.spec.cjs
           node --check tests/relative-date-timezone.spec.cjs
           node --check tests/native-performance.spec.cjs
+          node --check tests/native-main-comparison.spec.cjs
+          node --check tests/project-switch-cancel.spec.cjs
           node --check tests/persistence.spec.cjs
           node --check assets/js/storage.js
           node --check tests/ui.spec.cjs
@@ -64,7 +68,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: native-engine-performance
-          path: performance-results/native-benchmark.json
+          path: performance-results/*.json
           if-no-files-found: ignore
       - name: Upload visual review screenshots
         if: always()
