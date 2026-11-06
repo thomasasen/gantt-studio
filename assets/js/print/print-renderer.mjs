@@ -155,7 +155,7 @@ function drawRows(projection,page,layout,options,colors){
     if(inPage(today,page)) {
       const xx=label+xOf(today,page)+page.dayWidth/2;
       svg+=line(xx,a,xx,bottom,colors.today,.55,'2,1');
-      svg+=txt(Math.min(xx+4,label+w-1),a-1,'Heute',2.6,colors.today,'text-anchor="end"');
+      // Explain this line in the legend instead of overwriting axis date labels.
     }
   }
   if(elems.dependencies){
@@ -188,7 +188,7 @@ export function renderPrintPage(projection,layout,page,options={}){
     :'<div class="print-spacer"></div>';
   const footer=layout.settings.footer
     ?'<footer class="print-footer"><span>'+esc(options.footerNote||projection.projectName)+'</span><span>Abschnitt '+(page.timeIndex+1)+'/'+page.timeCount+' · Zeilen '+(page.rowIndex+1)+'/'+page.rowCount+' · Seite '+page.number+'/'+page.total+'</span></footer>':'';
-  const legend=layout.settings.legend?'<div class="print-legend">■ Vorgang &nbsp; ◆ Meilenstein / Gate &nbsp; ┄ Baseline / Puffer &nbsp; │ Stichtag</div>':'';
+  const legend=layout.settings.legend?'<div class="print-legend">■ Vorgang &nbsp; ◆ Meilenstein / Gate &nbsp; ┄ Baseline / Puffer &nbsp; │ Stichtag / Heute</div>':'';
   const svg='<svg xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Zeitplan '+esc(day(page.start))+' bis '+esc(day(page.end))+'" width="'+num(w)+'mm" height="'+num(h)+'mm" viewBox="0 0 '+num(w)+' '+num(h)+'">'+drawAxis(page,layout,c,options)+drawRows(projection,page,layout,options,c)+'</svg>';
   return '<section class="print-page" data-print-page="'+page.number+'" style="width:'+layout.pageWidth+'mm;height:'+layout.pageHeight+'mm;padding:'+layout.margin+'mm"><div class="print-inner">'+header+'<div class="print-chart">'+svg+'</div>'+legend+footer+'</div></section>';
 }
