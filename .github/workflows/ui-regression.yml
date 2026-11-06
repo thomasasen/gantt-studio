@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - refactor/engine-abstraction
+      - fix/frappe-lifecycle-isolation
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -49,6 +50,12 @@ jobs:
           node --check tests/project-activation-browser.spec.cjs
           node --check tests/toast-accessibility.spec.cjs
           node --check tests/pointercancel-regression.spec.cjs
+          node --check assets/js/engine/frappe/frappe-adapter.mjs
+          node --check assets/js/engine/frappe/frappe-task-mapper.mjs
+          node --check spikes/frappe/frame.mjs
+          node --check spikes/frappe/spike.mjs
+          node --check tests/frappe-spike.spec.mjs
+          node --check tests/frappe-isolation.spec.cjs
           node --check tests/theme-geometry-matrix.spec.cjs
           node --check tests/indexeddb-lifecycle.spec.cjs
           node --check tests/no-duplicate-commit.spec.cjs
@@ -58,6 +65,11 @@ jobs:
           node --check tests/icon-system.spec.cjs
           node --check tests/apple-design-audit.spec.cjs
           node --check playwright.config.cjs
+      - name: Build isolated Frappe vendor and run adapter unit tests
+        run: |
+          npm ci --prefix spikes/frappe --ignore-scripts --no-audit --no-fund
+          npm run build --prefix spikes/frappe
+          node --test tests/frappe-spike.spec.mjs
       - name: Install browser test dependency
         run: npm install --no-save --no-package-lock @playwright/test@1.56.1 @axe-core/playwright@4.11.0
       - name: Install Chromium
