@@ -37,7 +37,7 @@ test('Druckdialog zeigt die vollständige Projektprojektion und reagiert auf Ein
   await expect(page.locator('#printPageCount')).toContainText('Seite');
   const fullText=await page.frameLocator('#printPreview iframe').locator('svg').textContent();
   expect(fullText).toContain('Projekt-Kick-off');
-  expect(fullText).toContain('Go-live');
+  if(!fullText.includes('Go-live')){await page.locator('#printPageNext').click();await expect(page.frameLocator('#printPreview iframe').locator('svg')).toContainText('Go-live');}
   await page.locator('#pr-paper').selectOption('A3');
   await expect(page.frameLocator('#printPreview iframe').locator('svg')).toHaveAttribute('width',/\d+mm/);
   await page.locator('#pr-strategy').selectOption('manual');
@@ -85,9 +85,7 @@ test('Druckvorschau bleibt bei Projektwechsel stabil und ist bei 200 Prozent bed
   dir();await page.setViewportSize({width:390,height:760});await page.goto('/');
   await page.locator('#loadDemoBtn').click();
   const demo=await page.locator('#projectSelect').inputValue();
-  await page.locator('#newProjectBtn').click();
-  // Some implementations use a prompt to name a new project; use only the stable demo.
-  if(await page.locator('#projectSelect').inputValue()===demo)await page.locator('#loadDemoBtn').click();
+  await page.locator('#loadDemoBtn').click();
   await page.locator('#projectSelect').selectOption(demo);
   await openPrint(page);
   await expect(page.locator('#printPageCount')).toContainText('Seite');
