@@ -34,3 +34,6 @@ The runtime application itself has no Playwright dependency.
 - The real-pointer probe is a **negative safety gate**, not a proof of reliably editable Frappe. The current upstream sometimes does not emit a final edit from a physical drag. Existing direct upstream callback probes are retained unchanged for timing diagnostics.
 - A verified Frappe-to-IndexedDB UI commit, keyboard/touch parity, session abort after a begun IndexedDB save and a renderer acknowledgment remain **not tested as passing**, because the Frappe editor is intentionally not wired to production.
 - CI must run both feature-branch head and PR-merge-ref against `fix/frappe-lifecycle-isolation`; a green main-only status or earlier SHA is insufficient.
+
+
+**Verifizierte PR-Merge-Ref-CI der Transaktionsimplementierung `f967304`:** [43 Unit-Tests](https://github.com/thomasasen/gantt-studio/actions/runs/42227444924) und [107 Chromium-Tests plus 20 Projektwechsel-Stresstests](https://github.com/thomasasen/gantt-studio/actions/runs/42227444915), beide **SUCCESS**. Getestet wurde der berechnete Merge-Commit `800fbc2` gegen `fix/frappe-lifecycle-isolation@86de64e`. Der experimentelle Frappe-Diagnosemodus schreibt nicht in IndexedDB; die Tests beanspruchen ausdrücklich keine Schreibfreigabe.
