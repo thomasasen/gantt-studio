@@ -41,6 +41,7 @@ jobs:
           node --check tests/print-dialog.spec.cjs
           node --check tests/print-pdf.spec.cjs
           node --check tests/print-image.spec.cjs
+          node --check tests/export-format-labels.spec.cjs
           node --check assets/js/engine/dhtmlx/dhtmlx-mapper.mjs
           node --check assets/js/engine/dhtmlx/dhtmlx-adapter.mjs
           node --check spikes/dhtmlx/spike.mjs

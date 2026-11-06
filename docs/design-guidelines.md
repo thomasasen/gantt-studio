@@ -140,3 +140,5 @@ Bei optionalen asynchronen Renderern bleibt der bestätigte Gantt-Baum bis zu ei
 - Die Exportdarstellung reserviert genügend Höhe je Aufgabenzeile für Beschriftungen. Textlabels dürfen weder andere Aufgabenzeilen noch Status-/Risikoangaben verdecken.
 - Status und Risiko sind lesbar zu benennen und dürfen nie ausschließlich durch Farbgebung kommuniziert werden. PDF-Balken erhalten platzsparende Annotationen; ausführliche Bezeichnungen stehen weiterhin in der wiederholten Aufgabenspalte.
 - Label-Layout und Projekt-/Datumsberechnung verändern keine Gantt-Interaktionen, Aufgabenreihenfolge, Revision oder gespeicherten Projektdaten. Browserprüfungen müssen SVG-Geometrie, lange Texte, Meilensteine am Diagrammrand und PNG-/JPG-Downloads abdecken.
+
+- Exporttexte müssen klar zwischen PDF als mehrseitigem Druckdokument und PNG/JPG als **einzelner Datei des vollständigen Gantt-Diagramms** unterscheiden. Einstieg, Dialogtext, Formatwahl und primäre Aktion sollen einheitlich benannt sein; die primäre Aktion ändert ihre Bezeichnung mit der Formatauswahl.
