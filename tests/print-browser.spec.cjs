@@ -34,7 +34,7 @@ test('Druckdialog zeigt die vollständige Projektprojektion und reagiert auf Ein
   await scroll.evaluate(node=>{node.scrollLeft=800;node.scrollTop=250;});
   const before=await page.evaluate(async()=>JSON.stringify(await (await import('/assets/js/storage.js?v=2.9.0')).loadActive()));
   await openPrint(page);
-  await expect(page.locator('#printPageCount')).toContainText('Seite');
+  await expect(page.locator('#printPageCount')).toContainText('Druckseite');
   const fullText=await page.frameLocator('#printPreview iframe').locator('svg').textContent();
   expect(fullText).toContain('Projekt-Kick-off');
   if(!fullText.includes('Go-live')){await page.locator('#printPageNext').click();await expect(page.frameLocator('#printPreview iframe').locator('svg')).toContainText('Go-live');}
@@ -43,7 +43,7 @@ test('Druckdialog zeigt die vollständige Projektprojektion und reagiert auf Ein
   await page.locator('#pr-strategy').selectOption('manual');
   await expect(page.locator('#pr-scale')).toBeVisible();
   await page.locator('#pr-scale').fill('160');await page.locator('#pr-scale').dispatchEvent('change');
-  await expect(page.locator('#printPageCount')).toContainText('Seite');
+  await expect(page.locator('#printPageCount')).toContainText('Druckseite');
   await page.locator('#printDialog').screenshot({path:path.join(REVIEW,'dialog-desktop.png')});
   await page.locator('#printClose').click();await expect(page.locator('#printDialog')).toBeHidden();
   const after=await page.evaluate(async()=>JSON.stringify(await (await import('/assets/js/storage.js?v=2.9.0')).loadActive()));
@@ -90,7 +90,7 @@ test('Druckvorschau bleibt bei Projektwechsel stabil und ist bei 200 Prozent bed
   await expect(page.locator('#projectName')).toHaveValue('Dynamisches Demo-Projekt');
   await openPrint(page);
   await expect(page.frameLocator('#printPreview iframe').locator('svg')).toContainText('Projekt-Kick-off');
-  await expect(page.locator('#printPageCount')).toContainText('Seite');
+  await expect(page.locator('#printPageCount')).toContainText('Druckseite');
   await page.locator('#printPreviewZoom').selectOption('100');
   await expect(page.frameLocator('#printPreview iframe').locator('svg')).toBeVisible();
   await page.locator('#printDialog').screenshot({path:path.join(REVIEW,'dialog-mobile.png')});
