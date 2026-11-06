@@ -1,13 +1,17 @@
-import { renderGantt } from './gantt.js?v=2.6.0';
-import { icon, hydrateIcons } from './icons.mjs?v=2.6.0';
-import { saveLocal, loadActive, loadProject, listProjects, deleteProject, setActiveProject } from './storage.js?v=2.6.0';
-import { normalizeTaskOrder, nextDisplayOrder, sortedProjectTasks, phaseKey, reorderTask, nudgeTask } from './task-order.mjs?v=2.6.0';
-import { DESIGN_COLOR_FIELDS, DESIGN_PRESETS, findDesignPreset, matchDesignPreset, designThemeMode } from './design-presets.mjs?v=2.6.0';
+import { createEngineController } from './engine/engine-controller.mjs?v=2.8.1';
+import { createNativeEngine } from './engine/native/native-adapter.mjs?v=2.8.1';
+import { createProjectCommitter } from './core/project-commits.mjs?v=2.8.1';
+import { createProjectActivationCoordinator } from './core/project-activation.mjs?v=2.8.1';
+import { localTodayIso, isValidIsoDate } from './core/date-only.mjs?v=2.8.1';
+import { icon, hydrateIcons } from './icons.mjs?v=2.8.1';
+import { saveLocal, loadActive, loadProject, listProjects, deleteProject, setActiveProject } from './storage.js?v=2.8.1';
+import { normalizeTaskOrder, nextDisplayOrder, sortedProjectTasks, phaseKey, reorderTask, nudgeTask } from './task-order.mjs?v=2.8.1';
+import { DESIGN_COLOR_FIELDS, DESIGN_PRESETS, findDesignPreset, matchDesignPreset, designThemeMode } from './design-presets.mjs?v=2.8.1';
 
 const $ = (id) => document.getElementById(id);
 const clone = (x) => JSON.parse(JSON.stringify(x));
 const uuid = () => crypto.randomUUID ? crypto.randomUUID() : `id-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-const todayIso = () => new Date().toISOString().slice(0, 10);
+const todayIso = () => localTodayIso();
 const DAY = 86400000;
 
 const defaults = {
@@ -27,13 +31,29 @@ let zoom = 'week';
 let managementMode = 'operational';
 let managementCriteria = { ...managementDefaults };
 let collapsedPhases = new Set();
-let saveTimer = null;
+const projectCommitter = createProjectCommitter(saveLocal);
+const engineController = createEngineController(createNativeEngine);
+const projectActivation = createProjectActivationCoordinator({
+  load: async id => {
+    // A reactivated project must see any completed in-flight commit, not a
+    // stale snapshot loaded before its previous write finishes.
+    await projectCommitter.whenIdle(id);
+    const project = await loadProject(id);
+    if (!project) return null;
+    return {project, portfolio: await listProjects()};
+  },
+  present: ({project, portfolio}) => presentProject(project, portfolio)
+});
+const deletingProjects = new Set();
+let taskSavePending = false;
+let entitySavePending = false;
+const pendingSaves = new Map();
+const lastSaveFailed = new Set();
 let toastTimer = null;
 let activeTab = 'project';
 let taskDetailsExpanded = false;
 let taskSortMode = 'manual';
 let taskDrag = null;
-let ganttTaskDrag = null;
 let ganttLeftWidth = 0;
 let resizeRenderQueued = false;
 
@@ -65,6 +85,10 @@ function normalizeEnvelope(raw) {
 
 async function boot() {
   hydrateIcons();
+  engineController.mount({container:$('ganttStage'),onIntent:handleEngineIntent,
+    onSelect:handleEngineSelection,onError:error=>console.error('Gantt-Engine:',error),
+    onStatus:setTaskOrderStatus});
+  window.addEventListener('beforeunload',()=>engineController.destroy(),{once:true});
   bindEvents();
   buildSettings();
   let local = null;
@@ -75,6 +99,8 @@ async function boot() {
   }
   if (local) envelope = normalizeEnvelope({ schema:'gantt-studio.project', schemaVersion:1, generator:'Gantt Studio', project:local });
   else await saveLocal(envelope.project);
+  setActiveProject(envelope.project.id);
+  projectCommitter.remember(envelope.project);
   loadViewState();
   await renderAll();
   ganttLeftWidth = currentGanttLeftWidth();
@@ -94,7 +120,6 @@ function bindEvents() {
   $('taskTableBody').addEventListener('click', handleTaskTableClick);
   $('taskTableBody').addEventListener('keydown', handleTaskTableKeydown);
   $('taskTableBody').addEventListener('pointerdown', startTaskDrag);
-  $('ganttStage').addEventListener('pointerdown', startGanttTaskDrag);
   document.querySelectorAll('[data-task-sort-mode]').forEach(button =>
     button.addEventListener('click', () => setTaskSortMode(button.dataset.taskSortMode)));
 
@@ -122,22 +147,9 @@ function bindEvents() {
   document.querySelectorAll('[data-zoom]').forEach(btn => btn.addEventListener('click', () => setZoom(btn.dataset.zoom)));
   document.querySelectorAll('[data-management-mode]').forEach(btn => btn.addEventListener('click', () => setManagementMode(btn.dataset.managementMode)));
   document.querySelectorAll('[data-management-criterion]').forEach(cb => cb.addEventListener('change', () => { managementCriteria[cb.dataset.managementCriterion] = cb.checked; saveViewState(); renderGanttOnly(); syncControlStates(); }));
-  $('projectName').addEventListener('change', async e => { envelope.project.name = e.target.value.trim() || 'Unbenanntes Projekt'; touch(); await persist(); await renderPortfolio(); });
+  $('projectName').addEventListener('change', async e => { const name=e.target.value.trim() || 'Unbenanntes Projekt'; try { await commitProjectChange(p=>{p.name=name;}); await renderPortfolio(); } catch { $('projectName').value=envelope.project.name; } });
   $('saveTaskBtn').addEventListener('click', saveTask);
   $('deleteTaskBtn').addEventListener('click', deleteTask);
-  $('ganttStage').addEventListener('click', e => { if (Date.now() < (window.__ganttDragUntil || 0) || e.target.closest('[data-gantt-order-handle]')) return; const phaseRow=e.target.closest('[data-phase-id]'); const phaseId=phaseRow?.dataset.phaseId; if(phaseId){ collapsedPhases.has(phaseId)?collapsedPhases.delete(phaseId):collapsedPhases.add(phaseId); saveViewState(); renderPhaseToolbar(); renderGanttOnly(); return; } const node=e.target.closest('[data-task-id]'); const id=node?.dataset.taskId; if(id) openTaskDialog(id); });
-  $('ganttStage').addEventListener('keydown', e => {
-    const handle=e.target.closest('[data-gantt-order-handle]');
-    if(handle){
-      if(['ArrowUp','ArrowDown'].includes(e.key)){
-        e.preventDefault();e.stopPropagation();
-        if(canReorderTasks())void commitTaskMove(
-          ()=>nudgeTask(envelope.project,handle.dataset.taskId,e.key==='ArrowUp'?-1:1),
-          handle.dataset.taskId,'gantt');
-      }
-      return;
-    }
-    if(!['Enter',' '].includes(e.key)) return; const phaseRow=e.target.closest('[data-phase-id]'); const phaseId=phaseRow?.dataset.phaseId; if(phaseId){e.preventDefault(); collapsedPhases.has(phaseId)?collapsedPhases.delete(phaseId):collapsedPhases.add(phaseId); saveViewState(); renderPhaseToolbar(); renderGanttOnly(); return;} const taskId=e.target.closest('[data-task-id]')?.dataset.taskId; if(taskId){e.preventDefault(); openTaskDialog(taskId);} });
   $('phaseCollapseToolbar').addEventListener('click', handlePhaseCollapseClick);
   $('addPhaseBtn').addEventListener('click', () => openEntity('phase'));
   $('addMarkerBtn').addEventListener('click', () => openEntity('marker'));
@@ -151,22 +163,91 @@ function bindEvents() {
   $('relativeTargetDate').addEventListener('change', handleRelativeTargetDateChange);
   $('relativeJumpBtn').addEventListener('click', jumpToRelativeLine);
   for (const id of ['phaseList','markerList','holidayList']) $(id).addEventListener('click', e => { const row=e.target.closest('[data-entity-id]'); if(row) openEntity(row.dataset.entityKind,row.dataset.entityId); });
-  document.addEventListener('change', async e => { const key=e.target?.dataset?.setting; if(!key)return; envelope.project.planning.settings[key]=e.target.checked; touch(); await persist(); syncSettings(); renderGanttOnly(); });
+  document.addEventListener('change', async e => { const key=e.target?.dataset?.setting; if(!key)return; const checked=e.target.checked; try { await commitProjectChange(p=>{p.planning.settings[key]=checked;}); } catch {} syncSettings(); renderGanttOnly(); });
   window.addEventListener('keydown', e => { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase()==='s') { e.preventDefault(); exportProject(); } });
   document.addEventListener('input', e => { if (['designPrimary','designAccent','designWorkstream','designCritical','designMilestone','designGate','designPageBg','designPanelBg'].includes(e.target.id)) updateDesignPreview(); });
 }
 
+// Fetch before touching the DOM. The entire project surface then renders
+// synchronously so an older portfolio read cannot repaint a newer selection.
 async function renderAll() {
+  const token = currentProjectGeneration(), id = envelope.project.id;
+  const projects = await listProjects();
+  if (!projectActivation.isCurrent(token) || envelope.project.id !== id) return false;
+  renderAllFromPortfolio(projects);
+  return true;
+}
+
+function renderAllFromPortfolio(projects) {
   applyDesign();
   $('projectName').value = envelope.project.name;
-  await renderPortfolio();
+  renderPortfolioFromList(projects);
   renderMeta(); renderMetrics(); renderPlanningLists(); syncSettings(); renderQuickSettings(); renderPhaseToolbar(); renderGanttOnly(); renderTaskTable(); populateTaskPhases(); syncControlStates();
 }
 
 async function renderPortfolio() {
+  const token = currentProjectGeneration(), id = envelope.project.id;
   const projects = await listProjects();
+  if (!projectActivation.isCurrent(token) || envelope.project.id !== id) return false;
+  renderPortfolioFromList(projects);
+  return true;
+}
+
+function renderPortfolioFromList(projects) {
   $('projectSelect').innerHTML = projects.map(p => `<option value="${esc(p.id)}">${esc(p.name)} · ${p.tasks.length} Aufgaben</option>`).join('');
   $('projectSelect').value = envelope.project.id;
+}
+
+// All project-changing entry points share this generation. An outstanding
+// table or Gantt drag is invalidated before any asynchronous work begins.
+function beginProjectActivation() {
+  cancelTaskDrag();
+  engineController.cancelInteraction();
+  return projectActivation.begin();
+}
+function currentProjectGeneration() {
+  return projectActivation.current();
+}
+function restoreProjectSelection(token) {
+  if (projectActivation.isCurrent(token)) $('projectSelect').value = envelope.project.id;
+}
+
+function presentProject(stored, portfolio) {
+  const candidate = normalizeEnvelope({
+    schema:'gantt-studio.project', schemaVersion:1, generator:'Gantt Studio', project:stored
+  });
+  const previous = {
+    envelope, zoom, managementMode, managementCriteria, collapsedPhases, taskSortMode
+  };
+  try {
+    envelope = candidate;
+    loadViewState();
+    renderAllFromPortfolio(portfolio);
+    projectCommitter.remember(envelope.project);
+    setActiveProject(envelope.project.id);
+    if (pendingSaves.has(envelope.project.id))
+      setSaveStatus('saving','Änderungen werden lokal gesichert');
+    else if (lastSaveFailed.has(envelope.project.id))
+      setSaveStatus('error','Browser-Speicherung fehlgeschlagen');
+    else setSaveStatus('saved');
+    for (const id of ['taskDialog','entityDialog','designDialog']) {
+      const dialog = $(id);
+      if (dialog?.open) dialog.close();
+    }
+  } catch (error) {
+    envelope = previous.envelope;
+    zoom = previous.zoom;
+    managementMode = previous.managementMode;
+    managementCriteria = previous.managementCriteria;
+    collapsedPhases = previous.collapsedPhases;
+    taskSortMode = previous.taskSortMode;
+    try { renderAllFromPortfolio(portfolio); }
+    catch (rollbackError) {
+      throw new AggregateError([error,rollbackError],
+        'Projektwechsel fehlgeschlagen; vorherige Darstellung konnte nicht wiederhergestellt werden.');
+    }
+    throw error;
+  }
 }
 
 function renderMeta() {
@@ -181,6 +262,41 @@ function setSaveStatus(state, detail='Lokal im Browser') {
   $('saveStatusText').textContent=state==='saving'?'Speichert…':state==='error'?'Nicht gespeichert':'Gespeichert';
   $('saveStatusDetail').textContent=detail;
   box.querySelector('.save-status-icon').innerHTML=icon(state==='saving'?'loader-circle':state==='error'?'circle-alert':'check');
+}
+
+/**
+ * Only publishes a project after IndexedDB confirms its transaction.
+ * The queue is per project, so a later save cannot overwrite an earlier edit.
+ * An in-flight save for another project never changes the active selection.
+ */
+async function commitProjectChange(change) {
+  const project = envelope.project;
+  const id = project.id;
+  if (deletingProjects.has(id)) throw new Error('Dieses Projekt wird gerade gelöscht.');
+  pendingSaves.set(id,(pendingSaves.get(id)||0)+1);
+  if (envelope.project.id===id) setSaveStatus('saving','Änderungen werden lokal gesichert');
+  try {
+    const result = await projectCommitter.commit(project,change);
+    if (envelope.project.id===id) {
+      envelope.project=result.project;
+      renderMeta();
+    }
+    lastSaveFailed.delete(id);
+    return {...result,active:envelope.project.id===id};
+  } catch (error) {
+    lastSaveFailed.add(id);
+    if (envelope.project.id===id) toast(`Speichern fehlgeschlagen: ${error.message||'IndexedDB-Fehler'}`,true);
+    throw error;
+  } finally {
+    const remaining=(pendingSaves.get(id)||1)-1;
+    if (remaining) pendingSaves.set(id,remaining);
+    else pendingSaves.delete(id);
+    if (envelope.project.id===id) {
+      if (remaining) setSaveStatus('saving','Weitere Änderungen werden gesichert');
+      else if (lastSaveFailed.has(id)) setSaveStatus('error','Browser-Speicherung fehlgeschlagen; Änderung nicht übernommen');
+      else setSaveStatus('saved',`Lokal · ${new Intl.DateTimeFormat('de-DE',{hour:'2-digit',minute:'2-digit'}).format(new Date())}`);
+    }
+  }
 }
 
 function renderMetrics() {
@@ -261,10 +377,8 @@ function renderGanttOnly() {
   const tasks = visibleTasks();
   project.tasks = tasks;
   const stage = $('ganttStage');
-  cancelGanttTaskDrag();
-  const result = renderGantt(stage, project, {
-    zoom, onTaskChange:applyTimelineChange, reorderable:canReorderTasks()
-  });
+  engineController.cancelInteraction();
+  const result = engineController.render({project,view:{zoom,reorderable:canReorderTasks()}});
   const actualCount=tasks.filter(t=>!t.syntheticPhase).length;
   $('visibleTaskCount').textContent = actualCount===1?'1 Aufgabe':`${actualCount} Aufgaben`;
   if (result.empty) {
@@ -274,11 +388,45 @@ function renderGanttOnly() {
   }
 }
 
-async function applyTimelineChange(change){
-  const task=envelope.project.tasks.find(t=>t.id===change.id); if(!task)return;
-  if(change.start)task.start=change.start; if(change.end)task.end=change.end; if(Number.isFinite(change.progress))task.progress=clamp(Math.round(change.progress),0,100);
-  if(task.end<task.start){const x=task.start;task.start=task.end;task.end=x;}
-  touch(); await persist(); renderMetrics(); renderPhaseToolbar(); renderGanttOnly(); renderTaskTable();
+function handleEngineIntent(intent) {
+  if(intent?.type==='task-change')return applyTimelineChange(intent.change);
+  if(intent?.type==='reorder')return commitTaskMove(
+    project=>reorderTask(project,intent.taskId,intent.targetId,intent.place),
+    intent.taskId,intent.surface||'gantt');
+  if(intent?.type==='nudge')return commitTaskMove(
+    project=>nudgeTask(project,intent.taskId,intent.direction),
+    intent.taskId,intent.surface||'gantt');
+  throw new Error('Unbekannte Engine-Aktion: '+String(intent?.type));
+}
+
+function handleEngineSelection(selection) {
+  if(selection.kind==='phase') {
+    const id=selection.id;
+    collapsedPhases.has(id)?collapsedPhases.delete(id):collapsedPhases.add(id);
+    saveViewState();renderPhaseToolbar();renderGanttOnly();
+  } else if(selection.kind==='task') openTaskDialog(selection.id);
+}
+
+async function applyTimelineChange(change) {
+  const selectedId=envelope.project.id;
+  for (const key of ['start','end']) {
+    if (change[key]!==undefined && !isValidIsoDate(change[key]))
+      throw new Error('Ungültiges Kalenderdatum im Zeitplan.');
+  }
+  const result=await commitProjectChange(project=>{
+    const task=project.tasks.find(t=>String(t.id)===String(change.id));
+    if(!task)return false;
+    const start=change.start===undefined?task.start:change.start;
+    const end=change.end===undefined?task.end:change.end;
+    if(!isValidIsoDate(start)||!isValidIsoDate(end)||end<start)
+      throw new Error('Der Aufgabenzeitraum ist ungültig.');
+    task.start=start;
+    task.end=end;
+    if(Number.isFinite(change.progress))task.progress=clamp(Math.round(change.progress),0,100);
+  });
+  if(result.changed && result.active && envelope.project.id===selectedId){
+    renderMetrics();renderPhaseToolbar();renderGanttOnly();renderTaskTable();
+  }
 }
 
 function renderPhaseToolbar(){
@@ -317,7 +465,7 @@ function syncControlStates(){
 function setTaskSortMode(value) {
   if(!['manual','date'].includes(value) || value===taskSortMode)return;
   cancelTaskDrag();
-  cancelGanttTaskDrag();
+  engineController.cancelInteraction();
   taskSortMode=value;
   saveViewState();
   renderTaskTable();
@@ -367,6 +515,7 @@ function populateTaskPhases(selected='') {
 function populateDependencies(task) {$('taskDependencies').innerHTML=envelope.project.tasks.filter(t=>t.id!==task?.id).map(t=>`<option value="${esc(t.id)}" ${(task?.dependencies||[]).includes(t.id)?'selected':''}>${esc(t.name)}</option>`).join('');}
 
 async function saveTask() {
+  if(taskSavePending)return;
   const name=$('taskName').value.trim(), start=$('taskStart').value, end=$('taskEnd').value;
   if(!name||!start||!end) return toast('Name, Start und Ende sind Pflicht.',true);
   if(end<start) return toast('Das Enddatum darf nicht vor dem Start liegen.',true);
@@ -380,16 +529,44 @@ async function saveTask() {
   const task={id,name,start,end,progress:clamp(Number($('taskProgress').value)||0,0,100),type:$('taskType').value,dependencies:[...$('taskDependencies').selectedOptions].map(o=>o.value),phaseId,displayOrder:order,owner:$('taskOwner').value.trim().slice(0,80),status:$('taskStatus').value,risk:$('taskRisk').value,baselineStart,baselineEnd,bufferDays:clamp(Number($('taskBuffer').value)||0,0,365),costEur:Math.max(0,Number($('taskCost').value)||0),url:safeUrl($('taskUrl').value),notes:$('taskNotes').value.trim().slice(0,2000),showInGantt:true};
   const copy=envelope.project.tasks.map(t=>t.id===id?task:t); if(!copy.some(t=>t.id===id)) copy.push(task);
   try { validateGraph(copy); } catch(e) { return toast(e.message,true); }
-  const idx=envelope.project.tasks.findIndex(t=>t.id===id); if(idx>=0) envelope.project.tasks[idx]=task; else envelope.project.tasks.push(task);
-  touch(); await persist(); $('taskDialog').close(); await renderAll(); toast(idx>=0?'Aufgabe aktualisiert.':'Aufgabe erstellt.');
+  taskSavePending=true;
+  $('saveTaskBtn').disabled=true;
+  try {
+    const result=await commitProjectChange(project=>{
+      const previous=project.tasks.find(t=>String(t.id)===String(id));
+      const rank=previous&&phaseKey(project,previous)===phaseKey(project,{phaseId})
+        ? previous.displayOrder : nextDisplayOrder(project,phaseId);
+      const next={...task,displayOrder:rank};
+      const copy=project.tasks.map(t=>String(t.id)===String(id)?next:t);
+      if(!previous)copy.push(next);
+      validateGraph(copy);
+      project.tasks=copy;
+    });
+    if(!result.active)return;
+    $('taskDialog').close();await renderAll();toast(old?'Aufgabe aktualisiert.':'Aufgabe erstellt.');
+  } catch(error) { toast(error.message||'Aufgabe konnte nicht gespeichert werden.',true); }
+  finally { taskSavePending=false; $('saveTaskBtn').disabled=false; }
 }
 
-async function deleteTask() {const id=$('taskId').value;if(!id)return;envelope.project.tasks=envelope.project.tasks.filter(t=>t.id!==id).map(t=>({...t,dependencies:(t.dependencies||[]).filter(dep=>dep!==id)}));touch();await persist();$('taskDialog').close();await renderAll();toast('Aufgabe gelöscht.');}
+async function deleteTask() {
+  const id=$('taskId').value;
+  if(!id)return;
+  try {
+    const result=await commitProjectChange(project=>{
+      if(!project.tasks.some(t=>String(t.id)===String(id)))return false;
+      project.tasks=project.tasks.filter(t=>String(t.id)!==String(id))
+        .map(t=>({...t,dependencies:(t.dependencies||[]).filter(dep=>String(dep)!==String(id))}));
+    });
+    if(!result.active)return;
+    $('taskDialog').close();await renderAll();toast('Aufgabe gelöscht.');
+  } catch {}
+}
 
 async function loadDemoProject() {
   const button = $('loadDemoBtn');
   const emptyButton = $('emptyDemoBtn');
   if (button.disabled) return;
+  const token = beginProjectActivation();
   const originalLabel = button.textContent;
   button.disabled = true;
   button.textContent = 'Lade Demo…';
@@ -398,20 +575,21 @@ async function loadDemoProject() {
     const demoUrl = new URL('../../examples/demo.gantt.json', import.meta.url);
     const response = await fetch(demoUrl, { cache: 'no-store' });
     if (!response.ok) throw new Error(`Beispieldatei nicht erreichbar (HTTP ${response.status})`);
-
-    // Identischer Validierungs- und ID-Migrationspfad wie beim Dateiimport.
-    // Zuerst als separates Projekt speichern, erst danach die aktive Ansicht wechseln.
     const demo = cloneForImport(normalizeEnvelope(await response.json()));
-    demo.project.name = uniqueName(demo.project.name, await listProjects());
+    const projects = await listProjects();
+    if (!projectActivation.isCurrent(token)) return;
+    demo.project.name = uniqueName(demo.project.name, projects);
     await saveLocal(demo.project);
-    envelope = demo;
-    loadViewState();
-    switchTab('project');
-    await renderAll();
-    toast('Demoprojekt geladen. Bestehende Projekte bleiben erhalten.');
+    if (await projectActivation.activate(demo.project.id, token)) {
+      switchTab('project');
+      toast('Demoprojekt geladen. Bestehende Projekte bleiben erhalten.');
+    }
   } catch (error) {
-    console.error('Demoprojekt konnte nicht geladen werden:', error);
-    toast('Demoprojekt konnte nicht geladen werden. Bitte erneut versuchen.', true);
+    if (projectActivation.isCurrent(token)) {
+      restoreProjectSelection(token);
+      console.error('Demoprojekt konnte nicht geladen werden:', error);
+      toast('Demoprojekt konnte nicht geladen werden. Bitte erneut versuchen.', true);
+    }
   } finally {
     button.disabled = false;
     button.textContent = originalLabel;
@@ -419,11 +597,92 @@ async function loadDemoProject() {
   }
 }
 
-async function createProject() {const name=(prompt('Name des neuen Projekts:','Neues Projekt')||'').trim();if(!name)return;envelope=createEnvelope();envelope.project.name=uniqueName(name,await listProjects());await saveLocal(envelope.project);setActiveProject(envelope.project.id);loadViewState();await renderAll();toast('Projekt wurde angelegt.');}
-async function changeProject(e) {const p=await loadProject(e.target.value);if(!p)return;envelope=normalizeEnvelope({schema:'gantt-studio.project',schemaVersion:1,generator:'Gantt Studio',project:p});setActiveProject(p.id);loadViewState();await renderAll();}
-async function removeProject() {const projects=await listProjects();if(!envelope.project?.id)return;if(!confirm(`Projekt „${envelope.project.name}“ vollständig löschen?`))return;await deleteProject(envelope.project.id);const remaining=projects.filter(p=>p.id!==envelope.project.id);if(remaining.length){const p=await loadProject(remaining[0].id);envelope=normalizeEnvelope({schema:'gantt-studio.project',schemaVersion:1,generator:'Gantt Studio',project:p});setActiveProject(p.id);}else{envelope=createEnvelope();await saveLocal(envelope.project);}loadViewState();await renderAll();toast('Projekt wurde gelöscht.');}
+async function createProject() {
+  const name = (prompt('Name des neuen Projekts:','Neues Projekt')||'').trim();
+  if (!name) return;
+  const token = beginProjectActivation();
+  try {
+    const projects = await listProjects();
+    if (!projectActivation.isCurrent(token)) return;
+    const created = createEnvelope();
+    created.project.name = uniqueName(name, projects);
+    await saveLocal(created.project);
+    if (await projectActivation.activate(created.project.id, token))
+      toast('Projekt wurde angelegt.');
+  } catch (error) {
+    if (projectActivation.isCurrent(token)) {
+      restoreProjectSelection(token);
+      toast(`Projekt konnte nicht angelegt werden: ${error.message}`,true);
+    }
+  }
+}
 
-async function importFile(event) {const file=event.target.files?.[0];if(!file)return;try{envelope=cloneForImport(normalizeEnvelope(JSON.parse(await file.text())));envelope.project.name=uniqueName(envelope.project.name,await listProjects());await saveLocal(envelope.project);loadViewState();await renderAll();toast('Projekt importiert.');}catch(e){toast(e.message||'Datei konnte nicht importiert werden.',true);}finally{event.target.value='';}}
+async function changeProject(event) {
+  const id = event.target.value;
+  const token = beginProjectActivation();
+  try {
+    if (!await projectActivation.activate(id, token) && projectActivation.isCurrent(token))
+      restoreProjectSelection(token);
+  } catch (error) {
+    if (projectActivation.isCurrent(token)) {
+      restoreProjectSelection(token);
+      toast(`Projektwechsel fehlgeschlagen: ${error.message}`, true);
+    }
+  }
+}
+
+async function removeProject() {
+  const id = envelope.project?.id;
+  if (!id || !confirm(`Projekt „${envelope.project.name}“ vollständig löschen?`)) return;
+  const token = beginProjectActivation();
+  deletingProjects.add(id);
+  try {
+    await projectCommitter.whenIdle(id);
+    const projects = await listProjects();
+    if (!projectActivation.isCurrent(token)) return;
+    const remaining = projects.filter(project => project.id !== id);
+    let targetId = remaining[0]?.id;
+    if (!targetId) {
+      // Prepare a valid fallback before deleting the currently active project.
+      const fresh = createEnvelope();
+      await saveLocal(fresh.project);
+      targetId = fresh.project.id;
+    }
+    if (!projectActivation.isCurrent(token)) return;
+    await deleteProject(id);
+    projectCommitter.forget(id);
+    if (await projectActivation.activate(targetId, token))
+      toast('Projekt wurde gelöscht.');
+  } catch (error) {
+    if (projectActivation.isCurrent(token)) {
+      restoreProjectSelection(token);
+      toast(`Projekt konnte nicht gelöscht werden: ${error.message}`,true);
+    }
+  } finally {
+    deletingProjects.delete(id);
+  }
+}
+
+async function importFile(event) {
+  const file = event.target.files?.[0];
+  if (!file) return;
+  const token = beginProjectActivation();
+  try {
+    const imported = cloneForImport(normalizeEnvelope(JSON.parse(await file.text())));
+    const projects = await listProjects();
+    if (!projectActivation.isCurrent(token)) return;
+    imported.project.name = uniqueName(imported.project.name, projects);
+    await saveLocal(imported.project);
+    if (await projectActivation.activate(imported.project.id, token))
+      toast('Projekt importiert.');
+  } catch (error) {
+    if (projectActivation.isCurrent(token)) {
+      restoreProjectSelection(token);
+      toast(error.message||'Datei konnte nicht importiert werden.',true);
+    }
+  } finally { event.target.value = ''; }
+}
+
 function cloneForImport(source) {const e=clone(source),map=new Map();e.project.tasks.forEach(t=>map.set(t.id,uuid()));e.project.tasks=e.project.tasks.map(t=>({...t,id:map.get(t.id),dependencies:(t.dependencies||[]).map(d=>map.get(d)).filter(Boolean)}));const now=new Date().toISOString();e.project.id=uuid();e.project.createdAt=now;e.project.updatedAt=now;e.project.revision=1;e.exportedAt=now;return e;}
 
 function exportProject() {const payload=clone(envelope);payload.exportedAt=new Date().toISOString();download(JSON.stringify(payload,null,2),`${slug(payload.project.name)}-${todayIso()}.gantt.json`,'application/json');$('exportDialog').close();toast('Projektdatei exportiert.');}
@@ -441,9 +700,54 @@ function calculateRelativeTarget(baseIso=todayIso()){const settings=envelope.pro
 function offsetFromTarget(targetIso){const settings=envelope.project.planning.settings;normalizeRelativeSettings(settings);const base=todayIso();if(settings.relativeDayMode!=='workdays')return Math.round((new Date(`${targetIso}T00:00:00Z`)-new Date(`${base}T00:00:00Z`))/DAY);const target=new Date(`${targetIso}T00:00:00Z`),current=new Date(`${base}T00:00:00Z`);if(target.getTime()===current.getTime())return 0;const step=target>current?1:-1;let count=0;while(current.getTime()!==target.getTime()){current.setUTCDate(current.getUTCDate()+step);const candidate=current.toISOString().slice(0,10),weekend=[0,6].includes(current.getUTCDay()),holiday=settings.relativeSkipHolidays!==false&&holidaySet().has(candidate);if(!weekend&&!holiday)count+=step;}return count;}
 function relativeDisplayLabel(){const settings=envelope.project.planning.settings;if(settings.relativeLabel)return settings.relativeLabel;const n=Number(settings.relativeOffsetDays)||0;if(n===0)return'Heute';return`Heute ${n>0?'+':'−'} ${Math.abs(n)} ${settings.relativeDayMode==='workdays'?'AT':'T'}`;}
 function syncRelativeEditor(){const settings=envelope.project.planning.settings;normalizeRelativeSettings(settings);$('relativeEnabled').checked=settings.showRelativeToday;$('relativeOffset').value=String(settings.relativeOffsetDays);$('relativeMode').value=settings.relativeDayMode;$('relativeLabel').value=settings.relativeLabel;$('relativeColor').value=settings.relativeColor;$('relativeStyle').value=settings.relativeStyle;$('relativeSkipHolidays').checked=settings.relativeSkipHolidays;$('relativeSkipHolidays').disabled=settings.relativeDayMode!=='workdays';const target=calculateRelativeTarget();$('relativeTargetDate').value=target;$('relativeResultText').textContent=`${relativeDisplayLabel()} · ${formatDate(target)}`;$('relativeJumpBtn').disabled=!settings.showRelativeToday;$('relative-today-editor').classList.toggle('inactive',!settings.showRelativeToday);}
-async function handleRelativeSettingChange(e){const settings=envelope.project.planning.settings;if(e.target.id==='relativeEnabled')settings.showRelativeToday=e.target.checked;if(e.target.id==='relativeOffset')settings.relativeOffsetDays=Number(e.target.value);if(e.target.id==='relativeMode')settings.relativeDayMode=e.target.value;if(e.target.id==='relativeLabel')settings.relativeLabel=e.target.value;if(e.target.id==='relativeColor')settings.relativeColor=e.target.value;if(e.target.id==='relativeStyle')settings.relativeStyle=e.target.value;if(e.target.id==='relativeSkipHolidays')settings.relativeSkipHolidays=e.target.checked;normalizeRelativeSettings(settings);touch();await persist();syncRelativeEditor();renderGanttOnly();}
-async function handleRelativeTargetDateChange(){const target=$('relativeTargetDate').value;if(!target)return;const settings=envelope.project.planning.settings;normalizeRelativeSettings(settings);if(settings.relativeDayMode==='workdays'&&!isWorkdayIso(target,settings.relativeSkipHolidays!==false)){toast('Das gewählte Datum ist kein Arbeitstag. Bitte einen Arbeitstag wählen oder auf Kalendertage umstellen.',true);syncRelativeEditor();return;}settings.relativeOffsetDays=offsetFromTarget(target);touch();await persist();syncRelativeEditor();renderGanttOnly();}
-function jumpToRelativeLine(){if(!envelope.project.planning.settings.showRelativeToday)return;switchTab('project');renderGanttOnly();requestAnimationFrame(()=>{const line=document.querySelector('.relative-today-line'),scroller=$('ganttScroller');if(!line||!scroller){toast(`Das Zieldatum ${formatDate(calculateRelativeTarget())} liegt außerhalb des aktuell dargestellten Projektzeitraums.`,true);return;}const leftWidth=parseInt(getComputedStyle(document.documentElement).getPropertyValue('--left-width'))||430;scroller.scrollTo({left:Math.max(0,leftWidth+line.offsetLeft-scroller.clientWidth/2),behavior:'smooth'});});}
+async function handleRelativeSettingChange(e) {
+  const key={
+    relativeEnabled:'showRelativeToday',relativeOffset:'relativeOffsetDays',
+    relativeMode:'relativeDayMode',relativeLabel:'relativeLabel',
+    relativeColor:'relativeColor',relativeStyle:'relativeStyle',
+    relativeSkipHolidays:'relativeSkipHolidays'
+  }[e.target.id];
+  if(!key)return;
+  const value=['relativeEnabled','relativeSkipHolidays'].includes(e.target.id)
+    ? e.target.checked : e.target.id==='relativeOffset'?Number(e.target.value):e.target.value;
+  try {
+    await commitProjectChange(project=>{
+      const settings=project.planning.settings;
+      settings[key]=value;
+      normalizeRelativeSettings(settings);
+    });
+  } catch {}
+  syncRelativeEditor();renderGanttOnly();
+}
+
+async function handleRelativeTargetDateChange() {
+  const target=$('relativeTargetDate').value;
+  if(!isValidIsoDate(target))return;
+  const settings=envelope.project.planning.settings;
+  if(settings.relativeDayMode==='workdays'&&!isWorkdayIso(target,settings.relativeSkipHolidays!==false)) {
+    toast('Das gewählte Datum ist kein Arbeitstag. Bitte einen Arbeitstag wählen oder auf Kalendertage umstellen.',true);
+    syncRelativeEditor();return;
+  }
+  const offset=offsetFromTarget(target);
+  try { await commitProjectChange(project=>{project.planning.settings.relativeOffsetDays=offset;}); }
+  catch {}
+  syncRelativeEditor();renderGanttOnly();
+}
+
+function jumpToRelativeLine() {
+  if(!envelope.project.planning.settings.showRelativeToday)return;
+  switchTab('project');
+  renderGanttOnly();
+  requestAnimationFrame(()=>{
+    const marker=engineController.locateMarker('relative-target');
+    const scroller=$('ganttScroller');
+    if(!marker||!scroller){
+      toast(`Das Zieldatum ${formatDate(calculateRelativeTarget())} liegt außerhalb des aktuell dargestellten Projektzeitraums.`,true);
+      return;
+    }
+    scroller.scrollTo({left:Math.max(0,marker.x-scroller.clientWidth/2),behavior:'smooth'});
+  });
+}
 
 function toggleTaskDetails(){
   taskDetailsExpanded=!taskDetailsExpanded;
@@ -520,7 +824,7 @@ function handleTaskTableKeydown(e){
   const handle=e.target.closest('[data-task-drag-handle]');
   if(handle && ['ArrowUp','ArrowDown'].includes(e.key)){
     e.preventDefault();
-    if(canReorderTasks())void commitTaskMove(()=>nudgeTask(envelope.project,handle.dataset.taskId,e.key==='ArrowUp'?-1:1),handle.dataset.taskId);
+    if(canReorderTasks())void commitTaskMove(project=>nudgeTask(project,handle.dataset.taskId,e.key==='ArrowUp'?-1:1),handle.dataset.taskId);
     return;
   }
   const cell=e.target.closest('td[data-task-field]');
@@ -531,111 +835,6 @@ function setTaskOrderStatus(message){$('taskReorderStatus').textContent=message;
 
 /* Gantt ordering lives on the left task list only; bar drag and resize remain
    exclusively horizontal on the right timeline. Both surfaces share commitTaskMove. */
-function clearGanttDropMarkers(state){
-  state.left.querySelectorAll('.gantt-order-drop-before,.gantt-order-drop-after')
-    .forEach(row=>row.classList.remove('gantt-order-drop-before','gantt-order-drop-after'));
-  state.right.querySelectorAll('.gantt-order-drop-before,.gantt-order-drop-after')
-    .forEach(row=>row.classList.remove('gantt-order-drop-before','gantt-order-drop-after'));
-}
-
-function cancelGanttTaskDrag(){
-  const state=ganttTaskDrag;
-  if(!state)return;
-  ganttTaskDrag=null;
-  state.row.style.transform='';
-  state.row.classList.remove('gantt-row-dragging');
-  state.handle.classList.remove('active');
-  clearGanttDropMarkers(state);
-  window.removeEventListener('pointermove',moveGanttTaskDrag);
-  window.removeEventListener('pointerup',finishGanttTaskDrag);
-  window.removeEventListener('pointercancel',cancelGanttTaskDrag);
-  window.removeEventListener('keydown',cancelGanttDragOnEscape,true);
-  window.removeEventListener('blur',cancelGanttTaskDrag);
-  if(state.handle.hasPointerCapture?.(state.pointerId))
-    state.handle.releasePointerCapture(state.pointerId);
-}
-
-function cancelGanttDragOnEscape(event){
-  if(event.key!=='Escape')return;
-  event.preventDefault();
-  event.stopPropagation();
-  const handle=ganttTaskDrag?.handle;
-  cancelGanttTaskDrag();
-  handle?.focus({preventScroll:true});
-  window.__ganttDragUntil=Date.now()+350;
-  setTaskOrderStatus('Verschieben im Gantt abgebrochen.');
-}
-
-function startGanttTaskDrag(event){
-  if(!canReorderTasks() || event.button!==0 || !event.isPrimary || ganttTaskDrag)return;
-  const handle=event.target.closest('[data-gantt-order-handle]');
-  if(!handle)return;
-  const row=handle.closest('.task-row-left[data-task-id]');
-  const left=$('ganttStage').querySelector('.gantt-left');
-  const right=$('ganttStage').querySelector('.gantt-right');
-  if(!row || !left || !right)return;
-  event.preventDefault();
-  event.stopPropagation();
-  ganttTaskDrag={
-    handle,row,left,right,pointerId:event.pointerId,
-    startY:event.clientY,active:false,drop:null,
-    phase:phaseKey(envelope.project,envelope.project.tasks.find(task=>String(task.id)===String(row.dataset.taskId)))
-  };
-  handle.setPointerCapture(event.pointerId);
-  window.addEventListener('pointermove',moveGanttTaskDrag);
-  window.addEventListener('pointerup',finishGanttTaskDrag);
-  window.addEventListener('pointercancel',cancelGanttTaskDrag);
-  window.addEventListener('keydown',cancelGanttDragOnEscape,true);
-  window.addEventListener('blur',cancelGanttTaskDrag);
-}
-
-function moveGanttTaskDrag(event){
-  const drag=ganttTaskDrag;
-  if(!drag || event.pointerId!==drag.pointerId)return;
-  const delta=event.clientY-drag.startY;
-  if(!drag.active && Math.abs(delta)<6)return;
-  if(!drag.active){
-    drag.active=true;
-    drag.row.classList.add('gantt-row-dragging');
-    drag.handle.classList.add('active');
-  }
-  drag.row.style.transform=`translateY(${delta}px)`;
-  clearGanttDropMarkers(drag);
-  drag.drop=null;
-  const target=[...drag.left.querySelectorAll('.task-row-left[data-task-id]')]
-    .filter(row=>row!==drag.row)
-    .find(row=>{
-      const rect=row.getBoundingClientRect();
-      return event.clientY>=rect.top && event.clientY<=rect.bottom;
-    });
-  if(!target)return;
-  const targetTask=envelope.project.tasks.find(t=>String(t.id)===String(target.dataset.taskId));
-  if(!targetTask || phaseKey(envelope.project,targetTask)!==drag.phase)return;
-  const rect=target.getBoundingClientRect();
-  const place=event.clientY<rect.top+rect.height/2?'before':'after';
-  const cssClass=place==='before'?'gantt-order-drop-before':'gantt-order-drop-after';
-  target.classList.add(cssClass);
-  [...drag.right.querySelectorAll('.task-row-right[data-task-id]')]
-    .find(row=>row.dataset.taskId===target.dataset.taskId)?.classList.add(cssClass);
-  drag.drop={targetId:target.dataset.taskId,place};
-}
-
-function finishGanttTaskDrag(event){
-  const drag=ganttTaskDrag;
-  if(!drag || event.pointerId!==drag.pointerId)return;
-  moveGanttTaskDrag(event);
-  const drop=drag.drop,sourceId=drag.row.dataset.taskId,active=drag.active;
-  cancelGanttTaskDrag();
-  if(active){
-    window.__ganttDragUntil=Date.now()+350;
-    if(drop && canReorderTasks())
-      void commitTaskMove(
-        ()=>reorderTask(envelope.project,sourceId,drop.targetId,drop.place),
-        sourceId,'gantt');
-    else setTaskOrderStatus('Keine gültige Position innerhalb dieser Phase gewählt.');
-  }
-}
-
 function cancelTaskDrag(){
   const state=taskDrag;
   if(!state)return;
@@ -706,39 +905,25 @@ function moveTaskDrag(event){
   drag.drop={targetId:target.dataset.taskRowId,place};
 }
 
-async function commitTaskMove(reorder,taskId,focusSurface='table'){
-  const original=envelope.project.tasks.map(task=>[task.id,task.displayOrder]);
-  const oldRevision=envelope.project.revision,oldUpdated=envelope.project.updatedAt;
-  if(!reorder()){
-    setTaskOrderStatus('Die Reihenfolge bleibt unverändert.');
-    return;
-  }
-  touch();
-  try{
-    await persist();
-    const scroller=$('ganttScroller');
-    const scrollX=scroller.scrollLeft,scrollY=scroller.scrollTop;
-    renderGanttOnly();
-    renderTaskTable();
+async function commitTaskMove(reorder,taskId,focusSurface='table') {
+  try {
+    const result=await commitProjectChange(project=>reorder(project));
+    if(!result.active)return;
+    if(!result.changed){
+      setTaskOrderStatus('Die Reihenfolge bleibt unverändert.');
+      return;
+    }
+    const scroller=$('ganttScroller'),scrollX=scroller.scrollLeft,scrollY=scroller.scrollTop;
+    renderGanttOnly();renderTaskTable();
     scroller.scrollLeft=scrollX;scroller.scrollTop=scrollY;
-    const surface=focusSurface==='gantt' ? $('ganttStage') : $('taskTableBody');
-    const selector=focusSurface==='gantt'?'[data-gantt-order-handle]':'[data-task-drag-handle]';
-    for(const grip of surface.querySelectorAll(selector)){
-      if(grip.dataset.taskId===String(taskId)){
-        grip.focus({preventScroll:true});
-        break;
-      }
+    if(focusSurface==='gantt')engineController.focusTask(taskId,'reorder');
+    else for(const grip of $('taskTableBody').querySelectorAll('[data-task-drag-handle]')){
+      if(grip.dataset.taskId===String(taskId)){grip.focus({preventScroll:true});break;}
     }
     setTaskOrderStatus('Aufgabenreihenfolge gespeichert.');
-  }catch(error){
-    const old=new Map(original);
-    envelope.project.tasks.forEach(task=>task.displayOrder=old.get(task.id));
-    envelope.project.revision=oldRevision;
-    envelope.project.updatedAt=oldUpdated;
-    renderGanttOnly();
-    renderTaskTable();
-    setTaskOrderStatus('Speichern fehlgeschlagen. Reihenfolge zurückgesetzt.');
-    toast('Die Aufgabenreihenfolge konnte nicht gespeichert werden.',true);
+  } catch {
+    renderGanttOnly();renderTaskTable();
+    setTaskOrderStatus('Speichern fehlgeschlagen. Reihenfolge unverändert.');
   }
 }
 
@@ -749,7 +934,7 @@ function finishTaskDrag(event){
   const drop=drag.drop,sourceId=drag.row.dataset.taskRowId,wasActive=drag.active;
   cancelTaskDrag();
   if(wasActive && drop && canReorderTasks()){
-    void commitTaskMove(()=>reorderTask(envelope.project,sourceId,drop.targetId,drop.place),sourceId);
+    void commitTaskMove(project=>reorderTask(project,sourceId,drop.targetId,drop.place),sourceId);
   }else if(wasActive){
     setTaskOrderStatus('Keine gültige Position innerhalb dieser Phase gewählt.');
   }
@@ -821,15 +1006,37 @@ async function updateTaskFromTable(id,patch){
   if((next.dependencies||[]).includes(next.id))return toast('Eine Aufgabe kann nicht von sich selbst abhängen.',true);
   const copy=envelope.project.tasks.map((t,i)=>i===idx?next:t);
   try{validateGraph(copy);}catch(e){return toast(e.message,true);}
-  envelope.project.tasks=copy;
-  touch(); await persist(); await renderAll(); toast('Aufgabe aktualisiert.');
+  try {
+    const result=await commitProjectChange(project=>{
+      const index=project.tasks.findIndex(t=>String(t.id)===String(id));
+      if(index<0)return false;
+      const previous=project.tasks[index];
+      const next={...previous,...patch};
+      if(Object.prototype.hasOwnProperty.call(patch,'phaseId')
+         && phaseKey(project,previous)!==phaseKey(project,next))
+        next.displayOrder=nextDisplayOrder(project,next.phaseId);
+      if(!next.name?.trim()||!isValidIsoDate(next.start)||!isValidIsoDate(next.end)||next.end<next.start)
+        throw new Error('Aufgabenname oder Zeitraum ist ungültig.');
+      const copy=project.tasks.map((t,i)=>i===index?next:t);
+      validateGraph(copy);
+      project.tasks=copy;
+    });
+    if(result.active){await renderAll();toast('Aufgabe aktualisiert.');}
+  } catch(error) { toast(error.message||'Aufgabe konnte nicht gespeichert werden.',true); }
 }
 
 async function deleteTaskFromTable(id){
   const task=envelope.project.tasks.find(t=>String(t.id)===String(id)); if(!task)return;
   if(!confirm(`Aufgabe „${task.name}“ wirklich löschen?`))return;
-  envelope.project.tasks=envelope.project.tasks.filter(t=>String(t.id)!==String(id)).map(t=>({...t,dependencies:(t.dependencies||[]).filter(dep=>String(dep)!==String(id))}));
-  touch(); await persist(); await renderAll(); toast('Aufgabe gelöscht.');
+  try {
+    const result=await commitProjectChange(project=>{
+      if(!project.tasks.some(t=>String(t.id)===String(id)))return false;
+      project.tasks=project.tasks.filter(t=>String(t.id)!==String(id))
+        .map(t=>({...t,dependencies:(t.dependencies||[]).filter(dep=>String(dep)!==String(id))}));
+    });
+    if(result.active){await renderAll();toast('Aufgabe gelöscht.');}
+  } catch {}
+
 }
 
 function taskTypeLabel(type){return({workstream:'Arbeitspaket',critical:'Kritisch',milestone:'Meilenstein',gate:'Gate'})[type]||type||'–';}
@@ -842,10 +1049,87 @@ function renderPlanningLists(){const planning=envelope.project.planning,cost=env
 function entityRows(kind,items,detail){return items.length?items.slice().sort((a,b)=>(a.start||a.date||'').localeCompare(b.start||b.date||'')).map(x=>`<button type="button" class="entity-row" data-entity-kind="${kind}" data-entity-id="${esc(x.id)}"><span><strong>${esc(x.name)}</strong><small>${detail(x)}</small></span><span class="entity-row-edit">${icon('pencil')}</span><i style="background:${esc(x.color||'#DCE8EB')}"></i></button>`).join(''):'<div class="muted-empty">Noch keine Einträge.</div>';}
 
 function openEntity(kind,id=''){const list=kind==='phase'?envelope.project.planning.phases:kind==='marker'?envelope.project.planning.markers:envelope.project.planning.holidays;const item=list.find(x=>x.id===id)||{};$('entityKind').value=kind;$('entityId').value=id;$('deleteEntityBtn').style.visibility=id?'visible':'hidden';const cfg={phase:['PHASE','Phase bearbeiten'],marker:['STICHTAG','Stichtag bearbeiten'],holiday:['SONDERTAG','Sondertag bearbeiten']}[kind];$('entityEyebrow').textContent=cfg[0];$('entityTitle').textContent=id?cfg[1]:cfg[1].replace('bearbeiten','anlegen');if(kind==='phase')$('entityFields').innerHTML=`<label class="span-2">Name<input id="entityName" maxlength="120" required value="${esc(item.name||'')}"></label><label>Start<input id="entityStart" type="date" required value="${esc(item.start||todayIso())}"></label><label>Ende<input id="entityEnd" type="date" required value="${esc(item.end||todayIso())}"></label><label>Farbe<input id="entityColor" type="color" value="${esc(item.color||'#DCE8EB')}"></label>`;if(kind==='marker')$('entityFields').innerHTML=`<label class="span-2">Name<input id="entityName" maxlength="120" required value="${esc(item.name||'')}"></label><label>Datum<input id="entityDate" type="date" required value="${esc(item.date||todayIso())}"></label><label>Farbe<input id="entityColor" type="color" value="${esc(item.color||'#607A00')}"></label><label>Linie<select id="entityStyle"><option value="solid">Durchgezogen</option><option value="dashed">Gestrichelt</option><option value="dotted">Gepunktet</option></select></label>`;if(kind==='holiday')$('entityFields').innerHTML=`<label class="span-2">Name<input id="entityName" maxlength="120" required value="${esc(item.name||'')}"></label><label>Datum<input id="entityDate" type="date" required value="${esc(item.date||todayIso())}"></label>`;if(kind==='marker')$('entityStyle').value=item.style||'solid';$('entityDialog').showModal();}
-async function saveEntity(){const kind=$('entityKind').value,id=$('entityId').value||uuid(),name=$('entityName').value.trim();if(!name)return toast('Name darf nicht leer sein.',true);const p=envelope.project.planning;const list=kind==='phase'?p.phases:kind==='marker'?p.markers:p.holidays;let item;if(kind==='phase'){const start=$('entityStart').value,end=$('entityEnd').value;if(!start||!end||end<start)return toast('Bitte einen gültigen Phasenzeitraum angeben.',true);item={id,name,start,end,color:$('entityColor').value};}else if(kind==='marker'){item={id,name,date:$('entityDate').value,color:$('entityColor').value,style:$('entityStyle').value};}else{item={id,name,date:$('entityDate').value,source:'manual',country:'',subdivision:'',imported:false,importedAt:''};}const idx=list.findIndex(x=>x.id===id);if(idx>=0)list[idx]=item;else list.push(item);touch();await persist();$('entityDialog').close();renderPlanningLists();populateTaskPhases();renderPhaseToolbar();renderGanttOnly();toast('Planungselement gespeichert.');}
-async function deleteEntity(){const kind=$('entityKind').value,id=$('entityId').value;if(!id)return;const p=envelope.project.planning;if(kind==='phase'){p.phases=p.phases.filter(x=>x.id!==id);envelope.project.tasks=envelope.project.tasks.map(t=>t.phaseId===id?{...t,phaseId:''}:t);collapsedPhases.delete(String(id));}else if(kind==='marker')p.markers=p.markers.filter(x=>x.id!==id);else p.holidays=p.holidays.filter(x=>x.id!==id);touch();await persist();$('entityDialog').close();renderPlanningLists();populateTaskPhases();renderPhaseToolbar();renderGanttOnly();toast('Planungselement gelöscht.');}
+async function saveEntity() {
+  if(entitySavePending)return;
+  const kind=$('entityKind').value,id=$('entityId').value||uuid(),name=$('entityName').value.trim();
+  if(!name)return toast('Name darf nicht leer sein.',true);
+  let item;
+  if(kind==='phase'){
+    const start=$('entityStart').value,end=$('entityEnd').value;
+    if(!isValidIsoDate(start)||!isValidIsoDate(end)||end<start)
+      return toast('Bitte einen gültigen Phasenzeitraum angeben.',true);
+    item={id,name,start,end,color:$('entityColor').value};
+  } else if(kind==='marker'){
+    const date=$('entityDate').value;
+    if(!isValidIsoDate(date))return toast('Ungültiges Datum.',true);
+    item={id,name,date,color:$('entityColor').value,style:$('entityStyle').value};
+  } else {
+    const date=$('entityDate').value;
+    if(!isValidIsoDate(date))return toast('Ungültiges Datum.',true);
+    item={id,name,date,source:'manual',country:'',subdivision:'',imported:false,importedAt:''};
+  }
+  entitySavePending=true;
+  $('saveEntityBtn').disabled=true;
+  try {
+    const result=await commitProjectChange(project=>{
+      const planning=project.planning;
+      const list=kind==='phase'?planning.phases:kind==='marker'?planning.markers:planning.holidays;
+      const index=list.findIndex(x=>String(x.id)===String(id));
+      if(index>=0)list[index]=item;else list.push(item);
+    });
+    if(!result.active)return;
+    $('entityDialog').close();renderPlanningLists();populateTaskPhases();renderPhaseToolbar();renderGanttOnly();
+    toast('Planungselement gespeichert.');
+  } catch {}
+  finally { entitySavePending=false; $('saveEntityBtn').disabled=false; }
+}
 
-async function importGermanHolidays(){const year=Number(prompt('Jahr für den Feiertagsimport:',String(new Date().getFullYear())));if(!Number.isInteger(year)||year<1975||year>2100)return;const subdivision=(prompt('Bundesland-Code (z. B. DE-BY). Leer = nur bundesweite Feiertage:','DE-BY')||'').trim().toUpperCase();try{const res=await fetch(`https://date.nager.at/api/v3/PublicHolidays/${year}/DE`);if(!res.ok)throw new Error(`HTTP ${res.status}`);const raw=await res.json();const existing=new Set(envelope.project.planning.holidays.map(h=>`${h.date}|${h.name.toLowerCase()}`));let added=0;for(const h of raw){const counties=Array.isArray(h.counties)?h.counties.map(String):[];const national=h.global===true||!counties.length;if(!national&&(!subdivision||!counties.includes(subdivision)))continue;const name=String(h.localName||h.name||'').trim();const key=`${h.date}|${name.toLowerCase()}`;if(existing.has(key))continue;envelope.project.planning.holidays.push({id:uuid(),name,date:h.date,source:'Nager.Date',country:'DE',subdivision,imported:true,importedAt:new Date().toISOString()});existing.add(key);added++;}touch();await persist();renderPlanningLists();renderGanttOnly();toast(`${added} Feiertage importiert.`);}catch(e){toast(`Feiertagsimport fehlgeschlagen: ${e.message}`,true);}}
+async function deleteEntity() {
+  const kind=$('entityKind').value,id=$('entityId').value;
+  if(!id)return;
+  try {
+    const result=await commitProjectChange(project=>{
+      const planning=project.planning;
+      if(kind==='phase'){
+        planning.phases=planning.phases.filter(x=>String(x.id)!==String(id));
+        project.tasks=project.tasks.map(t=>String(t.phaseId)===String(id)?{...t,phaseId:''}:t);
+      } else if(kind==='marker') planning.markers=planning.markers.filter(x=>String(x.id)!==String(id));
+      else planning.holidays=planning.holidays.filter(x=>String(x.id)!==String(id));
+    });
+    if(!result.active)return;
+    if(kind==='phase')collapsedPhases.delete(String(id));
+    $('entityDialog').close();renderPlanningLists();populateTaskPhases();renderPhaseToolbar();renderGanttOnly();
+    toast('Planungselement gelöscht.');
+  } catch {}
+}
+
+async function importGermanHolidays() {
+  const year=Number(prompt('Jahr für den Feiertagsimport:',String(new Date().getFullYear())));
+  if(!Number.isInteger(year)||year<1975||year>2100)return;
+  const subdivision=(prompt('Bundesland-Code (z. B. DE-BY). Leer = nur bundesweite Feiertage:','DE-BY')||'').trim().toUpperCase();
+  try {
+    const res=await fetch(`https://date.nager.at/api/v3/PublicHolidays/${year}/DE`);
+    if(!res.ok)throw new Error(`HTTP ${res.status}`);
+    const raw=await res.json();
+    let added=0;
+    const result=await commitProjectChange(project=>{
+      const holidays=project.planning.holidays;
+      const existing=new Set(holidays.map(h=>`${h.date}|${h.name.toLowerCase()}`));
+      for(const h of raw){
+        const counties=Array.isArray(h.counties)?h.counties.map(String):[];
+        const national=h.global===true||!counties.length;
+        if(!national&&(!subdivision||!counties.includes(subdivision)))continue;
+        const name=String(h.localName||h.name||'').trim();
+        if(!name||!isValidIsoDate(h.date))continue;
+        const key=`${h.date}|${name.toLowerCase()}`;
+        if(existing.has(key))continue;
+        holidays.push({id:uuid(),name,date:h.date,source:'Nager.Date',country:'DE',subdivision,imported:true,importedAt:new Date().toISOString()});
+        existing.add(key);added++;
+      }
+    });
+    if(result.active){renderPlanningLists();renderGanttOnly();toast(`${added} Feiertage importiert.`);}
+  } catch(error) { toast(`Feiertagsimport fehlgeschlagen: ${error.message}`,true); }
+}
 
 function designInputId(key){return `design${key[0].toUpperCase()+key.slice(1)}`;}
 
@@ -915,7 +1199,22 @@ function updateDesignPreview(){
     ? `Vorschau: ${matched.label}. Erst „Design speichern“ übernimmt diese Farben.`
     : 'Individuelle Farbauswahl. Erst „Design speichern“ übernimmt diese Farben.';
 }
-async function saveDesign(){const c=envelope.project.design.colors;c.primary=$('designPrimary').value;c.headerBg=c.primary;c.accent=$('designAccent').value;c.workstream=$('designWorkstream').value;c.critical=$('designCritical').value;c.milestone=$('designMilestone').value;c.gate=$('designGate').value;c.pageBg=$('designPageBg').value;c.panelBg=$('designPanelBg').value;touch();await persist();applyDesign();renderGanttOnly();$('designDialog').close();toast('Design gespeichert.');}
+async function saveDesign() {
+  const colors={
+    primary:$('designPrimary').value,accent:$('designAccent').value,
+    workstream:$('designWorkstream').value,critical:$('designCritical').value,
+    milestone:$('designMilestone').value,gate:$('designGate').value,
+    pageBg:$('designPageBg').value,panelBg:$('designPanelBg').value
+  };
+  try {
+    const result=await commitProjectChange(project=>{
+      Object.assign(project.design.colors,colors,{headerBg:colors.primary});
+    });
+    if(!result.active)return;
+    applyDesign();renderGanttOnly();$('designDialog').close();toast('Design gespeichert.');
+  } catch {}
+}
+
 function applyDesign(){
   const c=envelope.project.design?.colors||{};
   const root=document.documentElement;
@@ -940,8 +1239,6 @@ function applyDesign(){
 }
 
 function validateGraph(tasks){const ids=new Set(tasks.map(t=>t.id)),byId=new Map(tasks.map(t=>[t.id,t]));for(const t of tasks)for(const dep of t.dependencies||[]){if(!ids.has(dep))throw new Error(`Aufgabe „${t.name}“ verweist auf einen unbekannten Vorgänger.`);if(dep===t.id)throw new Error(`Aufgabe „${t.name}“ darf nicht von sich selbst abhängen.`);}const visiting=new Set(),visited=new Set();const visit=id=>{if(visited.has(id))return;if(visiting.has(id))throw new Error('Die Aufgabenabhängigkeiten enthalten einen Zyklus.');visiting.add(id);for(const dep of byId.get(id)?.dependencies||[])visit(dep);visiting.delete(id);visited.add(id);};ids.forEach(visit);}
-function touch(){envelope.project.updatedAt=new Date().toISOString();envelope.project.revision=Math.max(1,Number(envelope.project.revision)||1)+1;setSaveStatus('saving','Änderungen werden lokal gesichert');}
-async function persist(){clearTimeout(saveTimer);try{await saveLocal(envelope.project);renderMeta();setSaveStatus('saved',`Lokal · ${new Intl.DateTimeFormat('de-DE',{hour:'2-digit',minute:'2-digit'}).format(new Date())}`);}catch(e){setSaveStatus('error','Browser-Speicherung fehlgeschlagen');throw e;}}
 function uniqueName(name,projects){const used=new Set(projects.map(p=>p.name.toLowerCase()));if(!used.has(name.toLowerCase()))return name;for(let i=2;i<1000;i++){const candidate=`${name} (${i})`;if(!used.has(candidate.toLowerCase()))return candidate;}return `${name} ${Date.now()}`;}
 function download(content,name,type){const blob=new Blob([content],{type});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);}
 function safeUrl(v){const raw=String(v||'').trim();if(!raw)return'';try{const u=new URL(raw);return ['http:','https:'].includes(u.protocol)?u.toString():'';}catch{return'';}}

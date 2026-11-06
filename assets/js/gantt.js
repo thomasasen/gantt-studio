@@ -1,4 +1,5 @@
-import { icon } from './icons.mjs?v=2.6.0';
+import { icon } from './icons.mjs?v=2.8.1';
+import { localTodayIso } from './core/date-only.mjs?v=2.8.1';
 
 const DAY = 86400000;
 const toDate = (s) => new Date(`${s}T00:00:00Z`);
@@ -15,7 +16,7 @@ function bounds(project) {
   const phaseDates = (project.planning?.phases || []).flatMap(p => [p.start,p.end]).filter(Boolean);
   const markerDates = (project.planning?.markers || []).map(m => m.date).filter(Boolean);
   dates.push(...phaseDates,...markerDates);
-  if (!dates.length) { const now=new Date(); return {start:addDays(now,-7),end:addDays(now,35)}; }
+  if (!dates.length) { const now=toDate(localTodayIso()); return {start:addDays(now,-7),end:addDays(now,35)}; }
   const sorted=dates.map(toDate).sort((a,b)=>a-b); return {start:sorted[0],end:sorted.at(-1)};
 }
 function fmtDate(date,options){return new Intl.DateTimeFormat('de-DE',{...options,timeZone:'UTC'}).format(date);}
@@ -82,7 +83,16 @@ function headerSegments(start,end,px,zoom){
 }
 
 export function renderGantt(container, project, options={}) {
-  const tasks=project.tasks.filter(t=>t.showInGantt!==false&&t.start&&t.end);container.innerHTML='';if(!tasks.length)return{empty:true};
+  const cancellations=new Set();
+  const opts={
+    ...options,
+    registerInteractionCancel:cancel=>cancellations.add(cancel),
+    unregisterInteractionCancel:cancel=>cancellations.delete(cancel)
+  };
+  const destroy=()=>{for(const cancel of [...cancellations])cancel();cancellations.clear();};
+  const tasks=project.tasks.filter(t=>t.showInGantt!==false&&t.start&&t.end);
+  container.innerHTML='';
+  if(!tasks.length)return{empty:true,destroy};
   const zoom=options.zoom||'week',cfg=ZOOM[zoom],raw=bounds(project),start=addDays(raw.start,-cfg.pad),end=addDays(raw.end,cfg.pad),totalDays=Math.floor((end-start)/DAY)+1,timelineWidth=Math.max(880,totalDays*cfg.px),leftWidth=parseInt(getComputedStyle(document.documentElement).getPropertyValue('--left-width'))||430,totalHeight=56+tasks.length*48;
   const grid=el('div','gantt-grid');grid.style.gridTemplateColumns=`${leftWidth}px ${timelineWidth}px`;grid.style.width=`${leftWidth+timelineWidth}px`;
   const left=el('div','gantt-left'),leftHead=el('div','gantt-head-left');leftHead.innerHTML='<span>Aufgabe</span><span>Owner</span><span>Status</span>';left.appendChild(leftHead);
@@ -128,11 +138,11 @@ export function renderGantt(container, project, options={}) {
     rowR.appendChild(bar);
     if(!synthetic&&settings.showBaseline!==false&&task.baselineStart&&task.baselineEnd){const b=el('div','baseline');b.style.left=`${daysBetween(iso(start),task.baselineStart)*cfg.px}px`;b.style.width=`${Math.max(cfg.px,(daysBetween(task.baselineStart,task.baselineEnd)+1)*cfg.px)}px`;rowR.appendChild(b);}
     if(!synthetic&&settings.showBuffer!==false&&Number(task.bufferDays)>0){const b=el('div','buffer');b.style.left=`${leftPx+widthPx}px`;b.style.width=`${Number(task.bufferDays)*cfg.px}px`;rowR.appendChild(b);}
-    if(!synthetic)attachInteraction(bar,task,cfg,options);
+    if(!synthetic)attachInteraction(bar,task,cfg,opts);
     right.appendChild(rowR);
   });
   const lineItems=[];
-if(settings.showToday!==false)lineItems.push({date:new Date(),lineClass:'today-line',labelClass:'today-label',label:'Heute'});
+if(settings.showToday!==false)lineItems.push({date:toDate(localTodayIso()),lineClass:'today-line',labelClass:'today-label',label:'Heute'});
 (project.planning?.markers||[]).forEach(marker=>{if(marker.date)lineItems.push({date:toDate(marker.date),lineClass:'marker-line',labelClass:'marker-label',label:marker.name||'Marker',color:marker.color,style:marker.style});});
 if(settings.showRelativeToday&&Number.isFinite(Number(settings.relativeOffsetDays))){
   const relativeIso=calculateRelativeDate(settings,project.planning?.holidays||[]);
@@ -147,7 +157,7 @@ lineItems.sort((a,b)=>a.date-b.date).forEach(item=>{
 });
   if(settings.showDependencies!==false)right.appendChild(makeDependencies(tasks,start,cfg.px,timelineWidth,totalHeight));
   if(settings.showStatusLine!==false)right.appendChild(makeStatusLine(tasks,start,cfg.px,timelineWidth,totalHeight));
-  grid.append(left,right);container.appendChild(grid);return{empty:false,start,end,timelineWidth,leftWidth};
+  grid.append(left,right);container.appendChild(grid);return{empty:false,start,end,timelineWidth,leftWidth,destroy};
 }
 
 function addInteractionHandles(bar,task,settings){if(['milestone','gate'].includes(task.type))return;const l=el('span','bar-handle left'),r=el('span','bar-handle right');l.title='Start verschieben';r.title='Ende verschieben';bar.append(l,r);if(settings.showProgressLabels!==false){const h=el('span','progress-handle');h.style.left=`${clamp(Number(task.progress)||0,0,100)}%`;h.title='Fortschritt anpassen';bar.appendChild(h);}}
@@ -182,6 +192,7 @@ function attachInteraction(bar, task, cfg, options) {
     const cleanup = () => {
       if (!active) return false;
       active = false;
+      options.unregisterInteractionCancel?.(onCancel);
       bar.removeEventListener('pointermove', onMove);
       bar.removeEventListener('pointerup', onUp);
       bar.removeEventListener('pointercancel', onCancel);
@@ -263,6 +274,7 @@ function attachInteraction(bar, task, cfg, options) {
     window.addEventListener('keydown', onKeyDown, true);
     bar.classList.add('dragging');
     bar.setPointerCapture(pointerId);
+    options.registerInteractionCancel?.(onCancel);
   });
 }
 
@@ -285,7 +297,7 @@ function addVerticalLine(parent,start,px,date,lineClass,labelClass,label,width,h
   lab.style.maxWidth=`${approxWidth}px`;
   line.appendChild(lab);parent.appendChild(line);return line;
 }
-function calculateRelativeDate(settings,holidays){const offset=Number(settings.relativeOffsetDays)||0,d=new Date(),base=new Date(Date.UTC(d.getUTCFullYear(),d.getUTCMonth(),d.getUTCDate()));if(settings.relativeDayMode!=='workdays'||offset===0){base.setUTCDate(base.getUTCDate()+offset);return iso(base);}const skipHolidays=settings.relativeSkipHolidays!==false,holidaySet=new Set((holidays||[]).map(h=>h.date).filter(Boolean)),step=offset>0?1:-1;let remaining=Math.abs(offset);while(remaining>0){base.setUTCDate(base.getUTCDate()+step);const day=base.getUTCDay(),dateIso=iso(base);if(day!==0&&day!==6&&(!skipHolidays||!holidaySet.has(dateIso)))remaining--;}return iso(base);}
+function calculateRelativeDate(settings,holidays){const offset=Number(settings.relativeOffsetDays)||0,base=toDate(localTodayIso());if(settings.relativeDayMode!=='workdays'||offset===0){base.setUTCDate(base.getUTCDate()+offset);return iso(base);}const skipHolidays=settings.relativeSkipHolidays!==false,holidaySet=new Set((holidays||[]).map(h=>h.date).filter(Boolean)),step=offset>0?1:-1;let remaining=Math.abs(offset);while(remaining>0){base.setUTCDate(base.getUTCDate()+step);const day=base.getUTCDay(),dateIso=iso(base);if(day!==0&&day!==6&&(!skipHolidays||!holidaySet.has(dateIso)))remaining--;}return iso(base);}
 function relativeLabel(settings){if(settings.relativeLabel)return settings.relativeLabel;const n=Number(settings.relativeOffsetDays)||0;if(n===0)return'Heute';return`Heute ${n>0?'+':'−'} ${Math.abs(n)} ${settings.relativeDayMode==='workdays'?'AT':'T'}`;}
 function makeStatusLine(tasks,start,px,width,height){const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.setAttribute('class','status-line-layer');svg.setAttribute('width',width);svg.setAttribute('height',height-56);svg.setAttribute('viewBox',`0 0 ${width} ${height-56}`);const points=[];tasks.forEach((task,index)=>{if(task.syntheticPhase||!task.start||!task.end)return;const duration=Math.max(1,daysBetween(task.start,task.end)+1),progress=clamp(Number(task.progress)||0,0,100)/100,x=daysBetween(iso(start),task.start)*px+duration*px*progress,y=index*48+24;points.push([x,y]);});if(points.length<2)return svg;const poly=document.createElementNS('http://www.w3.org/2000/svg','polyline');poly.setAttribute('class','status-progress-line');poly.setAttribute('points',points.map(([x,y])=>`${x},${y}`).join(' '));svg.appendChild(poly);points.forEach(([x,y])=>{const dot=document.createElementNS('http://www.w3.org/2000/svg','circle');dot.setAttribute('class','status-progress-dot');dot.setAttribute('cx',x);dot.setAttribute('cy',y);dot.setAttribute('r','2.5');svg.appendChild(dot);});return svg;}
 function statusLabel(status){return({green:'Grün',amber:'Gelb',red:'Rot',neutral:'Neutral'})[status]||'Neutral';}

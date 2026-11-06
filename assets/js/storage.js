@@ -15,26 +15,58 @@ function openDb() {
   });
 }
 
-export async function saveLocal(project) {
+export async function saveLocal(project, expectedRevision = null) {
   const db = await openDb();
   return new Promise((resolve, reject) => {
     const tx = db.transaction(STORE, 'readwrite');
-    tx.objectStore(STORE).put(structuredClone(project));
-    tx.oncomplete = () => {
-      localStorage.setItem(ACTIVE_KEY, project.id);
-      resolve();
+    let revisionError = null;
+    tx.oncomplete = () => { db.close(); resolve(); };
+    tx.onabort = () => {
+      const error = revisionError || tx.error || new Error('IndexedDB transaction aborted.');
+      db.close();
+      reject(error);
     };
-    tx.onerror = () => reject(tx.error);
+    tx.onerror = () => { if (!revisionError) reject(tx.error || new Error('IndexedDB write failed.')); };
+    const store = tx.objectStore(STORE);
+    const put = () => {
+      try { store.put(structuredClone(project)); }
+      catch (error) { revisionError = error; try { tx.abort(); } catch {} reject(error); }
+    };
+    if (expectedRevision === null) {
+      put();
+    } else {
+      // Read and write in the SAME readwrite transaction. A second browser tab
+      // cannot silently overwrite a project with a more recent revision.
+      const request = store.get(project.id);
+      request.onsuccess = () => {
+        if (!request.result || Number(request.result.revision) !== Number(expectedRevision)) {
+          revisionError = new Error('Projekt wurde zwischenzeitlich geändert. Bitte neu laden und erneut versuchen.');
+          revisionError.name = 'ConcurrentModificationError';
+          tx.abort();
+          return;
+        }
+        put();
+      };
+    }
   });
 }
+
+// Saving a project must never switch the active project. Selection is an explicit
+// UI action; otherwise a delayed write can silently undo a project switch.
 
 export async function loadProject(id) {
   if (!id) return null;
   const db = await openDb();
   return new Promise((resolve, reject) => {
-    const request = db.transaction(STORE, 'readonly').objectStore(STORE).get(id);
-    request.onsuccess = () => resolve(request.result || null);
-    request.onerror = () => reject(request.error);
+    try {
+      const request = db.transaction(STORE, 'readonly').objectStore(STORE).get(id);
+      request.onsuccess = () => { db.close(); resolve(request.result || null); };
+      request.onerror = () => { db.close(); reject(request.error); };
+    } catch (error) {
+      // A synchronous transaction/get failure must also release the connection.
+      db.close();
+      reject(error);
+    }
   });
 }
 
@@ -45,9 +77,14 @@ export async function loadActive() {
 export async function listProjects() {
   const db = await openDb();
   return new Promise((resolve, reject) => {
-    const request = db.transaction(STORE, 'readonly').objectStore(STORE).getAll();
-    request.onsuccess = () => resolve((request.result || []).sort((a, b) => String(b.updatedAt || '').localeCompare(String(a.updatedAt || ''))));
-    request.onerror = () => reject(request.error);
+    try {
+      const request = db.transaction(STORE, 'readonly').objectStore(STORE).getAll();
+      request.onsuccess = () => { db.close(); resolve((request.result || []).sort((a, b) => String(b.updatedAt || '').localeCompare(String(a.updatedAt || '')))); };
+      request.onerror = () => { db.close(); reject(request.error); };
+    } catch (error) {
+      db.close();
+      reject(error);
+    }
   });
 }
 
@@ -57,10 +94,11 @@ export async function deleteProject(id) {
     const tx = db.transaction(STORE, 'readwrite');
     tx.objectStore(STORE).delete(id);
     tx.oncomplete = () => {
+      db.close();
       if (localStorage.getItem(ACTIVE_KEY) === id) localStorage.removeItem(ACTIVE_KEY);
       resolve();
     };
-    tx.onerror = () => reject(tx.error);
+    tx.onabort = () => { db.close(); reject(tx.error || new Error('Projekt konnte nicht gelöscht werden.')); };
   });
 }
 

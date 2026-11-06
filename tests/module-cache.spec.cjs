@@ -17,6 +17,22 @@ test('production entrypoint versions every static ESM dependency',()=>{
     const imported=new URL(modulePath,'https://example.test/assets/js/');
     expect(imported.searchParams.get('v'),`Unversioned ESM dependency: ${modulePath}`).toBe(version);
   }
+  // Verify the entire nested browser ESM graph, not only app.js.
+  const {dirname,join,resolve}=require('node:path');
+  const graph=['assets/js/app.js','assets/js/gantt.js',
+    'assets/js/engine/engine-controller.mjs','assets/js/engine/engine-contract.mjs',
+    'assets/js/engine/native/native-adapter.mjs',
+    'assets/js/engine/native/native-interactions.mjs'];
+  for(const moduleFile of graph){
+    const source=readFileSync(moduleFile,'utf8');
+    const imports=[...source.matchAll(/^import\\s+[^;]+?\\s+from\\s+['"]([^'"]+)['"]/gm)];
+    for(const [,specifier] of imports){
+      const parsed=new URL(specifier,'https://example.test/'+moduleFile);
+      expect(parsed.searchParams.get('v'),moduleFile+' -> '+specifier).toBe(version);
+      const filepath=resolve(dirname(moduleFile),specifier.split('?')[0]);
+      expect(()=>readFileSync(filepath),moduleFile+' -> '+filepath).not.toThrow();
+    }
+  }
 });
 
 test('stale unversioned module cache must not disable all buttons',async({page})=>{

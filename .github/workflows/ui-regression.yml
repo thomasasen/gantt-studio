@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - refactor/engine-abstraction
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -17,6 +18,8 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Allow same-run baseline comparison against origin/main
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -29,6 +32,27 @@ jobs:
           node --check tests/design-presets.spec.cjs
           node --check tests/task-order.spec.cjs
           node --check assets/js/gantt.js
+          node --check assets/js/core/date-only.mjs
+          node --check assets/js/core/project-commits.mjs
+          node --check assets/js/core/project-activation.mjs
+          node --check assets/js/engine/engine-contract.mjs
+          node --check assets/js/engine/engine-controller.mjs
+          node --check assets/js/engine/native/native-adapter.mjs
+          node --check assets/js/engine/native/native-interactions.mjs
+          node --check tests/engine-contract.spec.cjs
+          node --check tests/engine-resilience.spec.cjs
+          node --check tests/relative-date-timezone.spec.cjs
+          node --check tests/native-performance.spec.cjs
+          node --check tests/native-main-comparison.spec.cjs
+          node --check tests/project-switch-cancel.spec.cjs
+          node --check tests/project-activation.spec.cjs
+          node --check tests/project-activation-browser.spec.cjs
+          node --check tests/toast-accessibility.spec.cjs
+          node --check tests/pointercancel-regression.spec.cjs
+          node --check tests/theme-geometry-matrix.spec.cjs
+          node --check tests/indexeddb-lifecycle.spec.cjs
+          node --check tests/no-duplicate-commit.spec.cjs
+          node --check tests/persistence.spec.cjs
           node --check assets/js/storage.js
           node --check tests/ui.spec.cjs
           node --check tests/icon-system.spec.cjs
@@ -40,12 +64,21 @@ jobs:
         run: npx playwright install --with-deps chromium
       - name: Run responsive and interaction checks
         run: npx playwright test --reporter=line
+      - name: Repeat the critical Gantt project-switch regression 20 times
+        run: npx playwright test tests/project-switch-cancel.spec.cjs --grep "switching projects during Gantt drag" --repeat-each=20 --workers=1 --reporter=line
       - name: Upload design audit report
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: apple-design-qa
           path: design-audit/
+          if-no-files-found: ignore
+      - name: Upload native performance measurements
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-engine-performance
+          path: performance-results/*.json
           if-no-files-found: ignore
       - name: Upload visual review screenshots
         if: always()

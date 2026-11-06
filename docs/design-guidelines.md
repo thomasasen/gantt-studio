@@ -38,6 +38,8 @@ Keine macOS-Kopie, kein Funktionsverlust zugunsten des Minimalismus, keine Anima
 - Falls die manuelle Farbwahl von einer Vorlage abweicht, muss die Auswahl sichtbar als **individuell** gekennzeichnet werden. Wiedererkennen erfolgt über einen exakten Farbvergleich, ohne eine falsche Auswahl zu markieren.
 - Häufige Aktionen sichtbar halten, sekundäre Funktionen logisch gruppieren und beschriften.
 
+- Status- und Toast-Meldungen müssen während ihrer gesamten sichtbaren Dauer den erforderlichen Farbkontrast halten. Keine Transparenz-Fadeouts für lesbaren Hinweistext; nach Anzeige vollständig ausblenden, statt halbtransparent zu verblassen.
+
 ## 4. Gantt-Interaktionsvertrag
 
 | Ereignis | Erwartetes Verhalten |
