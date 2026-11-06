@@ -514,3 +514,16 @@ The following remain **not implemented and therefore merge-blocking** as a full 
 **Weitere P1-Integrationsgrenze:** Das isolierte Frame signalisiert seinen Render-Erfolg asynchron über `postMessage`; der aktuelle `engine-controller.mjs` bestätigt Rendering und Rollback synchron. Der Experiment-Adapter darf deshalb nicht in den produktiven Controller eingehängt werden, bevor ein generationensicherer asynchroner Render-/Rollback-Vertrag oder eine gleichwertige atomare Aktivierung implementiert und getestet ist.
 
 **Decision: NOT READY FOR MERGE as a production Gantt engine.** PR #15 must stay Draft. PR #14 unchanged. Native remains the only supported and productive renderer.
+
+
+## 15. Async Engine-Lifecycle und rollback-sicheres Opt-in (06.11.2026)
+
+**Scope:** Weiterentwicklung auf Draft-PR #15 (`fix/frappe-lifecycle-isolation`), nicht als automatisch produktiv nutzbarer Renderer. `main`, `app.js`, Native-Renderpfad und IndexedDB-Protokoll bleiben unangetastet.
+
+- `engine-async-controller.mjs`: Separater opt-in Async-Controller mit serialisierten Render-/Switch-Intents, monotoner Generation, AbortSignal, immutable Projektionen und Veröffentlichung des letzten bestätigten Renderstands **erst nach erfülltem Render-Promise**. Neue Intents überholen ausstehende Renderbefehle; Scroll-Updates warten stattdessen auf Render-Readiness.
+- Ein nicht bestätigter Engine-Wechsel wird nicht als erfolgreich publiziert. Bei Fehler wird der vorherige Adapter mit der letzten bestätigten Projektprojektion und dem alten Viewport wiederhergestellt; schlägt dies fehl, wird der Controller geschlossen und fordert ein neues Mount.
+- `frappe-adapter.mjs`: `renderAsync({project,view},{signal})` wartet auf die tatsächliche `ready`-Rückmeldung des richtigen Frames (Origin, Window, Generation); Timeout, Fehler-Message und Abort lehnen die Operation ab. Der Legacy-`render()`-Aufruf behält seinen synchronen Rückgabewert nur für die isolierte Vorschau, **nicht** als Readiness-Bestätigung.
+- Der bisherige synchrone Controller weist Adapter mit `asyncRendering:true` vor der Aktivierung ab. Die Native-Engine bleibt sein einziger produktiver Renderer.
+- Tests: deterministische Unit-Tests für asynchrone Fehler, Stale/Supersession, Cancel, Viewport, Restore und Fail-Closed sowie separate Chromium-Integration gegen den echten Vendor-Frame.
+
+**Offen:** Die Engine-UI wird beim Test-Switch noch nicht visuell zweiphasig gestaged; kurzzeitig kann der Chart während eines async Switches leer sein. Daher noch keine vollständige atomare *Darstellungsumschaltung* und kein Produktions-GO. Alle bisherigen Funktionsparitäts-, A11y-, Fokus-/Scroll-, Performance- und Persistenz-Gates bleiben offen. Ein grüner Test reicht allein nicht für einen Merge.

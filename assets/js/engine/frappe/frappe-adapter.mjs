@@ -12,16 +12,28 @@ const CAPABILITIES=Object.freeze({
   taskMove:false,resizeStart:false,resizeEnd:false,progress:false,
   reorder:false,keyboardReorder:false,phaseRows:false,baseline:false,
   buffer:false,markers:false,holidays:false,dependencies:true,
-  themes:0,print:false,offline:true
+  themes:0,print:false,offline:true,asyncRendering:true
 });
 const VIEW_MODE=Object.freeze({day:'Day',week:'Week',month:'Month'});
 const CHANNEL='gantt-studio-frappe-isolated-v1';
 const FRAME_URL=new URL('../../../../spikes/frappe/frame.html',import.meta.url);
 
-export function createFrappeEngine({experimentalEditable=false}={}) {
+export function createFrappeEngine({experimentalEditable=false,readyTimeoutMs=15000}={}) {
+  if (!Number.isFinite(readyTimeoutMs) || readyTimeoutMs < 1)
+    throw new RangeError('A positive finite frame readiness timeout is required.');
   let container=null,frame=null,generation=0,mounted=false;
   let onSelect=()=>{},onError=()=>{},onStatus=()=>{};
   let messageHandler=null,lastRequest=null,onIntent=()=>{};
+  let pendingRender=null;
+  function finishPending(token,value,error=null){
+    if(!pendingRender || (token!==null && pendingRender.token!==token))return;
+    const pending=pendingRender;
+    pendingRender=null;
+    clearTimeout(pending.timer);
+    if(pending.signal)pending.signal.removeEventListener('abort',pending.onAbort);
+    if(error)pending.reject(error);
+    else pending.resolve(value);
+  }
   function detachFrame() {
     const previous=frame;
     frame=null;
@@ -43,9 +55,16 @@ export function createFrappeEngine({experimentalEditable=false}={}) {
         if(event.origin!==location.origin||event.source!==frame?.contentWindow)return;
         const data=event.data;
         if(!data||data.channel!==CHANNEL||data.generation!==generation)return;
-        if(data.type==='ready')onStatus('Frappe: gerendert');
+        if(data.type==='ready'){
+          finishPending(generation,{empty:false});
+          onStatus('Frappe: gerendert');
+        }
         else if(data.type==='selected')onSelect({kind:'task',id:String(data.id)});
-        else if(data.type==='error')onError(new Error('Frappe-Frame: '+String(data.message)));
+        else if(data.type==='error'){
+          const error=new Error('Frappe-Frame: '+String(data.message));
+          finishPending(generation,null,error);
+          onError(error);
+        }
         else if(data.type==='cancelled' && experimentalEditable && lastRequest)
           engine.render(lastRequest);
         else if(data.type==='intent' && experimentalEditable) {
@@ -61,6 +80,7 @@ export function createFrappeEngine({experimentalEditable=false}={}) {
       const tasks=mapProjectToFrappeTasks(project);
       lastRequest={project,view};
       const token=++generation;
+      finishPending(null,{superseded:true});
       detachFrame();
       container.replaceChildren();
       if(!tasks.length){onStatus('Frappe: leer');return {empty:true};}
@@ -81,6 +101,24 @@ export function createFrappeEngine({experimentalEditable=false}={}) {
       onStatus('Frappe: lade isolierte Ansicht');
       return {empty:false};
     },
+    renderAsync(request,{signal}={}) {
+      if(signal?.aborted)return Promise.reject(new DOMException('Frame render aborted','AbortError'));
+      let result;
+      try{result=this.render(request);}
+      catch(error){return Promise.reject(error);}
+      if(result.empty)return Promise.resolve(result);
+      const token=generation;
+      return new Promise((resolve,reject)=>{
+        const pending={token,resolve,reject,signal,timer:null,onAbort:null};
+        pendingRender=pending;
+        pending.onAbort=()=>finishPending(token,null,
+          new DOMException('Frame render aborted','AbortError'));
+        if(signal)signal.addEventListener('abort',pending.onAbort,{once:true});
+        pending.timer=setTimeout(()=>finishPending(token,null,
+          new Error('Frappe frame readiness timed out')),readyTimeoutMs);
+        if(signal?.aborted)pending.onAbort();
+      });
+    },
     setViewport(next={}) {
       const scroller=container?.parentElement;
       if(scroller&&Number.isFinite(next.scrollLeft))scroller.scrollLeft=next.scrollLeft;
@@ -96,6 +134,7 @@ export function createFrappeEngine({experimentalEditable=false}={}) {
     destroy(){
       if(!mounted)return;
       ++generation;
+      finishPending(null,{superseded:true});
       detachFrame();
       if(messageHandler)window.removeEventListener('message',messageHandler);
       container.replaceChildren();

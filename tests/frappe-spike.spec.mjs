@@ -78,5 +78,6 @@ test('isolated adapter obeys engine contract and explicitly forbids edits',async
   for(const key of ['taskMove','resizeStart','resizeEnd','progress','reorder',
     'keyboardReorder','phaseRows'])assert.equal(caps[key],false,key);
   assert.equal(caps.offline,true);
+  assert.equal(caps.asyncRendering,true);
   assert.equal(caps.zoom.length,3);
 });

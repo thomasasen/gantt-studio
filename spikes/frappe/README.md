@@ -97,3 +97,10 @@ Das frühere NO-GO für die direkte Frappe-1.2.2-Integration gilt weiterhin. Die
 Standard: `/spikes/frappe/index.html` zeigt Frappe weiterhin **schreibgeschützt**. Ein ausschließlich für Tests vorgesehener Modus `?edit=1` aktiviert eine experimentelle Drag-Intent-Sperre. Frappe-Callbacks während des Ziehens werden gepuffert; erst gültiges Mouse-Up kann einen einzelnen Intent auslösen. Escape und Pointer-Cancel verwerfen ihn. Auch dieser Modus speichert **nichts** und ist nicht produktiv nutzbar.
 
 Automatisierte Checks: `tests/frappe-isolation.spec.cjs`, `tests/frappe-gesture-gate.spec.mjs` und `tests/frappe-interaction-preview.spec.cjs`. Bestehende Native-Funktionalität und Projektdateien bleiben unverändert. Die noch fehlende Parität für Phasen, Overlays, Reorder, Tastatur, Designs und Druck blockiert jede Freigabe als Native-Ersatz.
+
+
+## Asynchroner Engine-Controller (experimentell)
+
+`createAsyncEngineController` ist jetzt als opt-in Export aus `assets/js/engine/engine-controller.mjs` verfügbar. Der bisherige synchrone Controller bleibt unverändert für die produktive Native-Engine; er weist Frappe-Adapter mit `asyncRendering:true` bewusst zurück. Der neue Pfad serialisiert Render- und Engine-Wechsel, wartet auf die echte Frame-`ready`-Bestätigung, verwirft überholte Generationen und versucht bei Fehlern die letzte bestätigte immutable Projektprojektion samt Viewport wiederherzustellen. Bei fehlerhaftem Rollback wird explizit fail-closed unmounted. `destroy()` bricht ausstehende Render-Promises ab. Scroll-Updates dürfen eine ausstehende Render-Freigabe nicht überholen.
+
+Frappe implementiert dazu `renderAsync(request, {signal})` mit dem realen Ready-/Error-`postMessage`, 15-Sekunden-Timeout (für Tests konfigurierbar) und AbortSignal-Unterstützung. `render()` bleibt bewusst kompatibel mit dem bisherigen Read-only-Vergleich, bestätigt aber keinen fertigen Frame. Die Integration bleibt **nicht** an `app.js` angeschlossen. Sie ist eine technische Vorstufe und keine produktive Freigabe. Tests: `tests/engine-async-controller.spec.mjs` und `tests/frappe-async-controller.spec.cjs`.

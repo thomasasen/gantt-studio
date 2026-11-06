@@ -38,6 +38,7 @@ jobs:
           node --check assets/js/core/project-activation.mjs
           node --check assets/js/engine/engine-contract.mjs
           node --check assets/js/engine/engine-controller.mjs
+          node --check assets/js/engine/engine-async-controller.mjs
           node --check assets/js/engine/native/native-adapter.mjs
           node --check assets/js/engine/native/native-interactions.mjs
           node --check tests/engine-contract.spec.cjs
@@ -59,6 +60,8 @@ jobs:
           node --check assets/js/engine/frappe/frappe-gesture-gate.mjs
           node --check tests/frappe-gesture-gate.spec.mjs
           node --check tests/frappe-interaction-preview.spec.cjs
+          node --check tests/frappe-async-controller.spec.cjs
+          node --check tests/engine-async-controller.spec.mjs
           node --check tests/theme-geometry-matrix.spec.cjs
           node --check tests/indexeddb-lifecycle.spec.cjs
           node --check tests/no-duplicate-commit.spec.cjs
@@ -72,7 +75,7 @@ jobs:
         run: |
           npm ci --prefix spikes/frappe --ignore-scripts --no-audit --no-fund
           npm run build --prefix spikes/frappe
-          node --test tests/frappe-spike.spec.mjs tests/frappe-gesture-gate.spec.mjs
+          node --test tests/frappe-spike.spec.mjs tests/frappe-gesture-gate.spec.mjs tests/engine-async-controller.spec.mjs
       - name: Install browser test dependency
         run: npm install --no-save --no-package-lock @playwright/test@1.56.1 @axe-core/playwright@4.11.0
       - name: Install Chromium
