@@ -33,6 +33,13 @@ try{
   if(experimentalIndependentLayer){
     memoryStore=createMemoryRevisionStore(project);
     window.__independentMemoryStore=memoryStore; // diagnostic only
+    // Test-only project activation: old frame + pending gesture must be fenced.
+    window.__independentSwitchProject=()=>{
+      const other={...memoryStore.snapshot(),id:'independent-other-project',revision:1};
+      memoryStore.activate(other);
+      project=immutableEngineProjection(other);
+      safeRender();
+    };
     document.querySelector('.notice').textContent=
       'Isolierter Day-Mode-Spike: Frappe rendert schreibgeschützt. Eigene Pointer-Vorschau und rein speicherinterner Compare-and-Swap-Commit. Keine Speicherung.';
   }
