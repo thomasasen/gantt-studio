@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow"><title>Gantt Studio – DHTMLX Community Spike</title>
+<link rel="stylesheet" href="../../assets/css/app.css?v=1.4.4">
+<link rel="stylesheet" href="../../assets/css/odin.css?v=1.4.4">
+<link rel="stylesheet" href="../../assets/css/task-table.css?v=1.5.1">
+<link rel="stylesheet" href="../../assets/css/design-system.css?v=2.6.1">
+<link rel="stylesheet" href="./vendor/dhtmlxgantt.css">
+<style>body{margin:0;padding:22px;background:#f1f4f5;color:#243746;font:14px/1.5 system-ui,sans-serif}h1{font-size:23px;margin:0 0 6px}.controls{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin:16px 0}.comparison{display:grid;gap:16px}.pane{padding:14px;border:1px solid #cbd5db;border-radius:12px;background:#fff;min-width:0}.viewport{overflow:auto;max-height:650px;min-height:240px}.notice{color:#755021;font-weight:600}:focus-visible{outline:2px solid #087e75;outline-offset:2px}@media(max-width:600px){body{padding:12px}}</style>
+<script src="./vendor/dhtmlxgantt.js"></script><script type="module" src="./spike.mjs"></script>
+</head><body><h1>DHTMLX Gantt Community 10.0.3 – Architekturvergleich</h1>
+<p class="notice">Isoliertes Experiment. Keine produktive Engine-Aktivierung, kein IndexedDB-Schreibzugriff. Nur mit <code>?edit=1</code> lassen sich Diagnosegesten im Arbeitsspeicher testen.</p>
+<div class="controls"><label for="viewMode">Zeitskala</label><select id="viewMode"><option value="day">Tag</option><option value="week" selected>Woche</option><option value="month">Monat</option></select>
+<button id="reloadBtn" type="button">Neu aufbauen</button><button id="switchBtn" type="button">Projekt wechseln</button>
+<output id="status" role="status" aria-live="polite">Lade Demo …</output></div>
+<main class="comparison"><section class="pane"><h2>Native Engine (verbindliche Referenz)</h2><div class="viewport"><div id="nativeRoot"></div></div></section>
+<section class="pane"><h2>DHTMLX Community <small id="mode"></small></h2><div class="viewport" id="dhtmlxRoot"></div></section></main>
+</body></html>
