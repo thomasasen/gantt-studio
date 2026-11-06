@@ -1,6 +1,6 @@
-import { PRINT_DEFAULTS, sanitizePrintSettings, projectForPrint, paginatePrint, days, add } from './print-model.mjs?v=2.11.0';
-import { createGanttChartSvg, createChartImage, downloadPrintExport } from './print-export.mjs?v=2.11.0';
-import { barAnnotation } from './print-labels.mjs?v=2.11.0';
+import { PRINT_DEFAULTS, sanitizePrintSettings, projectForPrint, paginatePrint, days, add } from './print-model.mjs?v=2.12.0';
+import { createGanttChartSvg, createChartImage, downloadPrintExport } from './print-export.mjs?v=2.12.0';
+import { barAnnotation } from './print-labels.mjs?v=2.12.0';
 const escape = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const printColor=(value,fallback)=>/^#[0-9a-f]{3}(?:[0-9a-f]{3})?$/i.test(String(value||''))?value:fallback;
 const fmt = s => new Intl.DateTimeFormat('de-DE',{timeZone:'UTC',day:'2-digit',month:'2-digit',year:'numeric'}).format(new Date(s+'T00:00:00Z'));
