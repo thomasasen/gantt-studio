@@ -1,24 +1,35 @@
-# Druck-Pipeline (Feature-Branch)
+# Engineunabhängige Druck- und PDF-Pipeline
 
-## Architekturentscheidung
+## Architektur
 
-Die Druckausgabe verwendet nicht die DOM-Struktur oder das Scrollfenster des Native-Renderers. Aus einem kopierten Projektsnapshot erzeugt `assets/js/print/print-model.mjs` eine eigenständige Projektion und eine zweidimensionale Paginierung. `assets/js/print/print-ui.mjs` rendert HTML/SVG-Seiten in einem isolierten `iframe`. Die Vorschau und die spätere Browserdruckausgabe verwenden dasselbe Dokument. Über den Browserdruckdialog kann als PDF gespeichert werden.
+Die Anwendung verwendet einen unabhängigen, unveränderlichen Projektsnapshot und erzeugt neue Druckseiten statt den aktuell sichtbaren Gantt-Viewport zu kopieren.
 
-Die Projektdatei und IndexedDB werden durch die Druckfunktion nicht geschrieben. Optionen werden getrennt in `localStorage` unter `gantt-studio.print-preferences-v1` gespeichert. Der Snapshot wird beim Öffnen erzeugt und beim Schließen freigegeben.
+- `assets/js/print/print-model.mjs`: Projektion, Aufgaben-/Phasenauswahl, Datumsgrenzen, Layoutparameter und zweidimensionale Paginierung, ohne Bezug auf Native/Frappe
+- `assets/js/print/print-ui.mjs`: eigener Dialog, HTML-/SVG-Druckseiten, Vorschau in `iframe`, Navigation, Vorschau-Zoom, Aufruf des Browserdruckdialogs
+- `assets/css/print.css`: responsives, barrierearmes Layout für den Konfigurationsdialog
+- Zuletzt verwendete Einstellungen und benannte Profile werden ausschließlich in `localStorage` gespeichert. Projektmodell, Revision und IndexedDB werden durch Druck nicht verändert. Der Druck-Snapshot enthält auch aktuelle Filter- und eingeklappte Phasen und bleibt bei Projektwechsel stabil.
 
-## Technische Grenzen und offene Abnahmepunkte
+## Enthaltene Funktionen
 
-- Das Browser-Druckdialogfenster bestimmt letztlich den Drucker und seine Skalierungsoptionen. `@page` und CSS-mm sind Vorgaben, keine für jeden Druckertreiber erzwingbare Zusicherung.
-- Die 2D-Aufteilung ordnet horizontale Zeitabschnitte und vertikale Aufgabenabschnitte zu. Ein Querformat mit mehrjähriger Timeline benötigt mehrere Seiten, statt die Schrift zwangsläufig unleserlich zu schrumpfen.
-- Abhängigkeits-Pfeile über Seiten hinweg, Ferien/Feiertagsdarstellung, Risiken/Puffer/Statuslinie, frei auswählbare Phasen/Aufgaben, zusätzliche Berichtstitelseite, benannte Benutzerprofile und gesonderter Vorschauzoom sind in diesem Stand **noch nicht umgesetzt**.
-- Die Legende ist eine einfache Typenlegende. Besonders lange Bezeichnungen werden mit CSS-Ellipsis abgeschnitten; für die vollständige Textausgabe sind Umbruchregeln zu ergänzen.
-- Ein Projektwechsel mit offenem Dialog hält den Snapshot fest; Filterkontext wird aktuell bei Neuberechnung gelesen und muss ebenfalls mit dem Snapshot eingefroren werden.
-- PDF-Ausgabe sowie Seitenabmessungen müssen in Chromium/Playwright visuell überprüft werden, bevor eine Freigabe erfolgen kann.
+- A4/A3, Hoch-/Querformat und automatische Ausrichtung, konfigurierbare Ränder
+- Profile Management, Detail, Benutzerdefiniert sowie selbst benannte Profile
+- Skalierungen „Eine Seite“, „Breite anpassen“, „Lesbarkeit optimieren“ und „Manuell“; Warnung und Fallback bei unlesbarem Ein-Seiten-Layout
+- Zweidimensionale Umbrüche nach Zeitraum und Aufgabenzeilen, wiederholte Aufgabenbeschriftungen und Zeitachsenbeschriftung
+- Vollständiger Zeitraum, eigener Datumsbereich, aktueller Monat / aktuelles Quartal; alle Gantt-Aufgaben, aktive Filter, ausgewählte Phasen, ausgewählte Aufgaben, Meilensteine/Gates
+- Ein- und Ausschalter für Projektphasen, Besitzer, Status, Fortschritt, Datumsangaben, Baselines, Marker, Abhängigkeiten, Puffer, Risiken, Wochenenden, Feiertage, Heute-Linie, Legende, Farben sowie Kopf-/Fußzeile
+- Projekt- und Phasenfarben, heller Papierhintergrund bei dunklen und Hybrid-Designs; weitgehend vektorbasierte Druckdarstellung
 
-## Validierung
+## Grenzen und noch nicht erfüllte Abnahmekriterien
 
-- `node --test tests/print-model.spec.mjs`: Projektsnapshot, Zeitachsen- und Aufgaben-Paginierung, Format/Ausrichtung, Filter- und Datumsbereich.
-- `tests/print-dialog.spec.cjs`: Dialog, scrollunabhängiger Ausdruck und heller Druckhintergrund.
-- GitHub Actions `validate.yml` prüft statische Dateien und Syntax sowie den neuen Node-Test.
+- Für Abhängigkeiten innerhalb einer einzelnen Seite werden SVG-Pfeile gerendert. Bei Zeit- oder Zeilenumbrüchen werden Vorgänger als Textreferenz ausgegeben, aber **kein durchgehender seitenübergreifender Pfeil** gezeichnet. Die Textreferenzen enthalten die Projekt-ID und sind nicht als Navigationsreferenzen aufbereitet.
+- Statuslinie, relativ berechnete Zieltermine, Gate-/Meilenstein-Kollisionsvermeidung, unabhängige Legenden-/Titelseiten sowie Management-Kennzahlen sind noch nicht vollständig implementiert.
+- Beim Quartal wird bisher das **aktuelle Quartal** unterstützt, keine explizite Quartalsauswahl. Weitere Diagrammoptionen wie individuelle Feiertagslegenden und Seitenüberlappung fehlen.
+- Bei sehr langen Einzelbeschriftungen wird die Zeilenhöhe geschätzt. Extrem lange Texte können weiterhin durch das Seitenlimit begrenzt werden.
+- Die tatsächliche PDF-Ausgabe muss durch den Chromium-Test `tests/print-pdf.spec.cjs` einschließlich PDF-Seitenzahl, Textinhalt, Papiergröße und Screenshot überprüft werden. Eine zusätzliche visuelle Red-Team-Abnahme der PDF-Seiten ist offen.
+- Browser-/Druckertreiber-Einstellungen können `@page`-Größen und Hintergründe verändern. Das Dokument ist eine Vorgabe für den Druckdialog, keine Garantie für jeden Treiber.
 
-**Status:** Implementierung in Arbeit, nicht für Merge freigegeben.
+## Tests
+
+`tests/print-model.spec.mjs` prüft unter anderem Snapshot-Isolation, Filter, Phasenauswahl, mehrjährige Zeitachsen und 2D-Seitenabdeckung. `tests/print-dialog.spec.cjs` prüft Browser-Scrollunabhängigkeit, responsive Vorschau und hellen Hintergrund. `tests/print-pdf.spec.cjs` erzeugt ein echtes Chromium-PDF und kontrolliert es maschinell mit `pdfinfo` und `pdftotext`; Vorschau-Screenshot und PDF werden in `visual-review/` gespeichert.
+
+**Freigabestatus: Draft.** Ohne fehlerfreie Browser-PDF-Ausgabe, visuelle Abnahme und Nacharbeit der kritischen Lücken ist ein Merge in `main` nicht zulässig.
