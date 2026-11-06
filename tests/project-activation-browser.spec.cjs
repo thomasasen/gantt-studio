@@ -113,3 +113,78 @@ test('project switching and page reload restore the exact ten-task project',asyn
   await active(page,empty,0);
   expect(await readTasks(page,demo)).toEqual(tasks);
 });
+
+test('older portfolio refresh cannot reset a newer project selection',async({page})=>{
+  const {demo,empty,tasks}=await projects(page);
+  await page.locator('#projectSelect').selectOption(demo);
+  await active(page,demo,10);
+  await page.evaluate(()=>{
+    const original=IDBObjectStore.prototype.getAll;
+    let intercepted=false;
+    window.__portfolioGate={waiting:[],release(){
+      for(const fn of this.waiting.splice(0))fn();
+    }};
+    IDBObjectStore.prototype.getAll=function(...args){
+      const request=original.apply(this,args);
+      if(intercepted)return request;
+      intercepted=true;
+      return new Proxy(request,{
+        get(target,prop){return Reflect.get(target,prop,target);},
+        set(target,prop,value){
+          if(prop==='onsuccess'){
+            target.onsuccess=event=>window.__portfolioGate.waiting.push(()=>value(event));
+            return true;
+          }
+          return Reflect.set(target,prop,value,target);
+        }
+      });
+    };
+  });
+  await page.locator('#projectName').fill('Demo refreshed while selecting');
+  await page.locator('#projectName').dispatchEvent('change');
+  await page.waitForFunction(()=>window.__portfolioGate.waiting.length>0);
+  await page.locator('#projectSelect').selectOption(empty);
+  await active(page,empty,0);
+  await page.evaluate(()=>window.__portfolioGate.release());
+  await active(page,empty,0);
+  await expect(page.locator('#projectName')).not.toHaveValue('Demo refreshed while selecting');
+  expect(await readTasks(page,demo)).toEqual(tasks);
+});
+
+test('a new project activation supersedes a held older read without changing its saved tasks',async({page})=>{
+  const {demo,empty,tasks}=await projects(page);
+  await page.evaluate(id=>{
+    const original=IDBObjectStore.prototype.get;
+    let intercepted=false;
+    window.__oldReadGate={waiting:[],release(){
+      for(const fn of this.waiting.splice(0))fn();
+    }};
+    IDBObjectStore.prototype.get=function(key){
+      const request=original.call(this,key);
+      if(intercepted||this.transaction.mode!=='readonly'||String(key)!==id)return request;
+      intercepted=true;
+      return new Proxy(request,{
+        get(target,prop){return Reflect.get(target,prop,target);},
+        set(target,prop,value){
+          if(prop==='onsuccess'){
+            target.onsuccess=event=>window.__oldReadGate.waiting.push(()=>value(event));
+            return true;
+          }
+          return Reflect.set(target,prop,value,target);
+        }
+      });
+    };
+  },demo);
+  await page.locator('#projectSelect').selectOption(demo);
+  await page.waitForFunction(()=>window.__oldReadGate.waiting.length>0);
+  page.once('dialog',dialog=>dialog.accept('Newest project'));
+  await page.locator('#newProjectBtn').click();
+  await expect(page.locator('#projectName')).toHaveValue('Newest project');
+  const newest=await page.locator('#projectSelect').inputValue();
+  expect(newest).not.toBe(demo);
+  expect(newest).not.toBe(empty);
+  await page.evaluate(()=>window.__oldReadGate.release());
+  await active(page,newest,0);
+  expect(await readTasks(page,demo)).toEqual(tasks);
+  await expect(page.locator('#ganttStage .gantt-bar.workstream')).toHaveCount(0);
+});
