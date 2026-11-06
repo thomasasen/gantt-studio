@@ -29,7 +29,11 @@ test('actual Chromium PDF contains every selected task and correct page dimensio
   const text=execFileSync('pdftotext',['-','-'],{input:pdf,encoding:'utf8'});
   const pages=Number(info.match(/^Pages:\s+(\d+)/m)?.[1]);
   expect(pages).toBe(expected);
-  expect(info).toMatch(/Page size:\s+1190\.\d+ x 841\.\d+ pts/);
+  const size=info.match(/^Page size:\\s+([\\d.]+) x ([\\d.]+) pts/m);
+  expect(size,'Expected PDF page dimensions from pdfinfo').not.toBeNull();
+  // Chromium rounds CSS millimetres through device/PDF units. Accept < 1 mm.
+  expect(Math.abs(Number(size[1])-420*72/25.4)).toBeLessThan(72/25.4);
+  expect(Math.abs(Number(size[2])-297*72/25.4)).toBeLessThan(72/25.4);
   for(const task of ['Projekt-Kick-off','Ist-Analyse und Stakeholder-Interviews','Schnittstellenentwicklung','Hypercare und Stabilisierung']){
     expect(text).toContain(task);
   }
