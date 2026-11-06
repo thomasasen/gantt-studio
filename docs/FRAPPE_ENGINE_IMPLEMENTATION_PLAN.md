@@ -610,3 +610,12 @@ Die Staging-Verwaltung ist bewusst Bestandteil des opt-in `engine-async-controll
 - CI: `validate.yml` und `ui-regression.yml` auf den neuen Branch und Draft-PR gegen den Lifecycle-Branch erweitert; sowohl finaler Head als auch PR-Merge-Ref sind separat zu prüfen.
 - **Keine Behauptung eines erfolgreichen realen schreibenden Browser-Commits:** Dafür existiert noch keine freigabefähige Runtime-Schnittstelle.
 - **Entscheidung für eine schreibfähige Frappe-Engine: NO-GO.** Teilweise GO nur für die isolierte, engineunabhängige Vertrags- und Negativtest-Infrastruktur, solange sämtliche editierenden Funktionen aus bleiben. Dies setzt das frühere Gate-C-NO-GO aus PR #14 **nicht** außer Kraft.
+
+
+### Verifizierter CI-Nachweis auf dem Implementierungsstand (06.11.2026)
+
+- **Implementierungs-SHA:** `f967304eeeb2534e65a0c56d480986f767aa5723`; tatsächlicher GitHub Actions **PR-Merge-Ref SHA:** `800fbc2` (Merge von `f967304` in `86de64e`). Die Checks laufen damit gegen den richtigen Zielbranch von PR #16, nicht nur gegen `main`.
+- [Static Validate, PR-Merge-Ref #42227444924](https://github.com/thomasasen/gantt-studio/actions/runs/42227444924): **SUCCESS, 43/43 Node-Tests**, 0 fehlgeschlagen.
+- [UI browser regression, PR-Merge-Ref #42227444915](https://github.com/thomasasen/gantt-studio/actions/runs/42227444915): **SUCCESS, 107/107 Chromium-Tests**, 0 fehlgeschlagen, anschließend **20/20 Projektwechsel-Stresstests** erfolgreich.
+- Diese grünen Läufe belegen die Vertrags-Negativtests, die Pointer-Proben und die Native-/Lifecycle-Regression, nicht den produktiven Frappe-Editor. Der präzise NO-GO-Status bleibt deshalb bestehen. Push-Runs des Feature-Head sind über die verfügbare workflow-run-Abfrage nicht separat verifiziert.
+- **Wichtig für einen folgenden Dokumentations-Commit:** Dessen SHA benötigt einen neuen erfolgreichen finalen CI-Lauf, bevor PR #16 als technisch grün auf dem endgültigen Head bezeichnet werden darf.
