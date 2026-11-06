@@ -58,9 +58,15 @@ export async function loadProject(id) {
   if (!id) return null;
   const db = await openDb();
   return new Promise((resolve, reject) => {
-    const request = db.transaction(STORE, 'readonly').objectStore(STORE).get(id);
-    request.onsuccess = () => { db.close(); resolve(request.result || null); };
-    request.onerror = () => { db.close(); reject(request.error); };
+    try {
+      const request = db.transaction(STORE, 'readonly').objectStore(STORE).get(id);
+      request.onsuccess = () => { db.close(); resolve(request.result || null); };
+      request.onerror = () => { db.close(); reject(request.error); };
+    } catch (error) {
+      // A synchronous transaction/get failure must also release the connection.
+      db.close();
+      reject(error);
+    }
   });
 }
 
@@ -71,9 +77,14 @@ export async function loadActive() {
 export async function listProjects() {
   const db = await openDb();
   return new Promise((resolve, reject) => {
-    const request = db.transaction(STORE, 'readonly').objectStore(STORE).getAll();
-    request.onsuccess = () => { db.close(); resolve((request.result || []).sort((a, b) => String(b.updatedAt || '').localeCompare(String(a.updatedAt || '')))); };
-    request.onerror = () => { db.close(); reject(request.error); };
+    try {
+      const request = db.transaction(STORE, 'readonly').objectStore(STORE).getAll();
+      request.onsuccess = () => { db.close(); resolve((request.result || []).sort((a, b) => String(b.updatedAt || '').localeCompare(String(a.updatedAt || '')))); };
+      request.onerror = () => { db.close(); reject(request.error); };
+    } catch (error) {
+      db.close();
+      reject(error);
+    }
   });
 }
 
