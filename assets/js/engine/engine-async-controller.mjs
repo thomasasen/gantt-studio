@@ -175,13 +175,12 @@ export function createAsyncEngineController(initialFactory) {
           node.setAttribute('aria-hidden', 'true');
           node.inert = true;
           committed = false;
-          }
+        }
       },
       close() {
         if (closed) return;
         closed = true;
         if (!committed) node.remove();
-        restoreParent();
       }
     };
   }
