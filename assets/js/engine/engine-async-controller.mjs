@@ -325,7 +325,7 @@ export function createAsyncEngineController(initialFactory) {
           // body or the newly loading iframe during PREPARE.
           const focusBeforeCommit = oldContainer?.contains?.(currentFocus)
             ? currentFocus
-            : (currentFocus === document.body || staging.node?.contains?.(currentFocus))
+            : (typeof document !== 'undefined' && (currentFocus === document.body || staging.node?.contains?.(currentFocus)))
               ? focusAtPrepare : null;
           const undo = staging.activate();
           try {
