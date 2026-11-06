@@ -97,3 +97,10 @@ Ein grüner statischer Test allein ist keine Editor-Freigabe. CI-Ergebnisse auf 
 
 
 **Phase 6: verifizierte DHTMLX-PR-Merge-Ref-Basis vor Abschlussdokumentation.** Head `be856c872e55cfa8e179814f80430989c8a2160e`: [Static Validate #42251548759](https://github.com/thomasasen/gantt-studio/actions/runs/42251548759) SUCCESS; [UI browser regression #42251548777](https://github.com/thomasasen/gantt-studio/actions/runs/42251548777) SUCCESS, **149/149 Chromium-Tests und 20/20 Native-Projektwechsel**. Inklusive vier echter positiver DHTMLX-Dragmodi (Move, linkes/rechtes Resize, Progress), Negativtests für Escape, Cancel, Projektwechsel, Destroy, Fokus-Handler, zweiten Pointer und fehlende Remote-Anfragen. DHTMLX-Performance-Rohdaten [Artefakt 13520547959](https://github.com/thomasasen/gantt-studio/actions/runs/42251548777/artifacts/13520547959): je drei Wiederholungen bei 0/1/25/250/1000 Aufgaben, Mediane im zentralen Architekturplan. Das ist eine *diagnostische* Browserabnahme, nicht die Freigabe für einen Produktivwechsel. Ein finales zusätzliches Dokumentations-Commit erfordert erneut Checks auf dem PR-Merge-Ref.
+
+
+### Phase 7: Native intent revision fencing
+
+Der neue reine Node-Test `node --test tests/native-intent-scope.spec.mjs` prüft die Herkunft eines Engine-Intents (Projekt-ID, Revision, Aktivierungsgeneration), stale Intents hinter bereits eingereihten Commits und verspätete Projektsnapshots nach erfolgreicher Speicherung.
+
+`npx playwright test tests/native-intent-fence.spec.cjs --workers=1` überprüft mit einer echten Mausgeste, dass Native nach einem Rerender keinen Intent der alten Gesture ausgeben kann, und dass ein gültiger Intent genau den ursprünglichen Projekt-/Revisions-/Generationskontext trägt. Die komplette Browser-Suite und der 20× kritische Native-Projektwechsel sind weiterhin Pflicht. Tests auf dem PR-Merge-Ref sind für den endgültigen Head zu verifizieren.

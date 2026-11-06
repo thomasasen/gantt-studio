@@ -10,6 +10,7 @@ on:
       - spike/frappe-public-editor-api
       - spike/frappe-independent-interaction-layer
       - spike/dhtmlx-community-engine
+      - fix/native-intent-revision-fence
   pull_request:
     branches: [main, fix/frappe-lifecycle-isolation, feature/frappe-transactional-editor]
   workflow_dispatch:
@@ -47,6 +48,9 @@ jobs:
           node --check assets/js/core/date-only.mjs
           node --check assets/js/core/project-commits.mjs
           node --check assets/js/core/transactional-editor.mjs
+          node --check assets/js/core/engine-intent-scope.mjs
+          node --check tests/native-intent-scope.spec.mjs
+          node --check tests/native-intent-fence.spec.cjs
           node --check tests/transactional-editor.spec.mjs
           node --check tests/frappe-transactional-browser.spec.cjs
           node --check tests/frappe-public-editor-pointer.spec.cjs
@@ -94,7 +98,7 @@ jobs:
         run: |
           npm ci --prefix spikes/frappe --ignore-scripts --no-audit --no-fund
           npm run build --prefix spikes/frappe
-          node --test tests/frappe-spike.spec.mjs tests/frappe-gesture-gate.spec.mjs tests/engine-async-controller.spec.mjs tests/transactional-editor.spec.mjs tests/frappe-independent-gesture.spec.mjs
+          node --test tests/frappe-spike.spec.mjs tests/frappe-gesture-gate.spec.mjs tests/engine-async-controller.spec.mjs tests/transactional-editor.spec.mjs tests/frappe-independent-gesture.spec.mjs tests/native-intent-scope.spec.mjs
       - name: Build pinned DHTMLX Community local assets and map tests
         run: |
           npm ci --prefix spikes/dhtmlx --ignore-scripts --no-audit --no-fund

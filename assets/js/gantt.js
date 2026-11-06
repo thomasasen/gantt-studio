@@ -261,7 +261,7 @@ function attachInteraction(bar, task, cfg, options) {
         if (change.progress === origProgress) { restore(); return; }
       }
       try {
-        await options.onTaskChange(change);
+        if(await options.onTaskChange(change)===false)restore();
       } catch (error) {
         restore();
         console.error('Gantt-Änderung konnte nicht gespeichert werden:', error);
