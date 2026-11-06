@@ -42,6 +42,9 @@ test('switching projects during Gantt drag discards the preview',async({page})=>
   const original=await bar.evaluate(el=>({left:el.style.left,taskId:el.dataset.taskId}));
   page.once('dialog',dialog=>dialog.accept('Target'));
   await page.locator('#newProjectBtn').click();
+  // The project creation handler is async; wait until the new empty project
+  // is displayed before capturing its id.
+  await expect(page.locator('#taskTableBody tr[data-task-row-id]')).toHaveCount(0);
   const targetId=await page.locator('#projectSelect').inputValue();
   await page.locator('#projectSelect').selectOption(sourceId);
   await expect(bar).toBeVisible();
