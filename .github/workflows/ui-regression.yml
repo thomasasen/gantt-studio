@@ -58,6 +58,7 @@ jobs:
           node --check tests/frappe-isolation.spec.cjs
           node --check assets/js/engine/frappe/frappe-gesture-gate.mjs
           node --check tests/frappe-gesture-gate.spec.mjs
+          node --check tests/frappe-interaction-preview.spec.cjs
           node --check tests/theme-geometry-matrix.spec.cjs
           node --check tests/indexeddb-lifecycle.spec.cjs
           node --check tests/no-duplicate-commit.spec.cjs
