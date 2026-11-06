@@ -45,7 +45,7 @@ export function barAnnotation(row,settings,rawConfig){
 export function wrapAnnotation(text,maxWidth,{fontSize=12,twoLine=true,ellipsis=true}={}){
  const content=String(text||'').trim();
  if(!content)return [];
- const capacity=Math.max(4,Math.floor(maxWidth/(fontSize*.62)));
+ const capacity=Math.max(4,Math.floor(maxWidth/(fontSize*.9)));
  const maxLines=twoLine?2:1;
  const words=content.split(/\s+/),lines=[];
  let active='';
@@ -79,7 +79,7 @@ export function planBarAnnotation({text,barStart,barEnd,timelineWidth,rowHeight,
  const padding=8,maximum=Math.max(36,Math.min(config.maxWidth,timelineWidth-2*padding));
  const lines=wrapAnnotation(text,maximum,{fontSize,twoLine:config.twoLine,ellipsis:config.ellipsis});
  const fullLength=lines.reduce((m,line)=>Math.max(m,line.length),0);
- const labelW=Math.min(maximum,Math.ceil(fullLength*fontSize*.62+4));
+ const labelW=Math.min(maximum,Math.ceil(fullLength*fontSize*.9+4));
  const lineH=fontSize+3,blockH=lines.length*lineH;
  const a=clamp(barStart,0,timelineWidth),b=clamp(barEnd,0,timelineWidth);
  const availableRight=timelineWidth-b-padding,availableLeft=a-padding;
