@@ -1,4 +1,4 @@
-import { assertEngineContract, immutableEngineProjection } from './engine-contract.mjs?v=2.8.1';
+import { assertEngineContract, immutableEngineProjection } from './engine-contract.mjs?v=2.8.2';
 
 /**
  * Owns the active adapter and the last successfully rendered immutable view.
@@ -43,6 +43,8 @@ export function createEngineController(initialFactory) {
     mount(options) {
       if (mounted) throw new Error('Engine is already mounted.');
       const candidate = assertEngineContract(factory());
+      if (candidate.getCapabilities().asyncRendering === true)
+        throw new Error('Asynchronous adapter requires createAsyncEngineController().');
       try { candidate.mount(options); }
       catch (error) {
         const errors = [error];
@@ -107,6 +109,8 @@ export function createEngineController(initialFactory) {
     switchEngine(nextFactory) {
       if (typeof nextFactory !== 'function') throw new TypeError('Engine factory required.');
       const next = assertEngineContract(nextFactory());
+      if (next.getCapabilities().asyncRendering === true)
+        throw new Error('Asynchronous adapter requires createAsyncEngineController().');
       if (!mounted) {
         factory = nextFactory;
         return;
@@ -143,3 +147,6 @@ export function createEngineController(initialFactory) {
     }
   };
 }
+
+// Opt-in asynchronous lifecycle; existing production controller remains synchronous.
+export {createAsyncEngineController} from './engine-async-controller.mjs?v=2.8.2';

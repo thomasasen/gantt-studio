@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <title>Gantt Studio – isolierter Frappe-Spike</title>
+  <link rel="stylesheet" href="../../assets/css/app.css?v=1.4.4">
+  <link rel="stylesheet" href="../../assets/css/odin.css?v=1.4.4">
+  <link rel="stylesheet" href="../../assets/css/task-table.css?v=1.5.1">
+  <link rel="stylesheet" href="../../assets/css/design-system.css?v=2.6.0">
+  
+  <style>
+    body { margin:0; padding:24px; background:#f1f4f5; color:#243746; font:14px/1.5 system-ui,sans-serif; }
+    h1 { margin:0 0 8px; font-size:24px; }
+    p { max-width:1000px; }
+    .controls { display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin:16px 0; }
+    .comparison { display:grid; gap:20px; }
+    .pane { min-width:0; border:1px solid #cbd5db; border-radius:12px; padding:12px; background:#fff; }
+    .pane h2 { font-size:18px; margin:0 0 12px; }
+    .viewport { overflow:auto; max-height:650px; min-height:240px; background:#fff; }
+    #nativeRoot, #frappeRoot { min-height:120px; }
+    #frappeRoot { color:#243746; }
+    .notice { font-weight:600; color:#755021; }
+    :focus-visible { outline:2px solid #087e75; outline-offset:2px; }
+    @media (max-width:600px) { body { padding:12px; } }
+  </style>
+  
+  <script type="module" src="./spike.mjs"></script>
+</head>
+<body>
+  <h1>Frappe Gantt 1.2.2 – isolierter Lifecycle-Test</h1>
+  <p class="notice">Experiment, nicht produktiv: Frappe läuft im isolierten Frame und ist schreibgeschützt. Projektdateien und IndexedDB werden von dieser Seite nicht beschrieben.</p>
+  <div class="controls">
+    <label for="viewMode">Zeitskala</label>
+    <select id="viewMode">
+      <option value="day">Tag</option>
+      <option value="week" selected>Woche</option>
+      <option value="month">Monat</option>
+    </select>
+    <button type="button" id="reloadBtn">Vergleich neu rendern</button>
+    <output id="status" role="status" aria-live="polite">Lade Demoprojekt …</output>
+  </div>
+  <main class="comparison">
+    <section class="pane" aria-labelledby="nativeTitle">
+      <h2 id="nativeTitle">Native Engine (Referenz)</h2>
+      <div class="viewport"><div id="nativeRoot"></div></div>
+    </section>
+    <section class="pane" aria-labelledby="frappeTitle">
+      <h2 id="frappeTitle">Frappe Engine (Read-only)</h2>
+      <div class="viewport"><div id="frappeRoot"></div></div>
+    </section>
+  </main>
+</body>
+</html>

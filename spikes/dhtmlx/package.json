@@ -1,0 +1,13 @@
+{
+  "name": "gantt-studio-dhtmlx-community-spike",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Isolated DHTMLX Gantt Community 10.0.3 comparison. Never loaded by production.",
+  "scripts": {
+    "build": "node build.mjs"
+  },
+  "dependencies": {
+    "dhtmlx-gantt": "10.0.3"
+  }
+}

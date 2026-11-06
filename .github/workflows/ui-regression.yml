@@ -5,8 +5,14 @@ on:
     branches:
       - main
       - refactor/engine-abstraction
+      - fix/frappe-lifecycle-isolation
+      - feature/frappe-transactional-editor
+      - spike/frappe-public-editor-api
+      - spike/frappe-independent-interaction-layer
+      - spike/dhtmlx-community-engine
+      - fix/native-intent-revision-fence
   pull_request:
-    branches: [main]
+    branches: [main, fix/frappe-lifecycle-isolation, feature/frappe-transactional-editor]
   workflow_dispatch:
 
 permissions:
@@ -26,6 +32,13 @@ jobs:
       - name: Validate JavaScript syntax
         run: |
           node --check assets/js/app.js
+          node --check assets/js/engine/dhtmlx/dhtmlx-mapper.mjs
+          node --check assets/js/engine/dhtmlx/dhtmlx-adapter.mjs
+          node --check spikes/dhtmlx/spike.mjs
+          node --check spikes/dhtmlx/build.mjs
+          node --check tests/dhtmlx-pointer.spec.cjs
+          node --check tests/dhtmlx-performance.spec.cjs
+          node --check spikes/dhtmlx/bench.mjs
           node --check assets/js/icons.mjs
           node --check assets/js/task-order.mjs
           node --check assets/js/design-presets.mjs
@@ -34,9 +47,21 @@ jobs:
           node --check assets/js/gantt.js
           node --check assets/js/core/date-only.mjs
           node --check assets/js/core/project-commits.mjs
+          node --check assets/js/core/transactional-editor.mjs
+          node --check assets/js/core/engine-intent-scope.mjs
+          node --check tests/native-intent-scope.spec.mjs
+          node --check tests/native-intent-fence.spec.cjs
+          node --check tests/transactional-editor.spec.mjs
+          node --check tests/frappe-transactional-browser.spec.cjs
+          node --check tests/frappe-public-editor-pointer.spec.cjs
+          node --check assets/js/engine/frappe/independent-gesture.mjs
+          node --check spikes/frappe/frame-independent.mjs
+          node --check tests/frappe-independent-gesture.spec.mjs
+          node --check tests/frappe-independent-pointer.spec.cjs
           node --check assets/js/core/project-activation.mjs
           node --check assets/js/engine/engine-contract.mjs
           node --check assets/js/engine/engine-controller.mjs
+          node --check assets/js/engine/engine-async-controller.mjs
           node --check assets/js/engine/native/native-adapter.mjs
           node --check assets/js/engine/native/native-interactions.mjs
           node --check tests/engine-contract.spec.cjs
@@ -49,6 +74,17 @@ jobs:
           node --check tests/project-activation-browser.spec.cjs
           node --check tests/toast-accessibility.spec.cjs
           node --check tests/pointercancel-regression.spec.cjs
+          node --check assets/js/engine/frappe/frappe-adapter.mjs
+          node --check assets/js/engine/frappe/frappe-task-mapper.mjs
+          node --check spikes/frappe/frame.mjs
+          node --check spikes/frappe/spike.mjs
+          node --check tests/frappe-spike.spec.mjs
+          node --check tests/frappe-isolation.spec.cjs
+          node --check assets/js/engine/frappe/frappe-gesture-gate.mjs
+          node --check tests/frappe-gesture-gate.spec.mjs
+          node --check tests/frappe-interaction-preview.spec.cjs
+          node --check tests/frappe-async-controller.spec.cjs
+          node --check tests/engine-async-controller.spec.mjs
           node --check tests/theme-geometry-matrix.spec.cjs
           node --check tests/indexeddb-lifecycle.spec.cjs
           node --check tests/no-duplicate-commit.spec.cjs
@@ -58,6 +94,16 @@ jobs:
           node --check tests/icon-system.spec.cjs
           node --check tests/apple-design-audit.spec.cjs
           node --check playwright.config.cjs
+      - name: Build isolated Frappe vendor and run adapter unit tests
+        run: |
+          npm ci --prefix spikes/frappe --ignore-scripts --no-audit --no-fund
+          npm run build --prefix spikes/frappe
+          node --test tests/frappe-spike.spec.mjs tests/frappe-gesture-gate.spec.mjs tests/engine-async-controller.spec.mjs tests/transactional-editor.spec.mjs tests/frappe-independent-gesture.spec.mjs tests/native-intent-scope.spec.mjs
+      - name: Build pinned DHTMLX Community local assets and map tests
+        run: |
+          npm ci --prefix spikes/dhtmlx --ignore-scripts --no-audit --no-fund
+          npm run build --prefix spikes/dhtmlx
+          node --test tests/dhtmlx-mapper.spec.mjs
       - name: Install browser test dependency
         run: npm install --no-save --no-package-lock @playwright/test@1.56.1 @axe-core/playwright@4.11.0
       - name: Install Chromium
@@ -66,12 +112,26 @@ jobs:
         run: npx playwright test --reporter=line
       - name: Repeat the critical Gantt project-switch regression 20 times
         run: npx playwright test tests/project-switch-cancel.spec.cjs --grep "switching projects during Gantt drag" --repeat-each=20 --workers=1 --reporter=line
+      - name: Upload Frappe real-pointer evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frappe-public-editor-pointer-evidence
+          path: frappe-evidence/*.json
+          if-no-files-found: ignore
       - name: Upload design audit report
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: apple-design-qa
           path: design-audit/
+          if-no-files-found: ignore
+      - name: Upload DHTMLX comparison performance measurements
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dhtmlx-community-performance
+          path: performance-results/dhtmlx-community-10.0.3.json
           if-no-files-found: ignore
       - name: Upload native performance measurements
         if: always()

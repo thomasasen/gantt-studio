@@ -1,5 +1,5 @@
-import { icon } from './icons.mjs?v=2.8.1';
-import { localTodayIso } from './core/date-only.mjs?v=2.8.1';
+import { icon } from './icons.mjs?v=2.8.2';
+import { localTodayIso } from './core/date-only.mjs?v=2.8.2';
 
 const DAY = 86400000;
 const toDate = (s) => new Date(`${s}T00:00:00Z`);
@@ -261,7 +261,7 @@ function attachInteraction(bar, task, cfg, options) {
         if (change.progress === origProgress) { restore(); return; }
       }
       try {
-        await options.onTaskChange(change);
+        if(await options.onTaskChange(change)===false)restore();
       } catch (error) {
         restore();
         console.error('Gantt-Änderung konnte nicht gespeichert werden:', error);

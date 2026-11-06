@@ -1,12 +1,13 @@
-import { createEngineController } from './engine/engine-controller.mjs?v=2.8.1';
-import { createNativeEngine } from './engine/native/native-adapter.mjs?v=2.8.1';
-import { createProjectCommitter } from './core/project-commits.mjs?v=2.8.1';
-import { createProjectActivationCoordinator } from './core/project-activation.mjs?v=2.8.1';
-import { localTodayIso, isValidIsoDate } from './core/date-only.mjs?v=2.8.1';
-import { icon, hydrateIcons } from './icons.mjs?v=2.8.1';
-import { saveLocal, loadActive, loadProject, listProjects, deleteProject, setActiveProject } from './storage.js?v=2.8.1';
-import { normalizeTaskOrder, nextDisplayOrder, sortedProjectTasks, phaseKey, reorderTask, nudgeTask } from './task-order.mjs?v=2.8.1';
-import { DESIGN_COLOR_FIELDS, DESIGN_PRESETS, findDesignPreset, matchDesignPreset, designThemeMode } from './design-presets.mjs?v=2.8.1';
+import { createEngineController } from './engine/engine-controller.mjs?v=2.8.2';
+import { createNativeEngine } from './engine/native/native-adapter.mjs?v=2.8.2';
+import { createProjectCommitter } from './core/project-commits.mjs?v=2.8.2';
+import { createProjectActivationCoordinator } from './core/project-activation.mjs?v=2.8.2';
+import { matchesEngineIntentScope } from './core/engine-intent-scope.mjs?v=2.8.2';
+import { localTodayIso, isValidIsoDate } from './core/date-only.mjs?v=2.8.2';
+import { icon, hydrateIcons } from './icons.mjs?v=2.8.2';
+import { saveLocal, loadActive, loadProject, listProjects, deleteProject, setActiveProject } from './storage.js?v=2.8.2';
+import { normalizeTaskOrder, nextDisplayOrder, sortedProjectTasks, phaseKey, reorderTask, nudgeTask } from './task-order.mjs?v=2.8.2';
+import { DESIGN_COLOR_FIELDS, DESIGN_PRESETS, findDesignPreset, matchDesignPreset, designThemeMode } from './design-presets.mjs?v=2.8.2';
 
 const $ = (id) => document.getElementById(id);
 const clone = (x) => JSON.parse(JSON.stringify(x));
@@ -378,7 +379,8 @@ function renderGanttOnly() {
   project.tasks = tasks;
   const stage = $('ganttStage');
   engineController.cancelInteraction();
-  const result = engineController.render({project,view:{zoom,reorderable:canReorderTasks()}});
+  const result = engineController.render({project,view:{zoom,reorderable:canReorderTasks(),
+    activationGeneration:currentProjectGeneration()}});
   const actualCount=tasks.filter(t=>!t.syntheticPhase).length;
   $('visibleTaskCount').textContent = actualCount===1?'1 Aufgabe':`${actualCount} Aufgaben`;
   if (result.empty) {
@@ -388,15 +390,28 @@ function renderGanttOnly() {
   }
 }
 
+// Check again inside the project's serialized commit queue: an intent is
+// bound to the rendered revision, never to whatever project is active later.
+function commitScopedEngineChange(scope,change) {
+  if(!matchesEngineIntentScope(scope,envelope.project,currentProjectGeneration()))
+    return Promise.resolve({changed:false,active:false});
+  return commitProjectChange(project=>{
+    if(!matchesEngineIntentScope(scope,project,currentProjectGeneration()))return false;
+    return change(project);
+  });
+}
+
 function handleEngineIntent(intent) {
-  if(intent?.type==='task-change')return applyTimelineChange(intent.change);
-  if(intent?.type==='reorder')return commitTaskMove(
+  if(!matchesEngineIntentScope(intent?.scope,envelope.project,currentProjectGeneration()))
+    return false;
+  if(intent.type==='task-change')return applyTimelineChange(intent.change,intent.scope);
+  if(intent.type==='reorder')return commitTaskMove(
     project=>reorderTask(project,intent.taskId,intent.targetId,intent.place),
-    intent.taskId,intent.surface||'gantt');
-  if(intent?.type==='nudge')return commitTaskMove(
+    intent.taskId,intent.surface||'gantt',intent.scope);
+  if(intent.type==='nudge')return commitTaskMove(
     project=>nudgeTask(project,intent.taskId,intent.direction),
-    intent.taskId,intent.surface||'gantt');
-  throw new Error('Unbekannte Engine-Aktion: '+String(intent?.type));
+    intent.taskId,intent.surface||'gantt',intent.scope);
+  throw new Error('Unbekannte Engine-Aktion: '+String(intent.type));
 }
 
 function handleEngineSelection(selection) {
@@ -407,13 +422,14 @@ function handleEngineSelection(selection) {
   } else if(selection.kind==='task') openTaskDialog(selection.id);
 }
 
-async function applyTimelineChange(change) {
+async function applyTimelineChange(change,scope) {
+  if(!matchesEngineIntentScope(scope,envelope.project,currentProjectGeneration()))return false;
   const selectedId=envelope.project.id;
   for (const key of ['start','end']) {
     if (change[key]!==undefined && !isValidIsoDate(change[key]))
       throw new Error('Ungültiges Kalenderdatum im Zeitplan.');
   }
-  const result=await commitProjectChange(project=>{
+  const result=await commitScopedEngineChange(scope,project=>{
     const task=project.tasks.find(t=>String(t.id)===String(change.id));
     if(!task)return false;
     const start=change.start===undefined?task.start:change.start;
@@ -424,9 +440,11 @@ async function applyTimelineChange(change) {
     task.end=end;
     if(Number.isFinite(change.progress))task.progress=clamp(Math.round(change.progress),0,100);
   });
-  if(result.changed && result.active && envelope.project.id===selectedId){
+  if(result.changed && result.active && envelope.project.id===selectedId
+      && scope.activationGeneration===currentProjectGeneration()){
     renderMetrics();renderPhaseToolbar();renderGanttOnly();renderTaskTable();
   }
+  return Boolean(result.changed && result.active);
 }
 
 function renderPhaseToolbar(){
@@ -905,10 +923,15 @@ function moveTaskDrag(event){
   drag.drop={targetId:target.dataset.taskRowId,place};
 }
 
-async function commitTaskMove(reorder,taskId,focusSurface='table') {
+async function commitTaskMove(reorder,taskId,focusSurface='table',scope=null) {
   try {
-    const result=await commitProjectChange(project=>reorder(project));
-    if(!result.active)return;
+    if(scope&&!matchesEngineIntentScope(scope,envelope.project,currentProjectGeneration()))
+      return false;
+    const result=await (scope
+      ? commitScopedEngineChange(scope,project=>reorder(project))
+      : commitProjectChange(project=>reorder(project)));
+    if(!result.active || (scope && (scope.projectId!==envelope.project.id
+        || scope.activationGeneration!==currentProjectGeneration())))return false;
     if(!result.changed){
       setTaskOrderStatus('Die Reihenfolge bleibt unverändert.');
       return;

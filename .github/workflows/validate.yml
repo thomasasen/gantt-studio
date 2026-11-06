@@ -2,7 +2,9 @@ name: Validate Gantt Studio
 
 on:
   push:
-    branches: [main, refactor/engine-abstraction]
+    branches: [main, refactor/engine-abstraction, fix/frappe-lifecycle-isolation, feature/frappe-transactional-editor, spike/frappe-public-editor-api, spike/frappe-independent-interaction-layer, spike/dhtmlx-community-engine, fix/native-intent-revision-fence]
+  pull_request:
+    branches: [main, fix/frappe-lifecycle-isolation, feature/frappe-transactional-editor]
   workflow_dispatch:
 
 permissions:
@@ -19,14 +21,32 @@ jobs:
       - name: Check JavaScript syntax
         run: |
           node --check assets/js/app.js
+          node --check assets/js/engine/dhtmlx/dhtmlx-mapper.mjs
+          node --check assets/js/engine/dhtmlx/dhtmlx-adapter.mjs
+          node --check spikes/dhtmlx/spike.mjs
+          node --check tests/dhtmlx-mapper.spec.mjs
           node --check assets/js/icons.mjs
           node --check assets/js/design-presets.mjs
           node --check assets/js/gantt.js
           node --check assets/js/core/date-only.mjs
           node --check assets/js/core/project-commits.mjs
+          node --check assets/js/core/transactional-editor.mjs
+          node --check assets/js/core/engine-intent-scope.mjs
+          node --check tests/native-intent-scope.spec.mjs
+          node --check tests/native-intent-fence.spec.cjs
+          node --check tests/transactional-editor.spec.mjs
+          node --check tests/frappe-public-editor-pointer.spec.cjs
+          node --check assets/js/engine/frappe/independent-gesture.mjs
+          node --check spikes/frappe/frame-independent.mjs
+          node --check tests/frappe-independent-gesture.spec.mjs
+          node --check tests/frappe-independent-pointer.spec.cjs
           node --check assets/js/core/project-activation.mjs
           node --check assets/js/engine/engine-contract.mjs
           node --check assets/js/engine/engine-controller.mjs
+          node --check assets/js/engine/engine-async-controller.mjs
+          node --check assets/js/engine/frappe/frappe-adapter.mjs
+          node --check tests/engine-async-controller.spec.mjs
+          node --check tests/frappe-async-controller.spec.cjs
           node --check assets/js/engine/native/native-adapter.mjs
           node --check assets/js/engine/native/native-interactions.mjs
           node --check assets/js/storage.js
@@ -42,8 +62,10 @@ jobs:
           test -s assets/js/core/date-only.mjs
           test -s assets/js/core/project-commits.mjs
           test -s assets/js/core/project-activation.mjs
+          test -s assets/js/core/engine-intent-scope.mjs
           test -s assets/js/engine/engine-contract.mjs
           test -s assets/js/engine/engine-controller.mjs
+          test -s assets/js/engine/engine-async-controller.mjs
           test -s assets/js/engine/native/native-adapter.mjs
           test -s assets/js/engine/native/native-interactions.mjs
           test -s assets/js/icons.mjs
@@ -52,7 +74,7 @@ jobs:
           test -s playwright.config.cjs
           test -s examples/demo.gantt.json
           python -m json.tool examples/demo.gantt.json >/dev/null
-          grep -q 'assets/js/app.js?v=2.8.1' index.html
+          grep -q 'assets/js/app.js?v=2.8.2' index.html
           grep -q 'assets/css/app.css?v=1.4.4' index.html
           grep -q 'assets/css/privacy.css?v=1.4.4' index.html
           grep -q 'assets/css/odin.css?v=1.4.4' index.html
@@ -61,13 +83,13 @@ jobs:
           grep -q 'assets/css/design-system.css?v=2.6.1' index.html
           grep -q 'Readability scale v1.4.2' assets/css/odin.css
           grep -q 'Clickable phase rows v1.4.3' assets/css/odin.css
-          grep -q "native-adapter.mjs?v=2.8.1" assets/js/app.js
-          grep -q "gantt.js?v=2.8.1" assets/js/engine/native/native-adapter.mjs
-          grep -q "storage.js?v=2.8.1" assets/js/app.js
-          grep -q "task-order.mjs?v=2.8.1" assets/js/app.js
-          grep -q "design-presets.mjs?v=2.8.1" assets/js/app.js
-          grep -q 'icons.mjs?v=2.8.1' assets/js/app.js
-          grep -q 'icons.mjs?v=2.8.1' assets/js/gantt.js
+          grep -q "native-adapter.mjs?v=2.8.2" assets/js/app.js
+          grep -q "gantt.js?v=2.8.2" assets/js/engine/native/native-adapter.mjs
+          grep -q "storage.js?v=2.8.2" assets/js/app.js
+          grep -q "task-order.mjs?v=2.8.2" assets/js/app.js
+          grep -q "design-presets.mjs?v=2.8.2" assets/js/app.js
+          grep -q 'icons.mjs?v=2.8.2' assets/js/app.js
+          grep -q 'icons.mjs?v=2.8.2' assets/js/gantt.js
           grep -q 'function periodWidth' assets/js/gantt.js
           grep -q 'const labelLanes=\[\]' assets/js/gantt.js
           grep -q 'text-overflow: ellipsis' assets/css/app.css
@@ -101,3 +123,10 @@ jobs:
           grep -q 'const documentUrl=safeUrl(task.url)' assets/js/app.js
           grep -q 'font-size:13px' assets/css/task-table.css
           grep -q 'font-size:11px' assets/css/task-table.css
+
+      - name: Verify DHTMLX mapper and exact version lock
+        run: |
+          node --test tests/dhtmlx-mapper.spec.mjs
+          node -e "const p=require('./spikes/dhtmlx/package-lock.json'); if(p.packages['node_modules/dhtmlx-gantt'].version!=='10.0.3')process.exit(1)"
+      - name: Verify isolated async engine lifecycle
+        run: node --test tests/engine-async-controller.spec.mjs tests/frappe-gesture-gate.spec.mjs tests/transactional-editor.spec.mjs tests/frappe-independent-gesture.spec.mjs tests/native-intent-scope.spec.mjs
