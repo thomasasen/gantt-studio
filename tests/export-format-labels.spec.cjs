@@ -2,8 +2,10 @@ const {test,expect}=require('@playwright/test');
 
 test('export entry explains PDF versus a complete single-image diagram',async({page})=>{
   await page.goto('/');
+  await expect(page.locator('#saveStatusText')).toContainText('Gespeichert');
   await page.locator('#loadDemoBtn').click();
   await page.locator('#centralExportBtn').click();
+  await expect(page.locator('#exportDialog')).toBeVisible();
   const entry=page.locator('#printPdfBtn');
   await expect(entry).toContainText('Diagramm / PDF exportieren');
   await expect(entry).toContainText('einzelnes PNG-/JPG-Bild');
