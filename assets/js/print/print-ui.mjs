@@ -4,13 +4,13 @@ const fmt = s => new Intl.DateTimeFormat('de-DE',{timeZone:'UTC',day:'2-digit',m
 const choices = (key,label,values,s) => '<label><span>'+label+'</span><select data-print="'+key+'">'+values.map(([k,v])=>'<option value="'+k+'"'+(s[key]===k?' selected':'')+'>'+v+'</option>').join('')+'</select></label>';
 const numeric = (key,label,s,min,max) => '<label><span>'+label+'</span><input type="number" min="'+min+'" max="'+max+'" data-print="'+key+'" value="'+s[key]+'"></label>';
 const toggle = (key,label,s) => '<label class="print-toggle"><input type="checkbox" data-print="'+key+'"'+(s[key]?' checked':'')+'><span>'+label+'</span></label>';
-function fields(s){
+function fields(s,project){
  return '<div class="print-fields">'+
  choices('profile','Profil',[['management','Management'],['detail','Detaillierter Projektplan'],['custom','Benutzerdefiniert']],s)+
  choices('strategy','Skalierung',[['one','Eine Seite'],['fitWidth','Breite anpassen'],['readable','Lesbarkeit optimieren'],['manual','Manuell']],s)+
  choices('paper','Papierformat',[['A4','A4'],['A3','A3']],s)+
  choices('orientation','Ausrichtung',[['auto','Automatisch'],['portrait','Hochformat'],['landscape','Querformat']],s)+
- choices('scope','Aufgaben',[['all','Alle Gantt-Aufgaben'],['filtered','Aktuelle Filterauswahl'],['milestones','Meilensteine / Gates']],s)+
+ choices('scope','Aufgaben',[['all','Alle Gantt-Aufgaben'],['filtered','Aktuelle Filterauswahl'],['milestones','Meilensteine / Gates'],['phases','Ausgewählte Phasen'],['selected','Ausgewählte Aufgaben']],s)+
  choices('range','Zeitraum',[['full','Projektgrenzen'],['custom','Datumsbereich'],['month','Aktueller Monat'],['quarter','Aktuelles Quartal']],s)+
  '<label><span>Von</span><input type="date" data-print="from" value="'+escape(s.from)+'"></label>'+
  '<label><span>Bis</span><input type="date" data-print="to" value="'+escape(s.to)+'"></label>'+
@@ -19,7 +19,16 @@ function fields(s){
  numeric('scale','Zeitskala (%)',s,30,200)+
  '<label><span>Berichtstitel</span><input type="text" data-print="title" maxlength="120" value="'+escape(s.title)+'"></label></div>'+
  '<fieldset class="print-toggles"><legend>Inhalte</legend>'+
- [['names','Aufgabennamen'],['owners','Verantwortliche'],['status','Status'],['progress','Fortschritt'],['dates','Datumsangaben'],['phases','Phasen'],['milestones','Meilensteine und Gates'],['baseline','Baselines'],['markers','Marker'],['weekends','Wochenenden'],['legend','Legende'],['header','Kopfzeile'],['footer','Fußzeile'],['color','Farben']].map(([k,v])=>toggle(k,v,s)).join('')+'</fieldset>';
+ [['names','Aufgabennamen'],['owners','Verantwortliche'],['status','Status'],['progress','Fortschritt'],['dates','Datumsangaben'],['phases','Phasen'],['milestones','Meilensteine und Gates'],['baseline','Baselines'],['markers','Marker'],['dependencies','Abhängigkeiten'],['buffers','Puffer'],['risks','Risiken'],['weekends','Wochenenden'],['holidays','Feiertage'],['today','Heute-Linie'],['expandCollapsed','Eingeklappte Phasen erweitern'],['legend','Legende'],['header','Kopfzeile'],['footer','Fußzeile'],['color','Farben']].map(([k,v])=>toggle(k,v,s)).join('')+'</fieldset>'+selectionFields(s,project);
+}
+function selectionFields(s,project){
+ if(!project||!['phases','selected'].includes(s.scope))return '';
+ const phases=project.planning?.phases||[];
+ const items=s.scope==='phases'?phases:project.tasks.filter(t=>t.showInGantt!==false);
+ const key=s.scope==='phases'?'selectedPhaseIds':'selectedTaskIds';
+ const chosen=new Set(s[key]);
+ const checkboxes=items.map(item=>'<label class="print-selection-item"><input data-print-select="'+key+'" type="checkbox" value="'+escape(String(item.id))+'"'+(chosen.has(String(item.id))?' checked':'')+'><span>'+escape(item.name||item.id)+'</span></label>').join('');
+ return '<fieldset class="print-selection"><legend>'+(s.scope==='phases'?'Phasen auswählen':'Aufgaben auswählen')+'</legend><div class="print-selection-list">'+checkboxes+'</div></fieldset>';
 }
 const sheetCss = [
  '*,*:before,*:after{box-sizing:border-box}body{margin:0;background:#e9edf0;color:#253746;font:12px system-ui,sans-serif}',
@@ -98,9 +107,11 @@ export function createPrintController({getProject,getContext,onError=console.err
    dialog.querySelector('#printWarning').textContent=layout.warnings.join(' ');
   }catch(error){onError(error);dialog.querySelector('#printWarning').textContent='Fehler beim Erstellen der Druckseiten.';}
  };
- const draw=()=>{options.innerHTML=fields(settings);update();};
+ const draw=()=>{options.innerHTML=fields(settings,snapshot);update();};
  const persist=()=>{try{localStorage.setItem(storageKey,JSON.stringify(settings));}catch{/* preferences are optional */}};
  options.addEventListener('change',event=>{
+  const selected=event.target.closest('[data-print-select]');
+  if(selected){const key=selected.dataset.printSelect,ids=new Set(settings[key]);if(selected.checked)ids.add(selected.value);else ids.delete(selected.value);settings=sanitizePrintSettings({...settings,[key]:[...ids]});persist();update();return;}
   const el=event.target.closest('[data-print]');if(!el)return;
   const key=el.dataset.print,value=el.type==='checkbox'?el.checked:el.type==='number'?Number(el.value):el.value;
   if(key==='profile'){
