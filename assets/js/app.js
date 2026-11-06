@@ -1,13 +1,13 @@
-import { createEngineController } from './engine/engine-controller.mjs?v=2.8.2';
-import { createNativeEngine } from './engine/native/native-adapter.mjs?v=2.8.2';
-import { createProjectCommitter } from './core/project-commits.mjs?v=2.8.2';
-import { createProjectActivationCoordinator } from './core/project-activation.mjs?v=2.8.2';
-import { matchesEngineIntentScope } from './core/engine-intent-scope.mjs?v=2.8.2';
-import { localTodayIso, isValidIsoDate } from './core/date-only.mjs?v=2.8.2';
-import { icon, hydrateIcons } from './icons.mjs?v=2.8.2';
-import { saveLocal, loadActive, loadProject, listProjects, deleteProject, setActiveProject } from './storage.js?v=2.8.2';
-import { normalizeTaskOrder, nextDisplayOrder, sortedProjectTasks, phaseKey, reorderTask, nudgeTask } from './task-order.mjs?v=2.8.2';
-import { DESIGN_COLOR_FIELDS, DESIGN_PRESETS, findDesignPreset, matchDesignPreset, designThemeMode } from './design-presets.mjs?v=2.8.2';
+import { createEngineController } from './engine/engine-controller.mjs?v=2.9.0';
+import { createNativeEngine } from './engine/native/native-adapter.mjs?v=2.9.0';
+import { createProjectCommitter } from './core/project-commits.mjs?v=2.9.0';
+import { createProjectActivationCoordinator } from './core/project-activation.mjs?v=2.9.0';
+import { matchesEngineIntentScope } from './core/engine-intent-scope.mjs?v=2.9.0';
+import { localTodayIso, isValidIsoDate } from './core/date-only.mjs?v=2.9.0';
+import { icon, hydrateIcons } from './icons.mjs?v=2.9.0';
+import { saveLocal, loadActive, loadProject, listProjects, deleteProject, setActiveProject } from './storage.js?v=2.9.0';
+import { normalizeTaskOrder, nextDisplayOrder, sortedProjectTasks, phaseKey, reorderTask, nudgeTask } from './task-order.mjs?v=2.9.0';
+import { DESIGN_COLOR_FIELDS, DESIGN_PRESETS, findDesignPreset, matchDesignPreset, designThemeMode } from './design-presets.mjs?v=2.9.0';
 import { createPrintController } from './print/print-controller.mjs?v=2.9.0';
 
 const $ = (id) => document.getElementById(id);
