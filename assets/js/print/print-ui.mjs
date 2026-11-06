@@ -1,4 +1,5 @@
-import { PRINT_DEFAULTS, sanitizePrintSettings, projectForPrint, paginatePrint, days, add } from './print-model.mjs?v=2.9.0';
+import { PRINT_DEFAULTS, sanitizePrintSettings, projectForPrint, paginatePrint, days, add } from './print-model.mjs?v=2.10.0';
+import { createImageExport, downloadPrintExport } from './print-export.mjs?v=2.10.0';
 const escape = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const printColor=(value,fallback)=>/^#[0-9a-f]{3}(?:[0-9a-f]{3})?$/i.test(String(value||''))?value:fallback;
 const fmt = s => new Intl.DateTimeFormat('de-DE',{timeZone:'UTC',day:'2-digit',month:'2-digit',year:'numeric'}).format(new Date(s+'T00:00:00Z'));
@@ -18,7 +19,13 @@ function fields(s,project){
  numeric('margin','Rand (mm)',s,5,30)+numeric('labelWidth','Aufgabenspalte (mm)',s,32,100)+
  numeric('rowHeight','Zeilenhöhe (mm)',s,6,16)+numeric('fontSize','Schrift (pt)',s,7,14)+
  numeric('scale','Zeitskala (%)',s,30,200)+
- '<label><span>Berichtstitel</span><input type="text" data-print="title" maxlength="120" value="'+escape(s.title)+'"></label></div>'+
+ '<label><span>Berichtstitel</span><input type="text" data-print="title" maxlength="120" value="'+escape(s.title)+'"></label>'+
+ choices('format','Ausgabeformat',[['pdf','PDF'],['png','PNG'],['jpg','JPG']],s)+
+ (s.format==='pdf'?'<div class="print-format-hint">PDF über den Browserdruckdialog speichern</div>':
+  choices('imageScope','Bildseiten',[['all','Alle Seiten (ZIP)'],['current','Aktuelle Seite']],s)+
+  choices('imageScale','Bildauflösung',[['1','1× (96 dpi)'],['2','2× (192 dpi)'],['3','3× (288 dpi)']],{imageScale:String(s.imageScale)})+
+  (s.format==='jpg'?choices('jpegQuality','JPG-Qualität',[['80','80 %'],['90','90 %'],['100','100 %']],{jpegQuality:String(s.jpegQuality)}):'<div class="print-format-hint">Verlustfreie Bildqualität</div>'))+
+ '</div>'+
  '<fieldset class="print-toggles"><legend>Inhalte</legend>'+
  [['names','Aufgabennamen'],['owners','Verantwortliche'],['status','Status'],['progress','Fortschritt'],['dates','Datumsangaben'],['phases','Phasen'],['milestones','Meilensteine und Gates'],['baseline','Baselines'],['markers','Marker'],['dependencies','Abhängigkeiten'],['buffers','Puffer'],['risks','Risiken'],['weekends','Wochenenden'],['holidays','Feiertage'],['today','Heute-Linie'],['expandCollapsed','Eingeklappte Phasen erweitern'],['legend','Legende'],['header','Kopfzeile'],['footer','Fußzeile'],['color','Farben']].map(([k,v])=>toggle(k,v,s)).join('')+'</fieldset>'+selectionFields(s,project);
 }
@@ -116,8 +123,8 @@ export function printHtml(projection,layout){
 }
 export function createPrintController({getProject,getContext,onError=console.error}){
  const dialog=document.createElement('dialog');dialog.className='print-dialog';dialog.id='printPdfDialog';
- dialog.innerHTML='<header class="print-dialog-head"><div><h2>Drucken &amp; PDF</h2><p>Vollständiger Projektzeitplan, unabhängig vom sichtbaren Ausschnitt</p></div><button class="btn" type="button" data-print-close>Schließen</button></header>'+
- '<div class="print-dialog-body"><aside class="print-controls"><div id="printOptions"></div><div class="print-profile-save"><label><span>Eigenes Druckprofil</span><input id="printProfileName" maxlength="50" placeholder="Profilname"></label><button type="button" class="btn" data-print-save-profile>Speichern</button><select id="printSavedProfiles" aria-label="Gespeichertes Druckprofil auswählen"><option value="">Gespeicherte Profile…</option></select></div><div class="print-actions"><button class="btn" type="button" data-print-reset>Zurücksetzen</button><button class="btn primary" type="button" data-print-output>Drucken / PDF speichern</button></div></aside>'+
+ dialog.innerHTML='<header class="print-dialog-head"><div><h2>Drucken &amp; Exportieren</h2><p>Vollständiger Projektzeitplan, unabhängig vom sichtbaren Ausschnitt</p></div><button class="btn" type="button" data-print-close>Schließen</button></header>'+
+ '<div class="print-dialog-body"><aside class="print-controls"><div id="printOptions"></div><div class="print-profile-save"><label><span>Eigenes Druckprofil</span><input id="printProfileName" maxlength="50" placeholder="Profilname"></label><button type="button" class="btn" data-print-save-profile>Speichern</button><select id="printSavedProfiles" aria-label="Gespeichertes Druckprofil auswählen"><option value="">Gespeicherte Profile…</option></select></div><div class="print-export-status" id="printExportStatus" role="status" aria-live="polite"></div><div class="print-actions"><button class="btn" type="button" data-print-reset>Zurücksetzen</button><button class="btn primary" type="button" data-print-output>Exportieren</button></div></aside>'+
  '<section class="print-preview" aria-label="Druckvorschau"><div class="print-preview-head"><strong id="printCount"></strong><span id="printWarning" role="status"></span><div class="print-page-tools"><button type="button" class="btn" data-print-prev aria-label="Vorherige Druckseite">‹</button><output id="printCurrentPage">1</output><button type="button" class="btn" data-print-next aria-label="Nächste Druckseite">›</button><label>Zoom <input id="printPreviewZoom" type="range" min="35" max="100" value="65" step="5" aria-label="Vorschau-Zoom in Prozent"></label></div></div><iframe title="Mehrseitige Druckvorschau" id="printFrame"></iframe></section></div>';
  document.body.append(dialog);
  const options=dialog.querySelector('#printOptions'),frame=dialog.querySelector('#printFrame'),storageKey='gantt-studio.print-preferences-v1';
@@ -129,6 +136,13 @@ export function createPrintController({getProject,getContext,onError=console.err
    const projection=projectForPrint(snapshot,settings,contextSnapshot);
    const layout=paginatePrint(projection);
    html=printHtml(projection,layout);
+   pageCount=layout.pageCount;
+   currentPage=Math.max(1,Math.min(currentPage,pageCount));
+   dialog.querySelector('#printCurrentPage').textContent=currentPage+' / '+pageCount;
+  dialog.querySelector('[data-print-prev]').disabled=currentPage<=1;
+  dialog.querySelector('[data-print-next]').disabled=currentPage>=pageCount;
+   dialog.querySelector('[data-print-prev]').disabled=currentPage<=1;
+   dialog.querySelector('[data-print-next]').disabled=currentPage>=pageCount;
    frame.srcdoc=html;
    dialog.querySelector('#printCount').textContent=layout.pageCount+' Seiten · '+layout.horizontal+' Zeitabschnitte × '+layout.vertical+' Aufgabenabschnitte';
    dialog.querySelector('#printWarning').textContent=layout.warnings.join(' ');
@@ -148,7 +162,7 @@ export function createPrintController({getProject,getContext,onError=console.err
  dialog.querySelector('#printPreviewZoom').addEventListener('input',zoomPreview);
  dialog.querySelector('[data-print-prev]').addEventListener('click',()=>showPage(currentPage-1));
  dialog.querySelector('[data-print-next]').addEventListener('click',()=>showPage(currentPage+1));
- const draw=()=>{options.innerHTML=fields(settings,snapshot);update();};
+ const draw=()=>{options.innerHTML=fields(settings,snapshot);dialog.querySelector('#printExportStatus').textContent='';update();};
  const persist=()=>{try{localStorage.setItem(storageKey,JSON.stringify(settings));}catch{/* preferences are optional */}};
  options.addEventListener('change',event=>{
   const selected=event.target.closest('[data-print-select]');
@@ -175,13 +189,37 @@ export function createPrintController({getProject,getContext,onError=console.err
  });
  dialog.querySelector('[data-print-close]').addEventListener('click',()=>dialog.close());
  dialog.querySelector('[data-print-reset]').addEventListener('click',()=>{settings={...PRINT_DEFAULTS};persist();draw();});
- dialog.querySelector('[data-print-output]').addEventListener('click',()=>{
-  if(!html)return;
-  if(pending){pending.remove();pending=null;}
-  const iframe=document.createElement('iframe');iframe.title='Druckdokument';iframe.style.cssText='position:fixed;left:-10000px;top:0;opacity:0;width:1px;height:1px;border:0;';
-  pending=iframe;document.body.append(iframe);
-  iframe.addEventListener('load',()=>{try{iframe.contentWindow.addEventListener('afterprint',()=>{iframe.remove();if(pending===iframe)pending=null;},{once:true});iframe.contentWindow.focus();iframe.contentWindow.print();}catch(error){onError(error);iframe.remove();}},{once:true});
-  iframe.srcdoc=html;
+ const exportButton=dialog.querySelector('[data-print-output]');
+ const outputStatus=dialog.querySelector('#printExportStatus');
+ let exporting=false;
+ dialog.querySelector('[data-print-output]').addEventListener('click',async()=>{
+  if(!html||exporting)return;
+  outputStatus.textContent='';
+  if(settings.format==='pdf'){
+   if(pending){pending.remove();pending=null;}
+   const iframe=document.createElement('iframe');iframe.title='Druckdokument';iframe.style.cssText='position:fixed;left:-10000px;top:0;opacity:0;width:1px;height:1px;border:0;';
+   pending=iframe;document.body.append(iframe);
+   iframe.addEventListener('load',()=>{try{iframe.contentWindow.addEventListener('afterprint',()=>{iframe.remove();if(pending===iframe)pending=null;},{once:true});iframe.contentWindow.focus();iframe.contentWindow.print();}catch(error){onError(error);outputStatus.textContent='Druckdialog konnte nicht geöffnet werden.';iframe.remove();}},{once:true});
+   iframe.srcdoc=html;
+   return;
+  }
+  exporting=true;
+  exportButton.disabled=true;
+  exportButton.textContent='Export läuft…';
+  try{
+   const doc=frame.contentDocument;
+   if(!doc?.querySelector('.sheet')||doc.readyState!=='complete')throw new Error('Vorschau ist noch nicht fertig geladen.');
+   const result=await createImageExport(doc,{format:settings.format,scale:settings.imageScale,jpegQuality:settings.jpegQuality,scope:settings.imageScope,currentPage,projectName:snapshot?.name||settings.title});
+   downloadPrintExport(result);
+   outputStatus.textContent=result.pages>1?result.pages+' Bildseiten als ZIP exportiert.':'Bildseite exportiert.';
+  }catch(error){
+   onError(error);
+   outputStatus.textContent='Export fehlgeschlagen: '+error.message;
+  }finally{
+   exporting=false;
+   exportButton.disabled=false;
+   exportButton.textContent='Exportieren';
+  }
  });
  dialog.addEventListener('close',()=>{snapshot=null;contextSnapshot=null;html='';frame.removeAttribute('srcdoc');if(pending){pending.remove();pending=null;}});
  return {open(){
