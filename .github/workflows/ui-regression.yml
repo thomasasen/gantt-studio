@@ -8,6 +8,7 @@ on:
       - fix/frappe-lifecycle-isolation
       - feature/frappe-transactional-editor
       - spike/frappe-public-editor-api
+      - spike/frappe-independent-interaction-layer
   pull_request:
     branches: [main, fix/frappe-lifecycle-isolation, feature/frappe-transactional-editor]
   workflow_dispatch:
@@ -41,6 +42,10 @@ jobs:
           node --check tests/transactional-editor.spec.mjs
           node --check tests/frappe-transactional-browser.spec.cjs
           node --check tests/frappe-public-editor-pointer.spec.cjs
+          node --check assets/js/engine/frappe/independent-gesture.mjs
+          node --check spikes/frappe/frame-independent.mjs
+          node --check tests/frappe-independent-gesture.spec.mjs
+          node --check tests/frappe-independent-pointer.spec.cjs
           node --check assets/js/core/project-activation.mjs
           node --check assets/js/engine/engine-contract.mjs
           node --check assets/js/engine/engine-controller.mjs
@@ -81,7 +86,7 @@ jobs:
         run: |
           npm ci --prefix spikes/frappe --ignore-scripts --no-audit --no-fund
           npm run build --prefix spikes/frappe
-          node --test tests/frappe-spike.spec.mjs tests/frappe-gesture-gate.spec.mjs tests/engine-async-controller.spec.mjs tests/transactional-editor.spec.mjs
+          node --test tests/frappe-spike.spec.mjs tests/frappe-gesture-gate.spec.mjs tests/engine-async-controller.spec.mjs tests/transactional-editor.spec.mjs tests/frappe-independent-gesture.spec.mjs
       - name: Install browser test dependency
         run: npm install --no-save --no-package-lock @playwright/test@1.56.1 @axe-core/playwright@4.11.0
       - name: Install Chromium
