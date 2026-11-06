@@ -35,9 +35,9 @@ const sheetCss = [
  '.pages{display:grid;justify-content:center;gap:18px;padding:20px}.sheet{position:relative;background:#fff;overflow:hidden;box-shadow:0 4px 18px #20304022;break-after:page}',
  '.inside{position:absolute;overflow:hidden}.title{font-size:13pt;font-weight:700;border-bottom:.2mm solid #bdcbd4;padding-bottom:2mm}',
  '.meta{font-size:8pt;margin:2mm 0 3mm;display:flex;justify-content:space-between;color:#516b79}',
- 'table{border-collapse:collapse;table-layout:fixed;width:100%}th{background:#eaf1f5;text-align:left;font-size:8pt;padding:1mm 2mm;border:.2mm solid #cdd8df;vertical-align:top}',
+ 'table{border-collapse:collapse;table-layout:fixed;width:100%}th{background:#eaf1f5;text-align:left;font-size:8pt;padding:1mm 2mm;border:.2mm solid #cdd8df;vertical-align:top;height:13mm}',
  'td{border-bottom:.2mm solid #e0e7eb;height:var(--row-height);padding:1mm;white-space:normal;overflow-wrap:anywhere;overflow:hidden;font-size:var(--font-size)}tr.phase{background:#edf3f6;font-weight:700}',
- 'td.gantt{padding:0}svg{display:block;width:100%;height:8mm}small{display:block;color:#647884;font-size:7pt}',
+ 'td.gantt{padding:0}svg{display:block;width:100%;height:8mm}small{display:block;color:#647884;font-size:7pt}.table-wrap{position:relative}.dependency-layer{position:absolute;pointer-events:none;z-index:3;overflow:visible;display:block}',
  '.footer{position:absolute;bottom:0;left:0;right:0;border-top:.2mm solid #ccd8df;padding-top:2mm;display:flex;justify-content:space-between;font-size:8pt;color:#516b79}',
  '.legend{margin-top:3mm;font-size:8pt;color:#516b79}',
  '@media print{body{background:#fff!important}.pages{display:block;padding:0;gap:0}.sheet{margin:0;box-shadow:none;break-after:page;page-break-after:always}.sheet:last-child{break-after:auto;page-break-after:auto}@page{margin:0}}'
@@ -56,6 +56,7 @@ function timeHeader(page,layout){
 function timeline(row,page,layout,s){
  const span=days(page.from,page.to)+1, width=layout.timeW, unit=layout.mmPerDay;
  let shapes='';
+ if(s.holidays)for(const holiday of page.holidays){const x=days(page.from,holiday.date)*unit;if(x>=0&&x<width)shapes+='<rect x="'+x+'" y="0" width="'+unit+'" height="8" fill="#f2d3d3"/>';}
  if(s.weekends)for(let i=0;i<span;i++){const day=new Date(add(page.from,i)+'T00:00:00Z').getUTCDay();if(day===0||day===6)shapes+='<rect x="'+i*unit+'" y="0" width="'+unit+'" height="8" fill="#f0f2f4"/>';}
  const start=days(page.from,row.start),end=days(page.from,row.end)+1, l=Math.max(0,start),r=Math.min(span,end);
  const color=s.color?(row.type==='critical'?'#a34b42':row.type==='phase-summary'?'#c2dbe6':row.type==='milestone'?'#94703a':row.type==='gate'?'#795a9a':'#286c83'):'#667783';
@@ -63,15 +64,36 @@ function timeline(row,page,layout,s){
   if(row.type==='milestone'||row.type==='gate'){const x=Math.min(width-2,Math.max(2,start*unit));shapes+='<path d="M '+x+' 1 L '+(x+2)+' 4 L '+x+' 7 L '+(x-2)+' 4 Z" fill="'+color+'"/>';}
   else{const x=l*unit,w=(r-l)*unit;shapes+='<rect x="'+x+'" y="2" width="'+w+'" height="4" rx=".5" fill="'+color+'"/>';if(s.progress&&Number(row.progress)>0)shapes+='<rect x="'+x+'" y="2" width="'+w*Math.min(100,Number(row.progress))/100+'" height="4" fill="#15384c" opacity=".45"/>';}
  }
+ if(s.buffers&&row.type!=='phase-summary'&&Number(row.bufferDays)>0){const a=Math.max(0,days(page.from,row.end)+1)*unit,b=Math.min(span,days(page.from,row.end)+1+Number(row.bufferDays))*unit;if(b>a)shapes+='<rect x="'+a+'" y="3" width="'+(b-a)+'" height="2" fill="#becbd0" stroke="#6b8490" stroke-dasharray="1 1" stroke-width=".2"/>';}
+ if(s.risks&&['high','critical'].includes(row.risk)){const x=Math.max(2,Math.min(width-2,start*unit));shapes+='<circle cx="'+x+'" cy="1.2" r="1" fill="#b14937"/>';}
  if(s.baseline&&row.baselineStart&&row.baselineEnd){const a=Math.max(0,days(page.from,row.baselineStart))*unit,b=Math.min(span,days(page.from,row.baselineEnd)+1)*unit;if(b>a)shapes+='<rect x="'+a+'" y="7" width="'+(b-a)+'" height=".7" fill="#687b87"/>';}
+ if(s.today){const today=new Date().toISOString().slice(0,10),x=days(page.from,today)*unit;if(x>=0&&x<=width)shapes+='<line x1="'+x+'" y1="0" x2="'+x+'" y2="8" stroke="#287e75" stroke-width=".4"/>';}
  if(s.markers)for(const marker of page.markers){const x=days(page.from,marker.date)*unit;shapes+='<line x1="'+x+'" y1="0" x2="'+x+'" y2="8" stroke="#a77d35" stroke-width=".35" stroke-dasharray="1 1"/>';}
  return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 '+width+' 8" preserveAspectRatio="none">'+shapes+'</svg>';
+}
+function dependencyLayer(page,layout){
+ const yAt=[],height=page.rowHeights.reduce((sum,h,i)=>{yAt[i]=sum;return sum+h;},0);
+ const rows=new Map(page.rows.map((row,i)=>[String(row.id),{row,i}]));
+ let paths='';
+ for(let i=0;i<page.rows.length;i++)for(const id of page.rows[i].dependencies||[]){
+  const from=rows.get(String(id));if(!from)continue;
+  const previous=from.row,target=page.rows[i];
+  const x1=(days(page.from,previous.end)+1)*layout.mmPerDay;
+  const x2=days(page.from,target.start)*layout.mmPerDay;
+  if(x1<0||x1>layout.timeW||x2<0||x2>layout.timeW)continue;
+  const y1=yAt[from.i]+page.rowHeights[from.i]/2,y2=yAt[i]+page.rowHeights[i]/2;
+  const mid=Math.min(layout.timeW-1,Math.max(x1+2,(x1+x2)/2));
+  paths+='<path d="M '+x1+' '+y1+' H '+mid+' V '+y2+' H '+x2+'" fill="none" stroke="#667b88" stroke-width=".35" marker-end="url(#dependency-arrow)"/>';
+ }
+ if(!paths)return '';
+ return '<svg class="dependency-layer" style="top:13mm;left:'+layout.labelW+'mm;width:'+layout.timeW+'mm;height:'+height+'mm" viewBox="0 0 '+layout.timeW+' '+height+'" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg"><defs><marker id="dependency-arrow" markerWidth="5" markerHeight="5" refX="4" refY="2.5" orient="auto"><path d="M0 0 L5 2.5 L0 5 Z" fill="#667b88"/></marker></defs>'+paths+'</svg>';
 }
 export function printHtml(projection,layout){
  const s=projection.settings;
  const sheets=layout.pages.map(page=>{
   const markers=projection.markers.filter(m=>m.date>=page.from&&m.date<=page.to);
-  const p={...page,markers};
+  const holidays=projection.holidays.filter(h=>h.date>=page.from&&h.date<=page.to);
+   const p={...page,markers,holidays};
   const headers='<thead><tr><th style="width:'+layout.labelW+'mm">Aufgabe</th><th>Zeitraum '+escape(fmt(page.from))+' – '+escape(fmt(page.to))+timeHeader(page,layout)+'</th></tr></thead>';
   const body=page.rows.map((row,rowIndex)=>{
    let label=s.names?escape(row.name):escape(row.id);
@@ -82,7 +104,7 @@ export function printHtml(projection,layout){
   }).join('');
   return '<section class="sheet" style="width:'+layout.w+'mm;height:'+layout.h+'mm;--row-height:'+layout.rowHeight+'mm;--font-size:'+s.fontSize+'pt"><div class="inside" style="left:'+s.margin+'mm;top:'+s.margin+'mm;width:'+layout.usableW+'mm;height:'+layout.usableH+'mm">'+
   (s.header?'<div class="title">'+escape(s.title||projection.name)+'</div><div class="meta"><span>'+escape(fmt(projection.from))+' – '+escape(fmt(projection.to))+'</span><span>Projektplan · Revision '+escape(projection.revision||'–')+'</span></div>':'')+
-  '<table><colgroup><col style="width:'+layout.labelW+'mm"><col></colgroup>'+headers+'<tbody>'+body+'</tbody></table>'+
+  '<div class="table-wrap"><table><colgroup><col style="width:'+layout.labelW+'mm"><col></colgroup>'+headers+'<tbody>'+body+'</tbody></table>'+(s.dependencies?dependencyLayer(page,layout):'')+'</div>'+
   (s.legend?'<div class="legend">■ Aufgabe　◆ Meilenstein / Gate　━ Baseline</div>':'')+
   (s.footer?'<div class="footer"><span>'+escape(projection.name)+'</span><span>Abschnitt '+page.x+'/'+layout.horizontal+' · '+page.y+'/'+layout.vertical+' | Seite '+page.index+'/'+layout.pageCount+'</span></div>':'')+
   '</div></section>';
