@@ -14,6 +14,7 @@ export function createProjectActivationCoordinator({load, present}) {
   return {
     begin() { return ++generation; },
     isCurrent,
+    current() { return generation; },
     async activate(id, token) {
       if (!isCurrent(token)) return false;
       const snapshot = await load(id);
