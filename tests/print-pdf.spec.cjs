@@ -34,8 +34,11 @@ test('actual Chromium PDF contains every selected task and correct page dimensio
   // Chromium rounds CSS millimetres through device/PDF units. Accept < 1 mm.
   expect(Math.abs(Number(size[1])-420*72/25.4)).toBeLessThan(72/25.4);
   expect(Math.abs(Number(size[2])-297*72/25.4)).toBeLessThan(72/25.4);
+  // Poppler may suppress hyphens at rendered line breaks. Match the full
+  // alphanumeric task label, not extractor-specific whitespace/hyphenation.
+  const normalize=source=>source.toLocaleLowerCase('de-DE').replace(/[^\p{L}\p{N}]/gu,'');
   for(const task of ['Projekt-Kick-off','Ist-Analyse und Stakeholder-Interviews','Schnittstellenentwicklung','Hypercare und Stabilisierung']){
-    expect(text).toContain(task);
+    expect(normalize(text)).toContain(normalize(task));
   }
   expect(text).toContain('2026');
   writeFileSync(join('visual-review','gantt-print-a3-landscape.pdf'),pdf);
