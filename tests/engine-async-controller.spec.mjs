@@ -322,3 +322,16 @@ test('candidate receives frozen confirmed project even if caller mutates its ori
  }]);
  c.destroy();
 });
+
+
+test('a factory returning the active adapter is rejected without destroying it',async()=>{
+ const log=[],adapter=mock('same',log);
+ const c=createAsyncEngineController(()=>adapter);
+ c.mount({container:{}});await c.render({project:project('A'),view});
+ await assert.rejects(c.switchEngine(()=>adapter),/fresh adapter/);
+ assert.equal(log.filter(x=>x==='same:destroy').length,0);
+ assert.equal(c.getCapabilities().id,'same');
+ await c.render({project:project('B'),view});
+ c.destroy();
+ assert.equal(log.filter(x=>x==='same:destroy').length,1);
+});
