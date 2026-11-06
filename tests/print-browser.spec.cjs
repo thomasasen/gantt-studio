@@ -102,13 +102,13 @@ test('Papierfarben sind für dunkle Projektfarben und mehrere Skalierungen neutr
   const result=await page.evaluate(async p=>{
     const {createPrintProjection}=await import('/assets/js/print/print-projection.mjs?v=2.9.0');
     const {computePrintLayout}=await import('/assets/js/print/print-layout.mjs?v=2.9.0');
-    const {renderPrintPage}=await import('/assets/js/print/print-renderer.mjs?v=2.9.0');
+    const {renderPrintPage,printStyles}=await import('/assets/js/print/print-renderer.mjs?v=2.9.0');
     p.project.design.colors={pageBg:'#060E17',panelBg:'#142336',text:'#F0F3F8'};
     return ['A4','A3'].flatMap(paper=>['portrait','landscape'].map(orientation=>{
       const options={paper,orientation,margin:9,elements:{names:true}};
       const proj=createPrintProjection(p.project,options),lay=computePrintLayout(proj,options);
       const html=renderPrintPage(proj,lay,lay.pages[0],options);
-      return {white:html.includes('background:#FFF'),svg:html.includes('<svg'),width:lay.pageWidth};
+      return {white:printStyles(lay).includes('background:#FFF'),svg:html.includes('<svg'),width:lay.pageWidth};
     }));
   },fixture(20,2));
   for(const item of result){expect(item.white).toBe(true);expect(item.svg).toBe(true);expect(item.width).toBeGreaterThan(200);}
