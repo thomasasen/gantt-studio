@@ -131,3 +131,12 @@ Bei optionalen asynchronen Renderern bleibt der bestätigte Gantt-Baum bis zu ei
 - Bildauflösung 1×/2×/3× und JPG-Qualität sind separat wählbar. Browser-Canvas-Limits dürfen niemals stillschweigend zu abgeschnittenen Bildern führen: stattdessen klare Fehlermeldung und Empfehlung zur Reduktion.
 - PDF verwendet weiterhin die zweidimensional paginierte Druckansicht. Formatabhängige Felder erscheinen nur, wenn sie für das ausgewählte Format wirken.
 - Eingaben, Selektoren und Buttons in derselben Zeile bleiben unabhängig von Hilfetexten und Ausgabeformat bündig und gleich hoch; die Vorschau stellt die tatsächlich exportierte Bildkomposition dar.
+
+
+## Beschriftungen im Bild- und PDF-Export
+
+- Fachliche Beschriftungen am Balken und an Meilenstein-/Gate-Symbolen basieren auf der unveränderten Projektkonfiguration `labelConfig`: Sichtbarkeit, Inhaltsgruppen, zwei Zeilen, Maximallänge, Ausweichspuren, Positionierung und Führungslinien. Zusätzlich gelten die Filter der Druck-/Exporteinstellungen.
+- Beschriftungen bleiben innerhalb der Diagrammgrenzen. Bei Platzmangel sind Ausweichpositionen und Linien statt Überlagerungen oder abgeschnittener Pixel zu verwenden; lange Bezeichnungen sind mit sichtbarer Ellipse nur dann zu kürzen, wenn `ellipsis` aktiviert ist. Das vollständige Label muss in SVG-Metadaten sowie der Aufgabenliste erhalten bleiben.
+- Die Exportdarstellung reserviert genügend Höhe je Aufgabenzeile für Beschriftungen. Textlabels dürfen weder andere Aufgabenzeilen noch Status-/Risikoangaben verdecken.
+- Status und Risiko sind lesbar zu benennen und dürfen nie ausschließlich durch Farbgebung kommuniziert werden. PDF-Balken erhalten platzsparende Annotationen; ausführliche Bezeichnungen stehen weiterhin in der wiederholten Aufgabenspalte.
+- Label-Layout und Projekt-/Datumsberechnung verändern keine Gantt-Interaktionen, Aufgabenreihenfolge, Revision oder gespeicherten Projektdaten. Browserprüfungen müssen SVG-Geometrie, lange Texte, Meilensteine am Diagrammrand und PNG-/JPG-Downloads abdecken.

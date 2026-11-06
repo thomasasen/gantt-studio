@@ -28,6 +28,12 @@ Die Anwendung verwendet einen unabhängigen, unveränderlichen Projektsnapshot u
 - Ein- und Ausschalter für Projektphasen, Besitzer, Status, Fortschritt, Datumsangaben, Baselines, Marker, Abhängigkeiten, Puffer, Risiken, Wochenenden, Feiertage, Heute-Linie, Legende, Farben sowie Kopf-/Fußzeile
 - Projekt- und Phasenfarben, heller Papierhintergrund bei dunklen und Hybrid-Designs; weitgehend vektorbasierte Druckdarstellung
 
+## Beschriftungen
+
+Das Projekt-`labelConfig` ist Teil des eingefrorenen Print-Snapshots. Der SVG-Bildexport verwendet Namen und Fortschritt sowie konfigurierbare Verantwortliche, Datumsangaben, Phasen, Status und Risiken unmittelbar am Gantt-Balken bzw. Gate/Meilenstein. Platzierung, Zeilenumbruch, maximale Breite, Führungslinien und sichtbare Kürzung folgen der bestehenden Labelkonfiguration. Die Aufgabe und ihr vollständiger Text bleiben in der Aufgabenliste und in SVG-`title`-Elementen erhalten.
+
+Status und Risiko werden zudem in der Aufgabenliste textlich dargestellt. Im PDF werden kompakte Annotationen an der Zeitachse gerendert; ausführliche Bezeichnungen, Fortschritt, Status und Risiken erscheinen in der wiederholten linken Spalte. Diese Exportbeschriftungen sind keine Änderung an den DOM-Interaktionen des Live-Gantt-Editors.
+
 ## Grenzen und noch nicht erfüllte Abnahmekriterien
 
 - Für Abhängigkeiten innerhalb einer einzelnen Seite werden SVG-Pfeile gerendert. Bei Zeit- oder Zeilenumbrüchen werden Vorgänger als Textreferenz ausgegeben, aber **kein durchgehender seitenübergreifender Pfeil** gezeichnet. Die Textreferenzen enthalten die Projekt-ID und sind nicht als Navigationsreferenzen aufbereitet.

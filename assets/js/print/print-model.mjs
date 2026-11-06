@@ -61,7 +61,7 @@ function orderedTasks(project,tasks,sortMode) {
         progress:Math.round(group.reduce((a,t)=>a+(Number(t.progress)||0),0)/group.length),
         phaseId:phase.id,phaseColor:phase.color,owner:group.length+' Aufgaben'});
     }
-    output.push(...group);
+    output.push(...group.map(task=>({...task,phaseName:phase.name||'Phase'})));
   }
   return [...output,...unphased.sort(sort)];
 }
@@ -94,7 +94,7 @@ export function projectForPrint(project, settings, context={}) {
     from=iso(Date.UTC(y,q,1));to=add(iso(Date.UTC(y,q+3,1)),-1);
   }
   const rangeRows=rows.filter(t=>t.end>=from&&t.start<=to);
-  return deepFreeze({name:source.name||'Projektplan',revision:source.revision,colors:source.design?.colors||{},
+  return deepFreeze({name:source.name||'Projektplan',revision:source.revision,colors:source.design?.colors||{},labelConfig:source.labelConfig||{},
     rows:rangeRows,from,to,markers:s.markers?(source.planning?.markers||[]).filter(m=>valid(m.date)&&m.date>=from&&m.date<=to):[],
     holidays:s.holidays?(source.planning?.holidays||[]).filter(h=>valid(h.date)&&h.date>=from&&h.date<=to):[],settings:s});
 }
@@ -136,7 +136,8 @@ export function paginatePrint(projection) {
   const heightFor=row=>{
     const label=s.names?String(row.name||''):String(row.id||'');
     const lines=Math.max(1,Math.ceil(label.length/charsPerLine));
-    const extras=(s.owners&&row.owner?4:0)+(s.dates?4:0)+(s.dependencies&&row.dependencies?.length?4:0);
+    const extras=(s.owners&&row.owner?4:0)+(s.dates?4:0)+(s.dependencies&&row.dependencies?.length?4:0)+
+      (s.progress&&row.type!=='milestone'&&row.type!=='gate'?4:0)+(s.risks&&row.risk&&row.risk!=='none'?4:0);
     return Math.max(rowHeight,2+lines*s.fontSize*.43+extras);
   };
   const bands=[];let active=[],used=0;

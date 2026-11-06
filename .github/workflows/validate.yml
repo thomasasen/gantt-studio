@@ -24,6 +24,8 @@ jobs:
           node --check assets/js/print/print-model.mjs
           node --check assets/js/print/print-ui.mjs
           node --check assets/js/print/print-export.mjs
+          node --check assets/js/print/print-labels.mjs
+          node --check tests/print-labels.spec.mjs
           node --check tests/print-image-model.spec.mjs
           node --check tests/print-model.spec.mjs
           node --check assets/js/engine/dhtmlx/dhtmlx-mapper.mjs
@@ -61,6 +63,7 @@ jobs:
           test -s assets/js/print/print-model.mjs
           test -s assets/js/print/print-ui.mjs
           test -s assets/js/print/print-export.mjs
+          test -s assets/js/print/print-labels.mjs
           test -s assets/css/print.css
           test -s assets/css/app.css
           test -s assets/css/privacy.css
@@ -83,7 +86,7 @@ jobs:
           test -s playwright.config.cjs
           test -s examples/demo.gantt.json
           python -m json.tool examples/demo.gantt.json >/dev/null
-          grep -q 'assets/js/app.js?v=2.10.0' index.html
+          grep -q 'assets/js/app.js?v=2.11.0' index.html
           grep -q 'assets/css/app.css?v=1.4.4' index.html
           grep -q 'assets/css/privacy.css?v=1.4.4' index.html
           grep -q 'assets/css/odin.css?v=1.4.4' index.html
@@ -92,13 +95,13 @@ jobs:
           grep -q 'assets/css/design-system.css?v=2.6.1' index.html
           grep -q 'Readability scale v1.4.2' assets/css/odin.css
           grep -q 'Clickable phase rows v1.4.3' assets/css/odin.css
-          grep -q "native-adapter.mjs?v=2.10.0" assets/js/app.js
-          grep -q "gantt.js?v=2.10.0" assets/js/engine/native/native-adapter.mjs
-          grep -q "storage.js?v=2.10.0" assets/js/app.js
-          grep -q "task-order.mjs?v=2.10.0" assets/js/app.js
-          grep -q "design-presets.mjs?v=2.10.0" assets/js/app.js
-          grep -q 'icons.mjs?v=2.10.0' assets/js/app.js
-          grep -q 'icons.mjs?v=2.10.0' assets/js/gantt.js
+          grep -q "native-adapter.mjs?v=2.11.0" assets/js/app.js
+          grep -q "gantt.js?v=2.11.0" assets/js/engine/native/native-adapter.mjs
+          grep -q "storage.js?v=2.11.0" assets/js/app.js
+          grep -q "task-order.mjs?v=2.11.0" assets/js/app.js
+          grep -q "design-presets.mjs?v=2.11.0" assets/js/app.js
+          grep -q 'icons.mjs?v=2.11.0' assets/js/app.js
+          grep -q 'icons.mjs?v=2.11.0' assets/js/gantt.js
           grep -q 'function periodWidth' assets/js/gantt.js
           grep -q 'const labelLanes=\[\]' assets/js/gantt.js
           grep -q 'text-overflow: ellipsis' assets/css/app.css
@@ -134,7 +137,7 @@ jobs:
           grep -q 'font-size:11px' assets/css/task-table.css
 
       - name: Verify print projection and pagination
-        run: node --test tests/print-model.spec.mjs tests/print-image-model.spec.mjs
+        run: node --test tests/print-model.spec.mjs tests/print-image-model.spec.mjs tests/print-labels.spec.mjs
       - name: Verify DHTMLX mapper and exact version lock
         run: |
           node --test tests/dhtmlx-mapper.spec.mjs

@@ -1,5 +1,6 @@
-import { PRINT_DEFAULTS, sanitizePrintSettings, projectForPrint, paginatePrint, days, add } from './print-model.mjs?v=2.10.0';
-import { createGanttChartSvg, createChartImage, downloadPrintExport } from './print-export.mjs?v=2.10.0';
+import { PRINT_DEFAULTS, sanitizePrintSettings, projectForPrint, paginatePrint, days, add } from './print-model.mjs?v=2.11.0';
+import { createGanttChartSvg, createChartImage, downloadPrintExport } from './print-export.mjs?v=2.11.0';
+import { barAnnotation } from './print-labels.mjs?v=2.11.0';
 const escape = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const printColor=(value,fallback)=>/^#[0-9a-f]{3}(?:[0-9a-f]{3})?$/i.test(String(value||''))?value:fallback;
 const fmt = s => new Intl.DateTimeFormat('de-DE',{timeZone:'UTC',day:'2-digit',month:'2-digit',year:'numeric'}).format(new Date(s+'T00:00:00Z'));
@@ -79,6 +80,24 @@ function timeline(row,page,layout,s){
  if(s.baseline&&row.baselineStart&&row.baselineEnd){const a=Math.max(0,days(page.from,row.baselineStart))*unit,b=Math.min(span,days(page.from,row.baselineEnd)+1)*unit;if(b>a)shapes+='<rect x="'+a+'" y="7" width="'+(b-a)+'" height=".7" fill="#687b87"/>';}
  if(s.today){const today=new Date().toISOString().slice(0,10),x=days(page.from,today)*unit;if(x>=0&&x<=width)shapes+='<line x1="'+x+'" y1="0" x2="'+x+'" y2="8" stroke="#287e75" stroke-width=".4"/>';}
  if(s.markers)for(const marker of page.markers){const x=days(page.from,marker.date)*unit;shapes+='<line x1="'+x+'" y1="0" x2="'+x+'" y2="8" stroke="#a77d35" stroke-width=".35" stroke-dasharray="1 1"/>';}
+ const fullLabel=barAnnotation(row,s,page.labelConfig);
+ if(fullLabel&&r>l){
+  const font=2.2,limit=Math.max(9,Math.min(42,Math.round(width*.3)));
+  const maxChars=Math.max(6,Math.floor(limit/(font*.57)));
+  const title=fullLabel.length>maxChars?fullLabel.slice(0,maxChars-1).trimEnd()+'…':fullLabel;
+  const textW=Math.min(limit,title.length*font*.57+2.5);
+  const before=l*unit,after=r*unit;
+  const fitsInside=!(row.type==='milestone'||row.type==='gate')&&after-before>=textW+3;
+  const onRight=after+textW+1.2<=width;
+  const onLeft=before-textW-1.2>=0;
+  let x=onRight?after+1.2:onLeft?before-textW-1.2:fitsInside?before+1.2:Math.max(.6,Math.min(width-textW-.6,(before+after)/2-textW/2));
+  x=Math.max(.6,Math.min(width-textW-.6,x));
+  const y=onRight||onLeft||fitsInside?5.15:1.95;
+  if(!onRight&&!onLeft&&!fitsInside)
+   shapes+='<path d="M '+((before+after)/2)+' 3 L '+(x+textW/2)+' 2.3" stroke="#516b79" stroke-width=".18" fill="none"/>';
+  shapes+='<rect x="'+(x-.2)+'" y="'+(y-2.05)+'" width="'+(textW+.4)+'" height="2.5" rx=".35" fill="#fff" opacity=".94"/>';
+  shapes+='<text x="'+(x+.8)+'" y="'+y+'" font-size="'+font+'" font-family="Arial,Helvetica,sans-serif" font-weight="600" fill="#203849">'+escape(title)+'</text>';
+ }
  return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 '+width+' 8" preserveAspectRatio="none">'+shapes+'</svg>';
 }
 function dependencyLayer(page,layout){
@@ -103,12 +122,14 @@ export function printHtml(projection,layout){
  const sheets=layout.pages.map(page=>{
   const markers=projection.markers.filter(m=>m.date>=page.from&&m.date<=page.to);
   const holidays=projection.holidays.filter(h=>h.date>=page.from&&h.date<=page.to);
-   const p={...page,markers,holidays,colors:projection.colors};
+   const p={...page,markers,holidays,colors:projection.colors,labelConfig:projection.labelConfig};
   const headers='<thead><tr><th style="width:'+layout.labelW+'mm">Aufgabe</th><th>Zeitraum '+escape(fmt(page.from))+' – '+escape(fmt(page.to))+timeHeader(page,layout)+'</th></tr></thead>';
   const body=page.rows.map((row,rowIndex)=>{
    let label=s.names?escape(row.name):escape(row.id);
    if(s.owners&&row.owner)label+='<small>'+escape(row.owner)+'</small>';
-   if(s.status&&row.status&&row.status!=='neutral')label+=' ['+escape(row.status)+']';
+   if(s.status&&row.status&&row.status!=='neutral')label+=' ['+escape(({green:'Grün',amber:'Gelb',red:'Rot'})[row.status]||row.status)+']';
+   if(s.risks&&row.risk&&row.risk!=='none')label+='<small>Risiko: '+escape(({low:'niedrig',medium:'mittel',high:'hoch',critical:'kritisch'})[row.risk]||row.risk)+'</small>';
+   if(s.progress&&Number.isFinite(Number(row.progress))&&!['milestone','gate'].includes(row.type))label+='<small>Fortschritt: '+Math.min(100,Math.max(0,Math.round(Number(row.progress))))+' %</small>';
    if(s.dates)label+='<small>'+escape(fmt(row.start))+' – '+escape(fmt(row.end))+'</small>';
     if(s.dependencies&&row.dependencies?.length)label+='<small>Vorgänger: '+escape(row.dependencies.join(', '))+'</small>';
    return '<tr style="height:'+page.rowHeights[rowIndex]+'mm"'+(row.type==='phase-summary'?' class="phase"':'')+'><td>'+label+'</td><td class="gantt">'+timeline(row,p,layout,s)+'</td></tr>';
