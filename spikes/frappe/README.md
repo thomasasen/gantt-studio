@@ -88,3 +88,12 @@ nachgewiesen belastbaren Lifecycle- und Interaktionsschnittstellen.
 Die vollständige Feature-Paritätsmatrix, Einzelmessungen und Red-Team-Befunde
 stehen im verbindlichen Masterplan
 `docs/FRAPPE_ENGINE_IMPLEMENTATION_PLAN.md`.
+
+
+## Neues isoliertes Experiment (Draft-PR #15)
+
+Das frühere NO-GO für die direkte Frappe-1.2.2-Integration gilt weiterhin. Die Vergleichsseite lädt Frappe jetzt nur noch in einem bei jedem Rendering neu erzeugten Frame. Die Bibliothek und ihre nicht entsorgbaren globalen Listener leben damit nicht mehr im Dokument von Gantt Studio. Die Browserregression prüft die Isolation. Das ist **kein** vollständiger Memory-GC-Nachweis.
+
+Standard: `/spikes/frappe/index.html` zeigt Frappe weiterhin **schreibgeschützt**. Ein ausschließlich für Tests vorgesehener Modus `?edit=1` aktiviert eine experimentelle Drag-Intent-Sperre. Frappe-Callbacks während des Ziehens werden gepuffert; erst gültiges Mouse-Up kann einen einzelnen Intent auslösen. Escape und Pointer-Cancel verwerfen ihn. Auch dieser Modus speichert **nichts** und ist nicht produktiv nutzbar.
+
+Automatisierte Checks: `tests/frappe-isolation.spec.cjs`, `tests/frappe-gesture-gate.spec.mjs` und `tests/frappe-interaction-preview.spec.cjs`. Bestehende Native-Funktionalität und Projektdateien bleiben unverändert. Die noch fehlende Parität für Phasen, Overlays, Reorder, Tastatur, Designs und Druck blockiert jede Freigabe als Native-Ersatz.
