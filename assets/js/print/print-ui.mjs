@@ -33,6 +33,17 @@ const sheetCss = [
  '.legend{margin-top:3mm;font-size:8pt;color:#516b79}',
  '@media print{body{background:#fff!important}.pages{display:block;padding:0;gap:0}.sheet{margin:0;box-shadow:none;break-after:page;page-break-after:always}.sheet:last-child{break-after:auto;page-break-after:auto}@page{margin:0}}'
 ].join('');
+function timeHeader(page,layout){
+ const span=days(page.from,page.to)+1;
+ const step=Math.max(1,Math.ceil(17/layout.mmPerDay));
+ let ticks='';
+ for(let day=0;day<span;day+=step){
+  const date=add(page.from,day),x=day*layout.mmPerDay;
+  ticks+='<line x1="'+x+'" x2="'+x+'" y1="0" y2="8" stroke="#bdcdd5" stroke-width=".2"/>';
+  ticks+='<text x="'+(x+.8)+'" y="5.1" font-size="2.8" fill="#425c6b">'+escape(fmt(date))+'</text>';
+ }
+ return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 '+layout.timeW+' 8" preserveAspectRatio="none">'+ticks+'</svg>';
+}
 function timeline(row,page,layout,s){
  const span=days(page.from,page.to)+1, width=layout.timeW, unit=layout.mmPerDay;
  let shapes='';
@@ -52,7 +63,7 @@ export function printHtml(projection,layout){
  const sheets=layout.pages.map(page=>{
   const markers=projection.markers.filter(m=>m.date>=page.from&&m.date<=page.to);
   const p={...page,markers};
-  const headers='<thead><tr><th style="width:'+layout.labelW+'mm">Aufgabe</th><th>Zeitraum '+escape(fmt(page.from))+' – '+escape(fmt(page.to))+'</th></tr></thead>';
+  const headers='<thead><tr><th style="width:'+layout.labelW+'mm">Aufgabe</th><th>Zeitraum '+escape(fmt(page.from))+' – '+escape(fmt(page.to))+timeHeader(page,layout)+'</th></tr></thead>';
   const body=page.rows.map(row=>{
    let label=s.names?escape(row.name):escape(row.id);
    if(s.owners&&row.owner)label+='<small>'+escape(row.owner)+'</small>';
@@ -76,10 +87,10 @@ export function createPrintController({getProject,getContext,onError=console.err
  '<section class="print-preview" aria-label="Druckvorschau"><div class="print-preview-head"><strong id="printCount"></strong><span id="printWarning" role="status"></span></div><iframe title="Mehrseitige Druckvorschau" id="printFrame"></iframe></section></div>';
  document.body.append(dialog);
  const options=dialog.querySelector('#printOptions'),frame=dialog.querySelector('#printFrame'),storageKey='gantt-studio.print-preferences-v1';
- let settings={...PRINT_DEFAULTS},snapshot,html='',pending=null;
+ let settings={...PRINT_DEFAULTS},snapshot,contextSnapshot,html='',pending=null;
  const update=()=>{
   try{
-   const projection=projectForPrint(snapshot,settings,getContext());
+   const projection=projectForPrint(snapshot,settings,contextSnapshot);
    const layout=paginatePrint(projection);
    html=printHtml(projection,layout);
    frame.srcdoc=html;
@@ -104,15 +115,16 @@ export function createPrintController({getProject,getContext,onError=console.err
  dialog.querySelector('[data-print-output]').addEventListener('click',()=>{
   if(!html)return;
   if(pending){pending.remove();pending=null;}
-  const iframe=document.createElement('iframe');iframe.title='Druckdokument';iframe.style.cssText='position:fixed;visibility:hidden;width:0;height:0;border:0;';
+  const iframe=document.createElement('iframe');iframe.title='Druckdokument';iframe.style.cssText='position:fixed;left:-10000px;top:0;opacity:0;width:1px;height:1px;border:0;';
   pending=iframe;document.body.append(iframe);
   iframe.addEventListener('load',()=>{try{iframe.contentWindow.addEventListener('afterprint',()=>{iframe.remove();if(pending===iframe)pending=null;},{once:true});iframe.contentWindow.focus();iframe.contentWindow.print();}catch(error){onError(error);iframe.remove();}},{once:true});
   iframe.srcdoc=html;
  });
- dialog.addEventListener('close',()=>{snapshot=null;html='';frame.removeAttribute('srcdoc');if(pending){pending.remove();pending=null;}});
+ dialog.addEventListener('close',()=>{snapshot=null;contextSnapshot=null;html='';frame.removeAttribute('srcdoc');if(pending){pending.remove();pending=null;}});
  return {open(){
   if(dialog.open)return;
   snapshot=JSON.parse(JSON.stringify(getProject()));
+  contextSnapshot=JSON.parse(JSON.stringify(getContext()));
   try{settings=sanitizePrintSettings(JSON.parse(localStorage.getItem(storageKey)||'{}'));}catch{settings={...PRINT_DEFAULTS};}
   draw();dialog.showModal();
  },destroy(){if(dialog.open)dialog.close();dialog.remove();}};
