@@ -717,3 +717,40 @@ Die erste neue Browser-CI (`44c56670`) schlug bei vier Fällen fehl, weil der un
 **Drei getrennte Entscheidungen:** (1) **Technische Machbarkeit: bedingtes GO** für die Diagnose und einen unabhängigen Transaktionsadapter als Forschungsergebnis, kein belastbarer End-to-End-Produktnachweis. (2) **Merge von PR #17 in `feature/frappe-transactional-editor`: GO ausschließlich bei vollständiger finaler CI und konfliktfreiem Stand**, da keine schreibende Engine aktiviert wird. (3) **Produktive schreibfähige Frappe-Engine: NO-GO**, bis öffentliche Abschluss-/Abort-Semantik, transaktionale Persistenz und Native-Parität belegt sind.
 
 **Nächste abgegrenzte Entwicklungsphase (nicht Teil von PR #17):** Zuerst mit Upstream ein öffentliches, versioniertes `gesture-finish/gesture-cancel`-API einschließlich gültigem Endzustand und Fehlerfall klären; alternativ die Kosten einer herstellerunabhängigen Pointer-Schicht und einer anderen Gantt-Bibliothek anhand derselben realen Contract-Matrix vergleichen. Danach separat einen CAS-geschützten, vor Transaktionsstart abbrechbaren IndexedDB-Commit-Pfad und eine explizite Native-Paritätsmatrix (Sortierung, Phasen, Kalender, Abhängigkeiten, Themes, Print, Touch, Keyboard, Accessibility) prototypisieren. Ohne diese Gates keinen Frappe-Produktiv-Merge.
+
+
+## 18. Phase 5 – unabhängige Frappe-Pointer-Schicht (isolierter Architektur-Spike, 06.11.2026)
+
+**Ausgangspunkt:** `feature/frappe-transactional-editor@c3df7e197dc7ad688e0998c9792c4c14b7102df5` (Merge PR #17).
+**Arbeitsbranch:** `spike/frappe-independent-interaction-layer`, PR gegen `feature/frappe-transactional-editor`, niemals gegen `main`.
+**Produktiver Zustand:** Native-only; weder `app.js`, die Native-Engine, IndexedDB noch Projektschema werden durch diesen Spike umgeschaltet oder erweitert.
+
+### Offizielle API und Alternativen
+
+- npm `frappe-gantt@1.2.2` bleibt aktuelle Stable-Version: https://www.npmjs.com/package/frappe-gantt?activeTab=versions.
+- Öffentliche dokumentierte Render-/Update-Funktionen: `update_options`, `change_view_mode`, `scroll_current`, `update_task`. Konfigurierbar sind u.a. `readonly`, `readonly_dates`, `readonly_progress`, `move_dependencies`, `view_mode`, `snap_at`. Quelle: https://github.com/frappe/gantt/blob/master/README.md.
+- Die dokumentierte API garantiert **keine atomare begin/preview/commit/cancel/rollback-Sequenz**. Die zuvor gemessenen frühen `on_date_change`-Callbacks bleiben ein Blocker für direkt persistierende Frappe-Edits.
+- **A – offizielle Frappe-API:** aktuell NO-GO für die transaktionale Editorsteuerung.
+- **B – unabhängige Pointer-Schicht:** als eingeschränkter, schreibfreier Spike umgesetzt; Ergebnis muss anhand echter Browsergesten und Upgrade-Risiko bewertet werden.
+- **C – alternative Engine:** DHTMLX Gantt Community ist eine MIT-lizenzierte Alternative mit dokumentierten `onBeforeTaskDrag`, `onTaskDrag`, `onAfterTaskDrag`, Hierarchie-/Summary-Tasks und umfangreichen Events (https://github.com/DHTMLX/gantt, https://docs.dhtmlx.com/gantt/guides/dnd/). Dennoch sind Projektterminologie, inklusives Ende, Fortschritt, Abbruchsicherheit und bestehende Designs nicht automatisch gleichwertig.
+
+### Implementierung von B
+
+- `assets/js/engine/frappe/independent-gesture.mjs`: DOM- und Frappe-unabhängige Single-Pointer-Zustandsmaschine mit immutable Vorher-/Nachher-Snapshots, exakten inklusiven Kalenderdaten, Move, Resize links/rechts, Progress, Änderungsfilter, Cancel und idempotentem Abschluss. Zusätzlicher rein speicherinterner CAS-Testadapter mit Projekt-ID, erwarteter Revision, Gesten-ID, Vorher-Zustand, Revisionsfortschreibung und Replay-/Konfliktschutz.
+- `spikes/frappe/frame-independent.mjs`: isolierter Pointer- und Vorschau-Binder für die **schreibgeschützt** gerenderte Frappe-Grafik. Unsere Ebene erzeugt eigene Griffe und Vorschau, hält Pointer Capture, verarbeitet Escape, pointercancel, Fokusverlust und Destroy; Frappe-interne Date-/Progress-Callbacks sind nicht beteiligt.
+- `spikes/frappe/frame.mjs`, `spikes/frappe/spike.mjs`, `assets/js/engine/frappe/frappe-adapter.mjs`: strikte opt-in Aktivierung nur über `/spikes/frappe/index.html?layer=1`, eingeschränkt auf Day-Zoom. Host prüft Projekt und Revision; angenommene Änderungen aktualisieren ausschließlich den RAM-Snapshot und erzeugen einen neuen isolierten Frame. Originaler `?edit=1`-Vendor-Diagnoseweg bleibt unangetastet.
+- In der Spike-Variante darf **kein** `indexedDB`-/`localStorage`-Write aus der neuen Schicht erfolgen. Durch Designentscheidung kein Aufruf des produktiven `createProjectCommitter`.
+
+### Kritisches Red-Team-Gate
+
+**P1 – strukturelle Frappe-DOM-Abhängigkeit:** Für exakte Trefferflächen/Positionierung nutzt der Diagnose-Binder `.bar-wrapper[data-id]`, `.bar` und SVG-`getBBox()`. Diese SVG-Elemente sind **kein dokumentierter Frappe-API-Vertrag**. Das Experiment belegt deshalb gegebenenfalls Pointer-Lebenszyklus und Datenintegrität, **nicht** Upgrade-Stabilität. Diese Kopplung ist für ein langfristiges GO unzulässig, solange keine stabile öffentliche Geometrie-/Hit-Test-Schnittstelle existiert. Sie darf nicht durch mehr private Selektoren als vermeintliche Lösung verschleiert werden.
+
+**P1 – zweite Engine:** Um die Kopplung ohne Upstream-Support zu lösen, müsste Gantt Studio Trefferflächen und Balken-Geometrie selbst vollständig verwalten. Dann übernimmt die zusätzliche Ebene zunehmend Rendering-/Editorarbeit, die die Native-Engine bereits leistet. Dazu kommen elf Designs, Phasen, Reorder, Abhängigkeiten, Baselines, Puffer, Marker, Druck und A11y. Eine isolierte Positivprobe ist keine wirtschaftliche oder produktive Freigabe.
+
+**P2 – ungetestete Vollständigkeit:** Der Spike konzentriert sich auf Day-Mode und Zeigerinteraktionen. Touch-/Stift- und Tastaturparität, Zoomwechsel, Scroll-/Resize-Synchronität, High-DPI, visuelle Glätte, reale Browserwechsel, Langzeitperformance und vollständige Native-Parität bleiben offene produktive Gates.
+
+### Verifikation und Entscheidung
+
+Testnachweise: `node --test tests/frappe-independent-gesture.spec.mjs`; realer Chromium-Browser `tests/frappe-independent-pointer.spec.cjs`, dazu sämtliche vorhandenen Regressionen. Jede Positivprobe muss echten Pointer-Down, eine sichtbare Vorher-/Nachher-Vorschau, exakt einen angenommenen RAM-Commit und **keinen** IndexedDB-Write prüfen. Cancel-/Fokus-/Rerender-/Projektwechseltests prüfen Null-Commit.
+
+**Architekturempfehlung vor Freigabe:** B nur als Diagnose, nicht als künftige Produkt-Engine akzeptieren, solange die DOM-Abhängigkeit verbleibt. Der betriebswirtschaftlich vernünftige Weg ist derzeit Native weiterbetreiben und für einen möglichen späteren Ersatz eine API-basierte Alternative in einem eigenen Vergleichs-Gate testen. Selbst ein grüner PR bestätigt ausdrücklich **keine** Freigabe für produktive Schreibvorgänge.
