@@ -18,6 +18,8 @@ test('actual Chromium PDF contains every selected task and correct page dimensio
     return {html:frame.srcdoc,expected:document.querySelectorAll('.sheet').length};
   });
   expect(expected).toBeGreaterThan(0);
+  mkdirSync('visual-review',{recursive:true});
+  await page.frameLocator('#printFrame').locator('.sheet').first().screenshot({path:'visual-review/gantt-print-a3-preview.png'});
   const pdfPage=await browser.newPage();
   await pdfPage.setContent(html,{waitUntil:'load'});
   const pdf=await pdfPage.pdf({printBackground:true,preferCSSPageSize:true});
@@ -32,6 +34,5 @@ test('actual Chromium PDF contains every selected task and correct page dimensio
     expect(text).toContain(task);
   }
   expect(text).toContain('2026');
-  mkdirSync('visual-review',{recursive:true});
   writeFileSync(join('visual-review','gantt-print-a3-landscape.pdf'),pdf);
 });
