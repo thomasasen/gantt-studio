@@ -18,9 +18,13 @@ const VIEW_MODE=Object.freeze({day:'Day',week:'Week',month:'Month'});
 const CHANNEL='gantt-studio-frappe-isolated-v1';
 const FRAME_URL=new URL('../../../../spikes/frappe/frame.html',import.meta.url);
 
-export function createFrappeEngine({experimentalEditable=false,readyTimeoutMs=15000}={}) {
+export function createFrappeEngine({experimentalEditable=false,readyTimeoutMs=15000,frameUrl=FRAME_URL}={}) {
   if (!Number.isFinite(readyTimeoutMs) || readyTimeoutMs < 1)
     throw new RangeError('A positive finite frame readiness timeout is required.');
+  // Same-origin test fixture injection only; never load a remote runtime.
+  const resolvedFrameUrl=new URL(frameUrl,FRAME_URL);
+  if(resolvedFrameUrl.origin!==FRAME_URL.origin)
+    throw new TypeError('Frappe frame URL must be same origin.');
   let container=null,frame=null,generation=0,mounted=false;
   let onSelect=()=>{},onError=()=>{},onStatus=()=>{};
   let messageHandler=null,lastRequest=null,onIntent=()=>{};
@@ -88,7 +92,7 @@ export function createFrappeEngine({experimentalEditable=false,readyTimeoutMs=15
       target.className='studio-frappe-frame';
       target.title='Frappe-Zeitplan (schreibgeschützte Vorschau)';
       target.style.cssText='width:100%;min-height:360px;height:'+Math.min(1200,Math.max(360,150+tasks.length*38))+'px;border:0;display:block';
-      target.src=FRAME_URL.href;
+      target.src=resolvedFrameUrl.href;
       target.onload=()=>{
         if(!mounted||frame!==target||generation!==token)return;
         target.contentWindow?.postMessage({

@@ -51,9 +51,6 @@ test('real isolated Frappe frame confirms readiness before async controller acti
 test('failed iframe readiness rejects switch and restores confirmed old project and viewport',async({page})=>{
  await page.goto('/spikes/frappe/index.html');
  await expect(page.locator('#status')).toContainText('Frappe: gerendert');
- await page.route('**/spikes/frappe/frame.html',route=>route.fulfill({
-   status:200,contentType:'text/html',body:'<!doctype html><title>no ready event</title>'
- }));
  const result=await page.evaluate(async()=>{
   const {createAsyncEngineController}=await import('/assets/js/engine/engine-controller.mjs?v=2.8.1');
   const {createFrappeEngine}=await import('/assets/js/engine/frappe/frappe-adapter.mjs?v=2.8.1');
@@ -75,7 +72,7 @@ test('failed iframe readiness rejects switch and restores confirmed old project 
    await controller.render({project:{id:'A',tasks:[]},view:{zoom:'day'}});
    await controller.setViewport({scrollLeft:55});
    let error;
-   try{await controller.switchEngine(()=>createFrappeEngine({readyTimeoutMs:350}));}
+   try{await controller.switchEngine(()=>createFrappeEngine({readyTimeoutMs:350,frameUrl:'/spikes/frappe/fixture-no-ready.html'}));}
    catch(e){error=e.message;}
    return{
     error,active:controller.getCapabilities().id,
