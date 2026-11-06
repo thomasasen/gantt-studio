@@ -13,8 +13,8 @@ for(const name of ['dhtmlxgantt.js','dhtmlxgantt.css']){
     const css=await readFile(source,'utf8');
     // Upstream default skins import Google's Inter font. The spike must work
     // with zero external runtime requests: retain system-font fallbacks.
-    const offline=css.replace(/@import\\s+url\\(\\s*(['"]?)https:\\/\\/fonts\\.googleapis\\.com[\\s\\S]*?\\1\\s*\\)\\s*;/gi,'');
-    if(/(?:url\\(\\s*['"]?|@import\\s+['"]?)https?:\\/\\//i.test(offline))
+    const offline=css.replace(/@import\s+url\(\s*(['"]?)https:\/\/fonts\.googleapis\.com[\s\S]*?\1\s*\)\s*;/gi,'');
+    if(/(?:url\(\s*['"]?|@import\s+['"]?)https?:\/\//i.test(offline))
       throw new Error('External runtime CSS URL detected: offline build blocked');
     await writeFile(join(vendor,name),offline);
   }else await copyFile(source,join(vendor,name));
