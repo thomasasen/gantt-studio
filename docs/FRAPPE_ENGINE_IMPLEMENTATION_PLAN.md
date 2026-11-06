@@ -1,6 +1,6 @@
 # Gantt Studio: Engine-Abstraktion und optionaler Frappe-Gantt-Adapter
 
-> **Status:** Phasen A und B implementiert; Phase C im getrennten Draft-PR #14 mit **NO-GO für Frappe Gantt 1.2.2** abgeschlossen. Phase-B-PR #13 befindet sich in der abschließenden Härtung und Merge-Readiness-Prüfung. Native bleibt der einzige unterstützte Renderer.
+> **Status:** Phasen A und B implementiert; Phase C im getrennten Draft-PR #14 mit **NO-GO für Frappe Gantt 1.2.2** abgeschlossen. Phase-B-PR #13 wurde am 06.11.2026 nach main gemergt. PR #15 bleibt als experimentelle, schreibgeschützte Frappe-Integration Draft. Native bleibt der einzige produktiv unterstützte Renderer.
 >
 > **Arbeitsbranch:** `refactor/engine-abstraction`  
 > **Repository:** https://github.com/thomasasen/gantt-studio  
@@ -527,3 +527,31 @@ The following remain **not implemented and therefore merge-blocking** as a full 
 - Tests: deterministische Unit-Tests für asynchrone Fehler, Stale/Supersession, Cancel, Viewport, Restore und Fail-Closed sowie separate Chromium-Integration gegen den echten Vendor-Frame.
 
 **Offen:** Die Engine-UI wird beim Test-Switch noch nicht visuell zweiphasig gestaged; kurzzeitig kann der Chart während eines async Switches leer sein. Daher noch keine vollständige atomare *Darstellungsumschaltung* und kein Produktions-GO. Alle bisherigen Funktionsparitäts-, A11y-, Fokus-/Scroll-, Performance- und Persistenz-Gates bleiben offen. Ein grüner Test reicht allein nicht für einen Merge.
+
+
+## Ergänzung: Zweiphasige Engine-Aktivierung auf PR #15 (06.11.2026)
+
+**Status:** Im Experimentierbranch \`fix/frappe-lifecycle-isolation\` implementiert; Freigabe nur nach den jeweils neuesten GitHub-Actions-Checks. **PR #15 bleibt Draft / NOT READY für einen produktiven Engine-Ersatz.** Keine Änderung an \`main\`, \`app.js\`, dem Projektformat oder dem Persistenzvertrag.
+
+### Entscheidung und Verantwortlichkeiten
+
+Die Staging-Verwaltung ist bewusst Bestandteil des opt-in \`engine-async-controller.mjs\`. Der synchrone \`engine-controller.mjs\` und die produktive Native-Integration bleiben unverändert. Der Async-Controller besitzt aktive und vorbereitete Adapter, die Generation, den letzten bestätigten eingefrorenen Projekt-Snapshot, den Viewport und die beiden DOM-Wurzeln. Persistenz bleibt ausschließlich Sache der Anwendung. Das experimentelle Frappe-Rendering bleibt read-only.
+
+**PREPARE:** Der bisherige DOM-Baum und seine Adapterinstanz bleiben sichtbar und bedienbar. Eine neue Engine wird in einem getrennten, inert und \`aria-hidden\` gesetzten Geschwisterelement unter **demselben Scroll-Parent** gemountet. Der vorbereitete Baum wird mit \`visibility:hidden\` und \`pointer-events:none\` bei realer Geometrie gerendert, nicht mit \`display:none\`. Mount-Callbacks werden bis zum Commit nach Engine-Identität gegated. Die neue Engine erhält die letzte bestätigte immutable Projektprojektion und den View-Zustand. \`renderAsync()\` gilt erst nach korrekter Frappe-Frame-Ready-Bestätigung als abgeschlossen; Timeout, Fehler oder Abort verhindern die Veröffentlichung.
+
+**COMMIT:** Nach erneutem Generationencheck wird der *aktuelle* Scrollstand des gemeinsamen Parents erfasst, mit dem neuen Adapter abgeglichen und danach synchron in einem JavaScript-Turn der alte DOM-Baum inert/unsichtbar und der neue sichtbar/aktiv gesetzt. Erst danach werden \`engine\` und \`factory\` auf den Kandidaten umgestellt. Der Fokus wird aus dem zuvor erfassten alten Element möglichst an dieselbe Aufgabe, sonst an den neuen Gantt-Container übertragen. Eine explizit gesetzte Root-Breite wird übernommen, um horizontalen Scroll-Clamp zu vermeiden. Es gibt keine künstlichen Animationen.
+
+**CLEANUP:** Erst nach Veröffentlichung wird der Altadapter einmal zerstört und sein alter Mount-Container entfernt. Cleanup-Fehler werden über den vorhandenen \`onError\`-Kanal gemeldet, ohne eine bereits bestätigte neue Ansicht zu reaktivieren. Der Controller hält ein \`WeakSet\` für idempotente Destroy-Versuche und gibt auch bei \`destroy()\` während des Stagings beide Adapter frei. Bei Controller-Destroy wird der ursprüngliche vom Aufrufer bereitgestellte Mount-Container an seine ursprüngliche DOM-Position zurückgestellt.
+
+**ROLLBACK / Nebenläufigkeit:** Factory-, Mount-, Render-, Frame-, Timeout-, Abort-, Generationen- und Aktivierungsfehler vor Commit entfernen ausschließlich den Kandidaten und sein Stage-Element; der bisherige Adapter wird weder zerstört noch neu gemountet oder erneut gerendert. Neuere Projekt- oder Engine-Aufträge invalidieren den älteren Generationstoken und aborten den wartenden Render-Auftrag. Sogar bei einem Adapter, der Abort nicht beachtet, kann die Controller-Queue durch abortfähiges Promise-Racing freigegeben werden. Verspätete Ergebnisse werden nicht veröffentlicht. Fachliche Projektaktivierung und visuelle Engine-Aktivierung sind getrennt.
+
+### Tests und Einschränkungen
+
+- \`tests/engine-async-controller.spec.mjs\`: deterministische Gate-/Abort-/Rollback-/Factory-/Mount-/Cleanup-/Destroy-Tests, immutable Snapshots und Konkurrenzfälle.
+- \`tests/frappe-async-controller.spec.cjs\`: echter isolierter Frappe-Frame, kontrolliert zurückgehaltener Frame-HTTP-Response (ohne \`sleep()\`), sichtbarer alter DOM-Baum während PREPARE, Timeout-/Rollback- und Viewport-Matrix, Fokus/Scroll bei simulierter 200-%-CSS-Zoomstufe und \`prefers-reduced-motion\`.
+- Vollständige bestehende Playwright-Suite, 20-facher Projektwechsel-Stresstest sowie PR-merge-ref-CI bleiben verbindliche Freigabegates. Ergebnisse **nur** für die endgültige Branch-SHA zählen.
+- Der Zoomtest mit CSS \`zoom:200%\` ersetzt **keine** manuelle echte Browser-Zoom-/Screenreader-Abnahme.
+- Der Native-Adapter nutzt \`container.parentElement\` als Scrollcontainer. Genau deshalb wird die Engine nicht als Kind des bisherigen Mount-Elements vorbereitet und ein bereits aktiver iframe nicht umgehängt.
+- Die neue Darstellung kann sich bei inhaltlich unterschiedlicher Chart-Höhe naturgemäß in ihrer erforderlichen Dokumenthöhe unterscheiden. Vollständige Funktionsparität, Accessibility, UX, Performance großer Projekte, Frappe-Editor-Transaktionen und realistische Langzeit-Ressourcenmessungen bleiben offene Gates.
+
+**Referenz:** [PR #15](https://github.com/thomasasen/gantt-studio/pull/15); CI-Links und finaler Commit sind bei der endgültigen Abnahme nachzutragen.

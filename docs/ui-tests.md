@@ -13,3 +13,12 @@ npx playwright test
 ```
 
 The runtime application itself has no Playwright dependency.
+
+
+### Zweiphasige Engine-Umschaltung (Draft PR #15)
+
+- Unit: \`node --test tests/engine-async-controller.spec.mjs\`; Prepare, Commit, ungültige Factory/Mount, Abort, Supersession, doppelfreies Cleanup und Destroy.
+- Browser: \`tests/frappe-async-controller.spec.cjs\`; realer Vendor-Frame, verzögerte HTTP-Freigabe als deterministische Ready-Schranke, bestehender DOM während Prepare, sichtbarer Commit, Timeout-Rollback und Fokus/Scroll.
+- Viewports 390/768/1024/1440 sowie CSS-\`zoom:200%\` und Reduced Motion. Echte Browser-Zoomstufe und Assistive-Technology-Navigation bedürfen zusätzlich einer manuellen Abnahme.
+- Weiterhin komplette \`npx playwright test\`-Suite sowie kritischen Projektwechsel mit \`--repeat-each=20 --workers=1\` ausführen.
+- Für Merge-Readiness ausschließlich den neuesten Branch-SHA, zugehörige Push-/Pull-Request-Runs und den PR-Merge-Ref gegen das aktuelle \`main\` auswerten.

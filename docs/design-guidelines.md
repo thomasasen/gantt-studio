@@ -108,3 +108,8 @@ Diese Datei ist **die zentrale Norm**; `AGENTS.md` verweist auf sie und der loka
 - SVGs sind in Textbuttons dekorativ und aus dem Accessibility Tree ausgeschlossen; Icon-only-Schaltflächen erfordern einen aussagekräftigen zugänglichen Namen. Trefferflächen, Fokus und Disabled/Active-Zustände bleiben am interaktiven Element.
 - Gantt-Fachnotation für Gate, Meilenstein, Abhängigkeit, Status, Risiko, Baseline und Puffer ist bewusst eigenständig und nicht durch generische Bedien-Icons zu ersetzen.
 - Alle elf Farbwelten und die Hybrid-Materialebenen müssen Icons über ihre Textfarbe korrekt erben. Keine festen hellen/dunklen SVG-Farben. Veränderte ESM-Dateien mit gemeinsamer Version ausliefern.
+
+
+## Atomare Engine-Umschaltung (experimenteller Async-Controller)
+
+Bei optionalen asynchronen Renderern bleibt der bestätigte Gantt-Baum bis zu einer eindeutigen Render-Ready-Bestätigung sichtbar und bedienbar. Eine neue Engine wird als inert, \`aria-hidden\`, \`visibility:hidden\` und für Pointer nicht erreichbares Geschwisterelement mit gültiger Geometrie vorbereitet. Sie darf bis zum Commit keine Projektänderungen auslösen, den Fokus übernehmen oder in der Screenreader-Reihenfolge erscheinen. Der Commit muss ohne Zwischenpaint erfolgen. Scrollposition und Tastaturfokus sind zu erhalten beziehungsweise sinnvoll auf den aktiven Container zu übertragen. Dekorative Übergänge sind untersagt; Reduced Motion und 200-%-Zoom sind zu prüfen.
