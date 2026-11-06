@@ -2,7 +2,9 @@ name: Validate Gantt Studio
 
 on:
   push:
-    branches: [main, refactor/engine-abstraction, fix/frappe-lifecycle-isolation]
+    branches: [main, refactor/engine-abstraction, fix/frappe-lifecycle-isolation, feature/frappe-transactional-editor]
+  pull_request:
+    branches: [fix/frappe-lifecycle-isolation]
   workflow_dispatch:
 
 permissions:
@@ -24,6 +26,8 @@ jobs:
           node --check assets/js/gantt.js
           node --check assets/js/core/date-only.mjs
           node --check assets/js/core/project-commits.mjs
+          node --check assets/js/core/transactional-editor.mjs
+          node --check tests/transactional-editor.spec.mjs
           node --check assets/js/core/project-activation.mjs
           node --check assets/js/engine/engine-contract.mjs
           node --check assets/js/engine/engine-controller.mjs
@@ -108,4 +112,4 @@ jobs:
           grep -q 'font-size:11px' assets/css/task-table.css
 
       - name: Verify isolated async engine lifecycle
-        run: node --test tests/engine-async-controller.spec.mjs tests/frappe-gesture-gate.spec.mjs
+        run: node --test tests/engine-async-controller.spec.mjs tests/frappe-gesture-gate.spec.mjs tests/transactional-editor.spec.mjs
