@@ -13,7 +13,7 @@ export function dateOnlyToLocalDate(iso){
 }
 export function localDateToDateOnly(date){
   if(!(date instanceof Date)||!Number.isFinite(date.getTime()))throw new TypeError('Expected finite local Date');
-  const iso=[date.getFullYear(),String(date.getMonth()+1).padStart(2,'0'),String(date.getDate()).padStart(2,'0')].join('-');
+  const iso=[String(date.getFullYear()).padStart(4,'0'),String(date.getMonth()+1).padStart(2,'0'),String(date.getDate()).padStart(2,'0')].join('-');
   if(!isValidIsoDate(iso))throw new RangeError('Out-of-range local date');
   return iso;
 }
