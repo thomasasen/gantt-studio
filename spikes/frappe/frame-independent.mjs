@@ -36,6 +36,7 @@ export function mountIndependentLayer({root,tasks,projectId,revision,record,send
       ghost.style.left=left+'px';ghost.style.top=box.top+'px';
       ghost.style.width=width+'px';ghost.style.height=box.height+'px';
       label.textContent=change.start+' – '+change.end+' · '+change.progress+' %';
+      ghost.style.background='linear-gradient(90deg,rgba(0,126,117,.32) '+change.progress+'%,rgba(0,126,117,.10) '+change.progress+'%)';
       record('independent-preview',{kind,dx,change:{id:visual.id,start:change.start,end:change.end,progress:change.progress}});
     },
     onCancel:details=>{ghost.style.display='none';visual=null;
