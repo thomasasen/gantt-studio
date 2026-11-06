@@ -112,6 +112,8 @@ export function paginatePrint(projection) {
   let fontSize=s.fontSize;
   const warn=[];
   if(s.strategy==='fitWidth'||s.strategy==='one') mmPerDay=Math.min(nominalDay,timeW/dayCount);
+  if(s.strategy==='one' && mmPerDay<.32){mmPerDay=nominalDay;warn.push('Die Ein-Seiten-Skalierung wäre unlesbar; Zeitachse wird auf mehrere Seiten verteilt.');}
+  if(s.strategy==='fitWidth' && mmPerDay<.32) warn.push('Die gesamte Breite wurde stark verkleinert. Für bessere Lesbarkeit „Lesbarkeit optimieren“ auswählen.');
   if(s.strategy==='one') {
     const rowRoom=Math.max(1,usableH-overhead);
     rowHeight=Math.min(rowHeight,rowRoom/Math.max(1,rows.length));
