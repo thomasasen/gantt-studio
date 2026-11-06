@@ -59,25 +59,25 @@ export function createGanttChartSvg(projection){
   xml.push(rect(0,64,width,51,'#e6eff3'));
   xml.push(label(20,91,'AUFGABE / PHASE',12,'#3e5869','font-weight="700"'));
   xml.push(line(0,114,width,114,'#c8d8df',1.5));
-  xml.push(line(chartLeft,64,chartLeft,header+rows.length*rowH,'#c1d2d9',1.3));
+  xml.push(line(chartLeft,64,chartLeft,header+bodyHeight,'#c1d2d9',1.3));
   xml.push(label(chartLeft+9,82,'ZEITACHSE',11,'#3e5869','font-weight="700"'));
   const tickStep=Math.max(1,Math.ceil(115/dayWidth));
   for(let d=0;d<count;d+=tickStep){
     const date=add(from,d),x=chartLeft+d*dayWidth;
-    xml.push(line(x,91,x,header+rows.length*rowH,'#e0e8ec',.8));
+    xml.push(line(x,91,x,header+bodyHeight,'#e0e8ec',.8));
     xml.push(label(x+5,105,fmt(date),10,'#526b79'));
   }
   if(s.weekends&&dayWidth>=3){
     for(let d=0;d<count;d++){
       const weekday=new Date(add(from,d)+'T00:00:00Z').getUTCDay();
-      if(weekday===0||weekday===6)xml.push(rect(chartLeft+d*dayWidth,header,dayWidth,rows.length*rowH,'#f1f4f6'));
+      if(weekday===0||weekday===6)xml.push(rect(chartLeft+d*dayWidth,header,dayWidth,bodyHeight,'#f1f4f6'));
     }
   }
   if(s.holidays)for(const holiday of projection.holidays||[]){
-    const d=days(from,holiday.date);if(d>=0&&d<count)xml.push(rect(chartLeft+d*dayWidth,header,Math.max(dayWidth,1),rows.length*rowH,'#fae4e1'));
+    const d=days(from,holiday.date);if(d>=0&&d<count)xml.push(rect(chartLeft+d*dayWidth,header,Math.max(dayWidth,1),bodyHeight,'#fae4e1'));
   }
   if(s.markers)for(const marker of projection.markers||[]){
-    const d=days(from,marker.date);if(d>=0&&d<count)xml.push(line(chartLeft+d*dayWidth,header,chartLeft+d*dayWidth,header+rows.length*rowH,'#bd894c',1.2,'stroke-dasharray="4 4"'));
+    const d=days(from,marker.date);if(d>=0&&d<count)xml.push(line(chartLeft+d*dayWidth,header,chartLeft+d*dayWidth,header+bodyHeight,'#bd894c',1.2,'stroke-dasharray="4 4"'));
   }
   const indices=new Map(rows.map((row,index)=>[String(row.id),index]));
   rows.forEach((row,index)=>{
@@ -131,7 +131,7 @@ export function createGanttChartSvg(projection){
     const today=days(from,isoToday());
     if(today>=0&&today<count){
       const x=chartLeft+today*dayWidth;
-      xml.push(line(x,header,x,header+rows.length*rowH,'#087e75',2,'stroke-dasharray="5 3"'));
+      xml.push(line(x,header,x,header+bodyHeight,'#087e75',2,'stroke-dasharray="5 3"'));
     }
   }
   // Labels are drawn last, above bars, connectors and grid. Every label has a
