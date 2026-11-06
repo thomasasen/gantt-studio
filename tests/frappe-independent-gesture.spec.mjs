@@ -16,6 +16,7 @@ test('date-only shifting survives DST and leap year boundaries',()=>{
   assert.equal(inclusiveDays('2026-03-28','2026-03-30'),3);
   assert.equal(shiftCalendarDay('2026-03-28',2),'2026-03-30');
   assert.equal(shiftCalendarDay('2024-02-28',1),'2024-02-29');
+  assert.equal(shiftCalendarDay('0099-12-31',1),'0100-01-01');
 });
 for(const [kind,dx,expectStart,expectEnd,expectProgress] of [
   ['move',40,'2026-03-29','2026-03-31',40],
