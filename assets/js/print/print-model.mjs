@@ -10,7 +10,7 @@ const clamp = (n,min,max) => Math.max(min,Math.min(max,n));
 const deepFreeze = value => { if(value && typeof value==='object' && !Object.isFrozen(value)){ Object.freeze(value); for(const item of Object.values(value)) deepFreeze(item); } return value; };
 export const PRINT_DEFAULTS = Object.freeze({
   profile:'detail', paper:'A4', orientation:'landscape', strategy:'readable',
-  format:'pdf', imageScope:'all', imageScale:2, jpegQuality:90,
+  format:'pdf', imageScale:2, jpegQuality:90,
   margin:12, scale:100, labelWidth:57, rowHeight:9, fontSize:9,
   scope:'all', selectedPhaseIds:[], selectedTaskIds:[], expandCollapsed:true, range:'full', from:'', to:'', color:true,
   names:true, owners:true, status:true, progress:true, dates:false,
@@ -23,7 +23,7 @@ export function sanitizePrintSettings(input={}) {
   const s={...PRINT_DEFAULTS,...input};
   for(const [key,values] of Object.entries({
     profile:['management','detail','custom'],paper:['A4','A3'],
-    format:['pdf','png','jpg'],imageScope:['all','current'],
+    format:['pdf','png','jpg'],
     orientation:['portrait','landscape','auto'],
     strategy:['one','fitWidth','readable','manual'],
     scope:['all','filtered','milestones','phases','selected'],range:['full','custom','month','quarter']
