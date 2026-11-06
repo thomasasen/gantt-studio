@@ -62,6 +62,10 @@ try{
     onStatus:report});
   initialized=true;safeRender();
 }catch(error){console.error(error);report('Fehler: '+error.message);}
+// Escape must reach the active frame even if focus has returned to the host.
+if(experimentalIndependentLayer)window.addEventListener('keydown',event=>{
+  if(event.key==='Escape'){event.preventDefault();frappe.cancelInteraction();}
+},true);
 viewMode.addEventListener('change',safeRender);
 document.getElementById('reloadBtn').addEventListener('click',safeRender);
 window.addEventListener('beforeunload',()=>{native.destroy();frappe.destroy();},{once:true});
