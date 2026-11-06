@@ -7,6 +7,7 @@ const add = (s,n) => iso(ms(s) + n * DAY);
 const days = (a,b) => Math.round((ms(b)-ms(a))/DAY);
 const valid = s => typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s) && Number.isFinite(ms(s)) && iso(ms(s)) === s;
 const clamp = (n,min,max) => Math.max(min,Math.min(max,n));
+const deepFreeze = value => { if(value && typeof value==='object' && !Object.isFrozen(value)){ Object.freeze(value); for(const item of Object.values(value)) deepFreeze(item); } return value; };
 export const PRINT_DEFAULTS = Object.freeze({
   profile:'detail', paper:'A4', orientation:'landscape', strategy:'readable',
   margin:12, scale:100, labelWidth:57, rowHeight:9, fontSize:9,
@@ -89,7 +90,7 @@ export function projectForPrint(project, settings, context={}) {
     from=iso(Date.UTC(y,q,1));to=add(iso(Date.UTC(y,q+3,1)),-1);
   }
   const rangeRows=rows.filter(t=>t.end>=from&&t.start<=to);
-  return Object.freeze({name:source.name||'Projektplan',revision:source.revision,colors:source.design?.colors||{},
+  return deepFreeze({name:source.name||'Projektplan',revision:source.revision,colors:source.design?.colors||{},
     rows:rangeRows,from,to,markers:s.markers?(source.planning?.markers||[]).filter(m=>valid(m.date)&&m.date>=from&&m.date<=to):[],
     holidays:s.holidays?(source.planning?.holidays||[]).filter(h=>valid(h.date)&&h.date>=from&&h.date<=to):[],settings:s});
 }
