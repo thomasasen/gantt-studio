@@ -4,7 +4,7 @@ on:
   push:
     branches: [main, refactor/engine-abstraction, fix/frappe-lifecycle-isolation, feature/frappe-transactional-editor, spike/frappe-public-editor-api, spike/frappe-independent-interaction-layer, spike/dhtmlx-community-engine, fix/native-intent-revision-fence]
   pull_request:
-    branches: [fix/frappe-lifecycle-isolation, feature/frappe-transactional-editor]
+    branches: [main, fix/frappe-lifecycle-isolation, feature/frappe-transactional-editor]
   workflow_dispatch:
 
 permissions:
