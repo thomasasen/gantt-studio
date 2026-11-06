@@ -27,6 +27,8 @@ test('projects are isolated, do not mutate revision, and include off-screen rows
   original.tasks[0].name='Changed outside snapshot';
   assert.equal(projected.rows[0].name,'Aufgabe 0');
   assert.equal(projected.revision,3);
+  assert.equal(Object.isFrozen(projected.rows[0]),true);
+  assert.equal(Object.isFrozen(projected.rows),true);
 });
 test('multi-year and many rows paginate in both axes without gaps',()=>{
   const p=project(Array.from({length:135},(_,i)=>task(i,'2023-01-01','2028-12-31')));
@@ -58,4 +60,16 @@ test('sanitizes hostile preference values and rejects invalid ISO dates',()=>{
   const s=sanitizePrintSettings({paper:'A0',margin:-8,scale:900,profile:'unknown',fontSize:1});
   assert.equal(s.paper,'A4');assert.equal(s.margin,5);assert.equal(s.scale,200);assert.equal(s.fontSize,7);
   assert.equal(days('2026-01-01','2026-01-31'),30);
+});
+
+test('selected phases, tasks and collapsed phase decisions do not depend on viewport',()=>{
+ const p=project([task(1,'2026-01-01','2026-01-04',{phaseId:'phase-A'}),task(2,'2026-02-01','2026-02-04',{phaseId:'phase-B'})]);
+ p.planning.phases=[{id:'phase-A',name:'Konzeption',start:'2026-01-01',end:'2026-01-04'},{id:'phase-B',name:'Umsetzung',start:'2026-02-01',end:'2026-02-04'}];
+ const a=projectForPrint(p,{scope:'phases',selectedPhaseIds:['phase-B']});
+ assert.equal(a.rows.some(row=>row.id==='task-1'),false);
+ assert.equal(a.rows.some(row=>row.id==='task-2'),true);
+ const b=projectForPrint(p,{scope:'selected',selectedTaskIds:['task-1'],expandCollapsed:false},{collapsedPhaseIds:['phase-A']});
+ assert.equal(b.rows.some(row=>row.id==='task-1'),false);
+ const c=projectForPrint(p,{scope:'selected',selectedTaskIds:['task-1'],expandCollapsed:true},{collapsedPhaseIds:['phase-A']});
+ assert.equal(c.rows.some(row=>row.id==='task-1'),true);
 });
