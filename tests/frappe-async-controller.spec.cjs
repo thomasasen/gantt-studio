@@ -258,6 +258,7 @@ test('commit preserves scroll and transfers keyboard focus, including 200 percen
    focusTask(){return false;},destroy(){root?.replaceChildren();root=null;},
    getCapabilities(){return caps;}
   };});
+  const focusOriginal=HTMLElement.prototype.focus;
   try{
    c.mount({container:host,onError:()=>{}});
    await c.render({project:{id:'focus',tasks:[{
@@ -267,7 +268,6 @@ test('commit preserves scroll and transfers keyboard focus, including 200 percen
    host.querySelector('button').focus({preventScroll:true});
    const wasFocused=document.activeElement.textContent==='Old focused task';
    const focusTrace=[];
-   const focusOriginal=HTMLElement.prototype.focus;
    HTMLElement.prototype.focus=function(...args){
     focusTrace.push({tag:this.tagName,id:this.id,tabindex:this.getAttribute('tabindex'),
      hidden:this.getAttribute('aria-hidden'),inert:this.inert,connected:this.isConnected});
