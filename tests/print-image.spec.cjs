@@ -70,3 +70,39 @@ test('complete image export remains independent of the Gantt scroller',async({pa
   await expect(diagram).toContainText('Projekt-Kick-off');
   await expect(diagram).toContainText('Hypercare und Stabilisierung');
 });
+
+
+test('Gantt annotation labels fit inside one complete image without overlapping task rows',async({page})=>{
+  await openPrint(page);
+  await page.locator('[data-print="format"]').selectOption('png');
+  const chart=page.frameLocator('#printFrame').locator('svg[role="img"]');
+  await expect(chart).toBeVisible();
+  const report=await chart.evaluate(svg=>{
+    const labels=[...svg.querySelectorAll('.gantt-export-label')];
+    const width=Number(svg.getAttribute('width')),height=Number(svg.getAttribute('height'));
+    const bounds=labels.map(node=>{
+      const box=node.getBBox();
+      return {id:node.dataset.taskId,x:box.x,y:box.y,w:box.width,h:box.height,
+        fullText:node.querySelector('title')?.textContent||'',text:node.textContent||''};
+    });
+    return {width,height,bounds};
+  });
+  expect(report.bounds.length).toBeGreaterThan(8);
+  expect(report.bounds.some(item=>item.fullText.includes('Projekt-Kick-off'))).toBe(true);
+  expect(report.bounds.some(item=>item.fullText.includes('Schnittstellenentwicklung'))).toBe(true);
+  expect(report.bounds.some(item=>item.fullText.includes('Hypercare und Stabilisierung'))).toBe(true);
+  for(const box of report.bounds){
+    expect(box.x,box.id).toBeGreaterThanOrEqual(0);
+    expect(box.y,box.id).toBeGreaterThanOrEqual(0);
+    expect(box.x+box.w,box.id).toBeLessThanOrEqual(report.width+1);
+    expect(box.y+box.h,box.id).toBeLessThanOrEqual(report.height+1);
+  }
+  // Annotations are on dedicated non-overlapping task rows.
+  for(let i=0;i<report.bounds.length;i++)for(let j=i+1;j<report.bounds.length;j++){
+    const a=report.bounds[i],b=report.bounds[j];
+    const overlapX=a.x<b.x+b.w&&b.x<a.x+a.w;
+    const overlapY=a.y<b.y+b.h&&b.y<a.y+a.h;
+    expect(overlapX&&overlapY,a.id+' ↔ '+b.id).toBe(false);
+  }
+  await page.screenshot({path:'visual-review/gantt-image-label-preview.png'});
+});
