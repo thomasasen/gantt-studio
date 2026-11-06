@@ -48,6 +48,7 @@ jobs:
           node --check tests/project-activation.spec.cjs
           node --check tests/project-activation-browser.spec.cjs
           node --check tests/toast-accessibility.spec.cjs
+          node --check tests/pointercancel-regression.spec.cjs
           node --check tests/theme-geometry-matrix.spec.cjs
           node --check tests/indexeddb-lifecycle.spec.cjs
           node --check tests/no-duplicate-commit.spec.cjs
