@@ -5,7 +5,7 @@ const PAPERS=Object.freeze({A4:[210,297],A3:[297,420]});
 const clamp=(v,a,b)=>Math.min(b,Math.max(a,Number(v)||a));
 const periodDays=(a,b)=>Math.round((parse(b)-parse(a))/DAY)+1;
 function wrapText(text,maxWidth,fontPt=8.5){
-  const chars=Math.max(12,Math.floor(maxWidth/(fontPt*25.4/72*.52)));
+  const chars=Math.max(8,Math.floor(maxWidth/(fontPt*25.4/72*.90)));
   const words=String(text??'').split(/\s+/),lines=[];let line='';
   for(const word of words){
     if(!word)continue;
@@ -55,13 +55,14 @@ export function computePrintLayout(projection,options={}){
   function prepareRows(font) {
     return projection.rows.map(r=>{
       const e=options.elements||{};
-      const meta=[e.owners!==false?r.owner:'',e.status?'Status: '+(r.status||'neutral'):'',
+      const meta=[e.owners!==false?r.owner:'',e.status?'Status: '+({green:'Grün',amber:'Gelb',red:'Rot',neutral:'Neutral'}[r.status]||'Neutral'):'',
         e.progress!==false?Math.round(Number(r.progress)||0)+' %':'',
         e.dates?r.start+' – '+r.end:'',e.risk&&r.risk&&r.risk!=='none'?'Risiko: '+r.risk:''].filter(Boolean).join(' · ');
       const title=wrapText(e.names===false?'':r.name,labelWidth-7,font);
       const extra=meta?wrapText(meta,labelWidth-7,Math.max(8,font-1)):[];
       const lineHeight=font*25.4/72*1.28;
       const height=Math.max(settings.density==='compact'?9:12,(title.length+extra.length)*lineHeight+4);
+      if(height>rowSpace)throw new RangeError('Aufgabe passt bei dieser Spaltenbreite nicht auf eine Druckseite. Bitte die Aufgabenspalte verbreitern.');
       return {...r,titleLines:title,metaLines:extra,height};
     });
   }
