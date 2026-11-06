@@ -29,11 +29,34 @@ window.addEventListener('message',event=>{
   try{
     if(typeof globalThis.Gantt!=='function')throw new Error('Local Frappe UMD missing');
     const editable=data.experimentalEditable===true;
+    // Opt-in diagnosis only: browser-native events and documented Frappe
+    // callbacks, never private Frappe methods. No persistence or app wiring.
+    const trace=[];
+    const record=(type,details={})=>{
+      if(!editable||trace.length>=2000)return;
+      trace.push({type,at:Math.round(performance.now()*1000)/1000,...details});
+    };
+    if(editable){
+      window.__frappeInteractionTrace=trace;
+      const point=e=>({
+        pointerId:Number.isInteger(e.pointerId)?e.pointerId:null,
+        x:Math.round(e.clientX||0),y:Math.round(e.clientY||0),
+        target:e.target?.getAttribute?.('class')||e.target?.tagName||null
+      });
+      for(const type of ['pointerdown','pointermove','pointerup','pointercancel',
+        'lostpointercapture','mousedown','mousemove','mouseup']){
+        document.addEventListener(type,e=>record(type,point(e)),true);
+      }
+      window.addEventListener('blur',()=>record('blur'),true);
+      window.addEventListener('keydown',e=>{
+        if(e.key==='Escape')record('escape');
+      },true);
+    }
     const tasks=structuredClone(data.tasks);
     const root=document.getElementById('chart');
     const gate=createFrappeGestureGate({
-      emit:(intent,gestureId)=>reply('intent',{gestureId,intent}),
-      rollback:()=>reply('cancelled'),
+      emit:(intent,gestureId)=>{record('gate-intent',{gestureId,change:intent.change});reply('intent',{gestureId,intent});},
+      rollback:()=>{record('gate-cancel');reply('cancelled');},
       onError:error=>reply('error',{message:error?.message||String(error)})
     });
     activeGate=gate;
@@ -87,11 +110,13 @@ window.addEventListener('message',event=>{
       language:'de',popup:()=>false,
       on_click:task=>reply('selected',{id:String(task.id)}),
       on_date_change:editable?(task,start,end)=>{
-        try{gate.preview(mapFrappeDateChange(task.id,start,end));}
+        try{const change=mapFrappeDateChange(task.id,start,end);
+          record('on_date_change',{change});gate.preview(change);}
         catch(error){reply('error',{message:error.message});}
       }:undefined,
       on_progress_change:editable?(task,progress)=>{
-        gate.preview({id:String(task.id),progress:Number(progress)});
+        const change={id:String(task.id),progress:Number(progress)};
+        record('on_progress_change',{change});gate.preview(change);
       }:undefined
     });
     // Diagnostic-only private reference: not part of product adapter.

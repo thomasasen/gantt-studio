@@ -619,3 +619,101 @@ Die Staging-Verwaltung ist bewusst Bestandteil des opt-in `engine-async-controll
 - [UI browser regression, PR-Merge-Ref #42227444915](https://github.com/thomasasen/gantt-studio/actions/runs/42227444915): **SUCCESS, 107/107 Chromium-Tests**, 0 fehlgeschlagen, anschließend **20/20 Projektwechsel-Stresstests** erfolgreich.
 - Diese grünen Läufe belegen die Vertrags-Negativtests, die Pointer-Proben und die Native-/Lifecycle-Regression, nicht den produktiven Frappe-Editor. Der präzise NO-GO-Status bleibt deshalb bestehen. Push-Runs des Feature-Head sind über die verfügbare workflow-run-Abfrage nicht separat verifiziert.
 - **Wichtig für einen folgenden Dokumentations-Commit:** Dessen SHA benötigt einen neuen erfolgreichen finalen CI-Lauf, bevor PR #16 als technisch grün auf dem endgültigen Head bezeichnet werden darf.
+
+
+## 17. Öffentliche Frappe-Editor-API – aktueller Stable-Check und physische Pointer-Diagnose (06.11.2026)
+
+**Ausgangs-SHA:** `feature/frappe-transactional-editor@c91dbefef0a93df19e8a591b8fe5f939abe17e90`. **Arbeitsbranch:** `spike/frappe-public-editor-api`; eigenständiger Draft-PR gegen den Feature-Branch. Keine Änderungen an `main`, `app.js`, dem Projektformat, der Native Engine oder dem vendorten Paket. `?edit=1` bleibt reiner Diagnosemodus ohne IndexedDB-Schreibanbindung.
+
+### A. Release- und API-Abgleich anhand der Primärquellen
+
+- npm: [frappe-gantt Versionsübersicht](https://www.npmjs.com/package/frappe-gantt?activeTab=versions) meldet **1.2.2 als aktuellen Stable-`latest`-Tag** (Veröffentlichung 25.02.2026), davor 1.2.1 (17.02.2026). Im November 2026 existiert **keine neuere stabile npm-Version**.
+- [GitHub Releases](https://github.com/frappe/gantt/releases) zeigt weiterhin **v1.0.3** als GitHub-Release an. Dies ist nicht gleich dem neuesten npm-Release; `master`-Commits sind keine geprüften npm-Stable-Versionen.
+- Dokumentierte öffentliche Methoden laut [Upstream README](https://github.com/frappe/gantt): `update_options`, `change_view_mode`, `scroll_current`, `update_task`. Dokumentierte Callbacks u. a. `on_date_change`, `on_progress_change`, `on_click`, `on_view_change`.
+- **Nicht dokumentiert** als verlässlicher öffentlicher Vertrag: `beforeCommit/afterCommit`, `preventDefault/rollback`, abortbarer Drag-/Resize-/Progress-Commit, Escape-/Pointer-Cancel-Transaktion, `destroy()` mit garantierter Listener-Freigabe. Insbesondere `update_task` ist kein Ersatz für eine transaktionale Bestätigung.
+- [Upstream Issue #494](https://github.com/frappe/gantt/issues/494) ist offen und benennt das konkrete Problem mehrfacher `on_date_change`-Aufrufe während eines Drag.
+- `move_dependencies:false` ist eine öffentliche Option, die automatische Frappe-Verschiebungen verhindern soll; diese Option **beweist keine** Vollständigkeit der eigenen Projekt-/Abhängigkeitsregeln. Der isolierte Frame und die lokale MIT-lizenzierte Vendor-Auslieferung bleiben erhalten.
+- Es gibt keinen Anlass, das geprüfte Paket 1.2.2 durch eine ältere 1.2.1-Version oder einen unveröffentlichten Upstream-`master` zu ersetzen.
+
+| Version/Kandidat | Stable / lokal verifiziert | Öffentlicher Abschluss-/Cancel-Vertrag | Entscheidung |
+| --- | --- | --- | --- |
+| 1.2.1 | Veröffentlicht, älter als 1.2.2; **nicht** erneut im Browser getestet | Kein neu nachgewiesener transaktionaler Abschlussvertrag | Kein begründeter Downgrade |
+| **1.2.2** | **Aktuellstes Stable, lokal im Projekt gepinnt**; bisherige Browser-Negativtests aus PR #14–#16 | Früh-Callbacks/fehlende Commit- und Cancel-Garantien in Vorphasen reproduziert | Beibehalten für Diagnose, **NO-GO** für schreibende Integration |
+| GitHub `master` | Unveröffentlichter Entwicklungsstand, keine Stable-Paketversion | Keine verlässliche veröffentlichte API-Zusage ableitbar | Nicht als neue Stable behandeln |
+
+Die Vergleichsmatrix ist ausdrücklich **kein vollständiger 1.2.1-vs.-1.2.2-Interaktions-Benchmark**. Dieser ist nur sinnvoll, wenn ein realer neuer Stable-Kandidat oder ein begründeter Regressionstest gegen die ältere Version erforderlich wird.
+
+### B. Tatsächlich hinzugefügte Diagnose
+
+`spikes/frappe/frame.mjs` protokolliert nur bei `?edit=1` Ereigniszeitpunkte in `window.__frappeInteractionTrace`: native `pointerdown/pointermove/pointerup/pointercancel/lostpointercapture`, `mousedown/mousemove/mouseup`, Escape, Blur sowie **öffentlich** ausgelöste `on_date_change`- und `on_progress_change`-Callbacks. Zusätzlich werden Gate-Intent und Cancel erfasst. Die Protokollierung verwendet **keine private Frappe-Methode** und ist auf 2.000 Einträge je Frame begrenzt. Kein Projekt- oder Browser-Storage wird durch die Diagnose beschrieben.
+
+`tests/frappe-public-editor-pointer.spec.cjs` erfasst per **echter Playwright-Maus und Tastatur** Move, Resize links/rechts, Progress, Klick ohne Bewegung, Escape, Release außerhalb und Frame-Neurendern während des Drags. Die JSON-Dateien werden unter `frappe-evidence/*.json` archiviert. Ein erfolgreicher **Sicherheits-Test** belegt nur `keine vorzeitige/mehrfache Intent-Abgabe` und `keine IndexedDB-Projektspeicherung`. **Null Upstream-Callbacks sind kein positives Funktionszertifikat.** Die tatsächliche Anzahl, Zeitpunkte und Inhalte stehen in den Prüfartefakten. Bis CI/Browser-Resultate dieses Commits vorliegen, sind sie als *implementiert, noch nicht verifiziert* zu behandeln.
+
+### C. Architekturentscheidung mit vier Red-Team-Perspektiven
+
+| Perspektive | Schwere | Befund / Maßnahme |
+| --- | --- | --- |
+| Architektur | **P1 Stop** | Stabile öffentliche Commit-/Cancel-API fehlt, Herstellerinterne Methoden dürfen nicht zur Laufzeit-Semantik werden. Kein Produktiv-Wiring. |
+| Datenintegrität | **P1 Stop** | Gestarteter IndexedDB-Write kann durch Engine-/Projektwechsel nicht verlässlich annulliert werden; vor-Commit-Fencing und Stale-UI-Filter sind vorhanden, Storage-Transaktionscancellation nicht. |
+| Frontend/UX | **P1 Stop** | Echtes Drag-/Resize-/Progress-Verhalten einschließlich Touch, Capture-Verlust, Datumssnap, Fokus, Tastatur und A11y nicht positiv zertifiziert. |
+| QA/Sicherheit | **P2** | Positivtests dürfen durch null Callback/unechte Pointerereignisse nicht vorgetäuscht werden; jeder reale Lauf liefert Rohdaten und Sicherheitsassertions. Stale-Messages und Replay bleiben mit Sessions/Generation zu schützen. |
+| Upgrade-/Paritätsrisiko | **P2** | Keine neue stabile Hersteller-API, weiter hoher Eigenaufwand für Native-Parität, Druck, Designs und Phasen. Native bleibt Referenz. |
+
+**Option 1 (aktuelle Stable direkt): NO-GO**, da der öffentliche Abschlussvertrag nicht nachgewiesen ist. **Option 2 (Adapter um 1.2.2): NO-GO für schreibfähigen Betrieb**, weil der Pointer-Guard auf internem DOM-/Gesture-Verhalten beruht. **Option 3 (read-only Isolation und unabhängige Sicherheitsprüfungen): gewählt.** Keine konkurrierende Commit-Schicht, keine Frappe-Patches, kein Fork.
+
+### D. Technische Abnahme und Sperren
+
+- **Untersucht:** npm-/GitHub-Stable-Stand und öffentliche API, Upstream-Issue #494, Stand PR #14–#16.
+- **Experimentell implementiert:** isolierte Ereignis-Telemetrie und echte physische Playwright-Diagnoseszenarien. Keine echte schreibende Engine implementiert.
+- **Bereits durch frühere Unit-Tests nachgewiesen:** Transaktions-/Session-/Revisionsschutz des unabhängigen Editors (PR #16).
+- **Echte Browserinteraktionen in diesem Branch:** neu angelegt, tatsächliche Resultate nur nach erfolgreichem CI-Lauf und Einsicht in Protokolle bestätigen.
+- **Vollständige Persistenzintegration:** **nicht vorhanden und nicht nachgewiesen**.
+- **Noch offen:** Herstellervalidierter End-of-Gesture-/Cancel-Vertrag, echte positive Move-/Resize-/Progress-Matrix, Kalender-/DST-/TZ-End-to-end über den Vendor, vollständiger Commit nach IndexedDB und UI-Refresh, Projektwechsel während begonnenem Save, Touch/Keyboard/A11y, Native-Feature-Parität, Memory-/Performance-Langzeitmessungen.
+- **Entscheidung:** **NO-GO** für einen schreibfähigen Frappe-Editor. Die neue Diagnostik ist nur eine unabhängige experimentelle Härtung. Kein Merge und keine produktive Aktivierung.
+
+### E. Reale Browsermessung auf PR-Merge-Ref `be37bd2` (CI vom 06.11.2026)
+
+Die erste neue Browser-CI (`44c56670`) schlug bei vier Fällen fehl, weil der unterhalb der Native-Referenzansicht liegende Frappe-iframe vor dem physischen Mauszug **nicht in den sichtbaren Browserviewport gescrollt** wurde. Dadurch erreichte `pointerdown` den iframe überhaupt nicht. Der Messaufbau wurde ausdrücklich korrigiert: `scrollIntoViewIfNeeded()`, `toBeInViewport()` sowie eine im iframe instrumentierte echte `pointerdown`-Bestätigung. Damit lässt sich ein falsch-grüner Offscreen-Maustest künftig nicht als Browsernachweis ausgeben.
+
+**Nachgewiesen auf `20b5f9b0012f53d775b90ba8a9d5e32f0858b190`:** [PR-Validate #42231551668](https://github.com/thomasasen/gantt-studio/actions/runs/42231551668) erfolgreich, **43/43 Node-Tests**; [PR-Merge-Ref-UI #42231551678](https://github.com/thomasasen/gantt-studio/actions/runs/42231551678) erfolgreich, **115/115 Chromium-Tests** und **20/20 Projektwechsel-Stresstests**, tatsächlicher Checkout des PR-Merge-Commits `be37bd2` gegen den Feature-Branch. Ebenfalls erfolgreicher [Branch-Push-Validate #42231539816](https://github.com/thomasasen/gantt-studio/actions/runs/42231539816) und [Branch-Push-UI #42231540108](https://github.com/thomasasen/gantt-studio/actions/runs/42231540108). [Messdaten-Archiv](https://github.com/thomasasen/gantt-studio/actions/runs/42231551678/artifacts/13510170939).
+
+| Echte Playwright-Interaktion | Öffentliche Frappe-Callbacks laut Browsertrace | Diagnose-Gate/IndexedDB | Bewertung |
+| --- | --- | --- | --- |
+| Balken-Move (+65 px) | **3 × `on_date_change`, alle vor Pointer-Up**; letzter Callback 44,2 ms vor Pointer-Up | **1 Intent erst nach Pointer-Up**, keine Speicherung | Früh-Callbacks real reproduziert |
+| Resize links (−30 px) | **1 × `on_date_change` vor Pointer-Up** | 1 Intent nach Up, keine Speicherung | Physische Vorschau/Abgabe demonstriert, nicht API-zertifiziert |
+| Resize rechts (+35 px) | **1 × `on_date_change` vor Pointer-Up** | 1 Intent nach Up, keine Speicherung | Wie oben |
+| Progress (+25 px) | **1 × `on_progress_change` nach Pointer-Up** | 1 Intent nach Up, keine Speicherung | Abschließender Callback empirisch beobachtet, nicht garantiert |
+| Klick ohne Bewegung | 0 Edit-Callbacks | 0 Intents, keine Speicherung | Sicherheitsgate bestanden |
+| Escape während Drag | 3 × `on_date_change` **vor Escape** | 0 Intents, keine Speicherung | Rollback-Gate wirksam; Frame wird neu aufgebaut |
+| Pointer-Up außerhalb | 3 × `on_date_change` **vor Verlassen** | 0 Intents, keine Speicherung | Kein fachlicher Commit; Frame entfernt/neugeladen |
+| iframe-Neurendern während Drag | Alte Frame-Trace durch Teardown nicht vollständig erhalten | 0 Intents, keine Speicherung | Stale-Negativgate, **kein** vollständiger Ablaufnachweis |
+
+**Konkrete Move-Spur:** Callbacks bei 795,7 / 843,4 / 905,7 ms (relative Frame-Zeit), Pointer-Up bei 949,9 ms, Diagnose-Intent bei 950,3 ms. Der letzte Callback enthielt `demo-core` mit `start:2026-07-23`, `end:2026-08-19` und wurde vom Gate nach Pointer-Up einmal weitergereicht. Für Resize links wurde `2026-07-19..2026-08-16`, rechts `2026-07-20..2026-08-17`, für Progress `52` gemessen. Einzelne CI-Messung, kein Nachweis für alle Zeitraster, Zeitgrenzen oder Laufzeitumgebungen.
+
+**Verschärfung nach dieser Messung:** In `tests/frappe-public-editor-pointer.spec.cjs` müssen die vier eigentlichen Edit-Szenarien nun **mindestens einen echten Upstream-Callback, genau einen Intent und dessen Übereinstimmung mit dem letzten Callback** nachweisen. Die bisherige negative Prüfung `maximal ein Intent` bleibt durch diese positive Pflicht verschärft; damit kann ein Stummbleiben des Herstellers nicht mehr als bestandener Edit-Test gelten. Die neue finale CI für diesen nachfolgenden Commit ist gesondert zu bestätigen.
+
+**Red-Team-Auswertung:** Der sichere Gate-Diagnosemodus funktioniert unter den beobachteten Playwright-Mausgesten. Ein garantiertes öffentliches `Preview → Finish / Cancel`-API-Signal fehlt weiterhin. Die neue positive Testpflicht beweist funktionierende Beispielgesten für **die ausgelieferte 1.2.2-Runtime**, aber weder robuste Release-Stabilität noch Touch/Escape/Pointer-Capture-/Blur-Parität, Endzustandskonsistenz in sämtlichen Fällen, Transaktionsabbrüche während IndexedDB-Writes oder die Native-Funktionsparität. **NO-GO bleibt verbindlich; Native bleibt produktiv.**
+
+
+### F. PR #17: unabhängige abschließende Diagnose- und Red-Team-Prüfung (06.11.2026)
+
+**Geltungsbereich:** ausschließlich der isolierte, optional über `/spikes/frappe/index.html?edit=1` erreichbare Diagnoserenderer. Keine produktive App-Anbindung, keine Frappe-Schreibfreigabe, keine Änderung von `main` oder der Native-Default-Engine.
+
+**Unabhängig verifizierte Ausgangsbasis:** PR #17 Head `de3732fb4023a771f449ca9ba3e72407dede6ff3`, Zielbranch `feature/frappe-transactional-editor@c91dbefef0a93df19e8a591b8fe5f939abe17e90`, Merge-Ref `6bdcbfa4ce03ca2e099c2e3c3e769debbc733b0d`. [Push Validate](https://github.com/thomasasen/gantt-studio/actions/runs/42232296779), [Push Browser](https://github.com/thomasasen/gantt-studio/actions/runs/42232296631), [PR Validate](https://github.com/thomasasen/gantt-studio/actions/runs/42232310534) und [PR Browser](https://github.com/thomasasen/gantt-studio/actions/runs/42232310526) jeweils tatsächlich **SUCCESS**; 43/43 Unit-/Contract-Tests, 115/115 Chromium-Tests und 20/20 kritische Projektwechsel je Browserlauf. Das PR-Merge-Ref-JSON wurde über [Evidence-Artefakt #13509474039](https://github.com/thomasasen/gantt-studio/actions/runs/42232310526/artifacts/13509474039) gesondert analysiert (8 Szenarien).
+
+**Echte Callback-Spuren:** Move 3 × `on_date_change` vor Pointer-Up, Resize links/rechts jeweils 1 × `on_date_change` vor Pointer-Up, Progress 1 × `on_progress_change` nach Pointer-Up. Je gültiger Geste genau ein Diagnose-Intent entsprechend dem letzten Callback; vor der Freigabe kein Intent. Klick ohne Drag sowie Escape und Release außerhalb ergeben 0 Intents. Die Browserprüfung findet keine angelegte IndexedDB-Datenbank. Es handelt sich ausschließlich um punktuelle Chromium-Befunde, nicht um eine stabile Hersteller-Commit-/Cancel-Garantie.
+
+**Neuer Red-Team-Befund und Korrektur, P2 / QA:** Das achte Szenario „iframe-Neurendern während Drag“ war zunächst falsch-positiv: In dessen JSON fehlten `pointerdown` und Upstream-Callbacks vollständig, weil der Balken nicht in den sichtbaren Viewport gescrollt wurde. Der Test ist jetzt auf `scrollIntoViewIfNeeded`, `toBeInViewport`, echten `pointerdown`, echten `on_date_change` vor dem Neustart, nachweislich abgelösten Frame und 0 verbleibende Intents verschärft. **Diese neue Teständerung braucht eigene erfolgreiche CI auf dem finalen Head und PR-Merge-Ref; die vorherigen grünen Läufe gelten nicht als Nachweis für diese Korrektur.**
+
+**Vier unabhängige Review-Perspektiven:**
+
+| Review | Einstufung | Befund und Abgrenzung |
+| --- | --- | --- |
+| Architektur | P1 für Produktivbetrieb, nicht blockierend für isolierte Diagnose | Offizielles Frappe 1.2.2 besitzt keinen nachgewiesenen öffentlichen finalen Gesture-/Cancel-Vertrag; kein privates Upstream-API als Produktgrundlage verwenden |
+| Datenintegrität | P1 für Produktivbetrieb, nicht blockierend für isolierte Diagnose | Bereits gestartete IndexedDB-Transaktionen sind durch Frame-Destroy nicht rückabwickelbar; Diagnose nimmt gar keine Persistenz vor |
+| Frontend/UX | P1 für Produktivbetrieb, P2 für Diagnose | Mausgesten exemplarisch gemessen; Touch, Pen, Tastatur, Fokusverlust, Capture-Verlust, Browser-Zoom, Screenreader und Native-Parität nicht vollständig abgenommen |
+| QA/Sicherheit | P2 korrigiert, Restrisiken P2 | Falsch-positive Offscreen-Neustartprobe korrigiert; Generation/Session, Replay- und Manipulations-Negativtests vorhanden; gleichoriginiger kompromittierter Code bleibt eine Grenze der iframe-Isolation |
+
+**Drei getrennte Entscheidungen:** (1) **Technische Machbarkeit: bedingtes GO** für die Diagnose und einen unabhängigen Transaktionsadapter als Forschungsergebnis, kein belastbarer End-to-End-Produktnachweis. (2) **Merge von PR #17 in `feature/frappe-transactional-editor`: GO ausschließlich bei vollständiger finaler CI und konfliktfreiem Stand**, da keine schreibende Engine aktiviert wird. (3) **Produktive schreibfähige Frappe-Engine: NO-GO**, bis öffentliche Abschluss-/Abort-Semantik, transaktionale Persistenz und Native-Parität belegt sind.
+
+**Nächste abgegrenzte Entwicklungsphase (nicht Teil von PR #17):** Zuerst mit Upstream ein öffentliches, versioniertes `gesture-finish/gesture-cancel`-API einschließlich gültigem Endzustand und Fehlerfall klären; alternativ die Kosten einer herstellerunabhängigen Pointer-Schicht und einer anderen Gantt-Bibliothek anhand derselben realen Contract-Matrix vergleichen. Danach separat einen CAS-geschützten, vor Transaktionsstart abbrechbaren IndexedDB-Commit-Pfad und eine explizite Native-Paritätsmatrix (Sortierung, Phasen, Kalender, Abhängigkeiten, Themes, Print, Touch, Keyboard, Accessibility) prototypisieren. Ohne diese Gates keinen Frappe-Produktiv-Merge.

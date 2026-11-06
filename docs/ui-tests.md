@@ -37,3 +37,30 @@ The runtime application itself has no Playwright dependency.
 
 
 **Verifizierte PR-Merge-Ref-CI der Transaktionsimplementierung `f967304`:** [43 Unit-Tests](https://github.com/thomasasen/gantt-studio/actions/runs/42227444924) und [107 Chromium-Tests plus 20 Projektwechsel-Stresstests](https://github.com/thomasasen/gantt-studio/actions/runs/42227444915), beide **SUCCESS**. Getestet wurde der berechnete Merge-Commit `800fbc2` gegen `fix/frappe-lifecycle-isolation@86de64e`. Der experimentelle Frappe-Diagnosemodus schreibt nicht in IndexedDB; die Tests beanspruchen ausdrücklich keine Schreibfreigabe.
+
+
+### Physische Frappe-Editor-API-Diagnose (experimenteller PR #17)
+
+Aktuelle veröffentlichte Stable-Version: `frappe-gantt@1.2.2`; es gibt Stand 06.11.2026 kein neueres stabiles npm-Paket. Upstream-Issue [#494](https://github.com/frappe/gantt/issues/494) beschreibt die mehrfachen `on_date_change`-Aufrufe während des Drags.
+
+- Browser-Befehl nach `npm ci --prefix spikes/frappe && npm run build --prefix spikes/frappe`: `npx playwright test tests/frappe-public-editor-pointer.spec.cjs --workers=1 --reporter=line`.
+- Der Test `?edit=1` verwendet die ausgelieferte lokale Frappe-UMD-Bibliothek und echte Playwright-Maus-/Tastaturereignisse. Fälle: Move, Resize links, Resize rechts, Progress, Klick ohne Bewegung, Escape, Loslassen außerhalb und iframe-Neurendern während der Geste.
+- Ereignisspur je Fall: `frappe-evidence/*.json`. Enthält native Browser-Events, `on_date_change`, `on_progress_change`, Gate-Intent, Gate-Cancel und verbleibende Intents. Sie wird durch den CI-Workflow auch bei Testfehlern hochgeladen, sofern vorhanden.
+- **Abnahmegrenze:** Tests prüfen zunächst streng Negativ-Sicherheit (kein früher Commit, höchstens ein Intent, keine IndexedDB-Schreibung). Wenn keine Callback-Ereignisse eintreffen, **ist das kein Nachweis für Editor-Funktionsfähigkeit**. Positive Anforderungen wie exakt ein gültiger Endzustand bei Drag/Resize/Progress und der vollständige persistente Datenfluss bleiben gesonderte Blocker.
+- Tests in `tests/frappe-interaction-preview.spec.cjs` nutzen zu Diagnosezwecken teilweise private Upstream-Aufrufe. Sie sind **keine** Ersatznachweise für physische Pointer-Bedienung.
+- Für die aktuelle Branch-/PR-Abnahme sind vollständige Static-Validate- und Browser-CI auf finalem Head **und** PR-Merge-Ref gegen `feature/frappe-transactional-editor` erforderlich. Ein älterer Erfolg von PR #16 zählt nicht als Beleg für neue Änderungen.
+
+### Verifizierter physischer Vendor-Test (06.11.2026)
+
+Beim ersten Lauf lagen die echten Frappe-Balken wegen des hohen Native-Referenzcharts unterhalb des Viewports; Mausbewegungen ohne vorheriges Scrollen erreichten den iframe nicht. Die Tests scrollen die Frappe-Controls deshalb explizit in den sichtbaren Bereich, verifizieren `toBeInViewport` und protokollieren ein tatsächliches Browser-`pointerdown`. Jeder positive Edit-Test muss nun mindestens **einen echten Frappe-Änderungs-Callback, genau einen passenden Diagnose-Intent und keinen IndexedDB-Write** liefern.
+
+Auf dem geprüften Stand `20b5f9b` und dem PR-Merge-Ref `be37bd2`: [CI-Run #42231551678](https://github.com/thomasasen/gantt-studio/actions/runs/42231551678) **115/115 Chromium-Browser-Tests + 20/20 Projektwechsel**; [JSON-Ereignisspuren](https://github.com/thomasasen/gantt-studio/actions/runs/42231551678/artifacts/13510170939). Reale Interaktionen: Move = 3 `on_date_change` vor Pointer-Up; Resize links/rechts = je 1 `on_date_change` vor Pointer-Up; Progress = 1 `on_progress_change` nach Pointer-Up; Escape und Release außerhalb = 0 fachliche Intents. Das beweist exemplarische physische Interaktionen und das eigene Gate, **nicht** eine öffentlich dokumentierte transaktionale Hersteller-API. Die erneut verschärften Positivassertions benötigen ihren eigenen abschließenden CI-Nachweis.
+
+
+### Unabhängige Abschlussprüfung PR #17 (06.11.2026)
+
+- **Nachweis auf Head `de3732fb` und zugehörigem PR-Merge-Ref `6bdcbfa4`:** [Branch-Validierung](https://github.com/thomasasen/gantt-studio/actions/runs/42232296779) und [PR-Validierung](https://github.com/thomasasen/gantt-studio/actions/runs/42232310534) jeweils SUCCESS (43/43 Unit-/Contract-Tests); [Branch-Browser](https://github.com/thomasasen/gantt-studio/actions/runs/42232296631) und [PR-Merge-Ref-Browser](https://github.com/thomasasen/gantt-studio/actions/runs/42232310526) jeweils SUCCESS (115/115 Chromium, 20/20 Projektwechsel).
+- [Tatsächliche Rohspuren des PR-Merge-Refs](https://github.com/thomasasen/gantt-studio/actions/runs/42232310526/artifacts/13509474039): 8 JSON-Dateien. Move 3 frühe `on_date_change`; Resize links und rechts jeweils 1 früher `on_date_change`; Progress 1 `on_progress_change` nach Pointer-Up. In allen vier Fällen genau 1 Intent mit dem letzten Callback-Inhalt; Klick/Escape/Release außerhalb jeweils 0 Intents. Keine angelegte IndexedDB-Datenbank. Keine Garantie für allgemeine Callback-Stabilität.
+- **Identifizierte falsch-positive Probe:** `rerender-during-drag.json` auf diesem früheren Stand enthielt überhaupt keinen `pointerdown` und keinen Änderungs-Callback. Ursache war ein Offscreen-Mauszug. Der Test wird nun durch Scroll-/Viewport-Kontrolle sowie Pflichtassertions für echten `pointerdown`, mindestens einen `on_date_change` vor Frame-Neustart und nachgewiesenes Frame-Teardown abgesichert. Ohne diese Vorbedingungen darf der Test nicht grün sein.
+- **Neue Testversion:** Die abschließenden GitHub-Actions-Läufe müssen ausdrücklich auf dem **neuen** Head einschließlich dieser Testkorrektur und auf dessen PR-Merge-Ref erfolgreich sein. Die oben genannten Ergebnisse sind nur die historische Baseline vor der Korrektur. Finale Referenzen und Merge-Entscheidung sind in der Beschreibung von PR #17 zu hinterlegen.
+- Browser-seitig bereits vorhandene synthetische Negativtests für `pointercancel` und ESC sowie Session-/Revisions-/Replay-Tests ersetzen keine physische Touch-/Pen-/Keyboard- und IndexedDB-Transaktionsabnahme. Der Frappe-Modus bleibt Diagnose und besitzt keine schreibende Produktanbindung.
