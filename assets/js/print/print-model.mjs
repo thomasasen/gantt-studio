@@ -82,7 +82,7 @@ export function projectForPrint(project, settings, context={}) {
     const y=Number(today.slice(0,4)), m=Number(today.slice(5,7))-1, q=Math.floor(m/3)*3;
     from=iso(Date.UTC(y,q,1));to=add(iso(Date.UTC(y,q+3,1)),-1);
   }
-  const rangeRows=rows.filter(t=>t.type==='phase-summary' || (t.end>=from&&t.start<=to));
+  const rangeRows=rows.filter(t=>t.end>=from&&t.start<=to);
   return Object.freeze({name:source.name||'Projektplan',revision:source.revision,
     rows:rangeRows,from,to,markers:s.markers?(source.planning?.markers||[]).filter(m=>valid(m.date)&&m.date>=from&&m.date<=to):[],
     holidays:source.planning?.holidays||[],settings:s});
