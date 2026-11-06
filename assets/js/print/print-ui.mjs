@@ -1,5 +1,6 @@
 import { PRINT_DEFAULTS, sanitizePrintSettings, projectForPrint, paginatePrint, days, add } from './print-model.mjs?v=2.9.0';
 const escape = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const printColor=(value,fallback)=>/^#[0-9a-f]{3}(?:[0-9a-f]{3})?$/i.test(String(value||''))?value:fallback;
 const fmt = s => new Intl.DateTimeFormat('de-DE',{timeZone:'UTC',day:'2-digit',month:'2-digit',year:'numeric'}).format(new Date(s+'T00:00:00Z'));
 const choices = (key,label,values,s) => '<label><span>'+label+'</span><select data-print="'+key+'">'+values.map(([k,v])=>'<option value="'+k+'"'+(s[key]===k?' selected':'')+'>'+v+'</option>').join('')+'</select></label>';
 const numeric = (key,label,s,min,max) => '<label><span>'+label+'</span><input type="number" min="'+min+'" max="'+max+'" data-print="'+key+'" value="'+s[key]+'"></label>';
@@ -59,7 +60,8 @@ function timeline(row,page,layout,s){
  if(s.holidays)for(const holiday of page.holidays){const x=days(page.from,holiday.date)*unit;if(x>=0&&x<width)shapes+='<rect x="'+x+'" y="0" width="'+unit+'" height="8" fill="#f2d3d3"/>';}
  if(s.weekends)for(let i=0;i<span;i++){const day=new Date(add(page.from,i)+'T00:00:00Z').getUTCDay();if(day===0||day===6)shapes+='<rect x="'+i*unit+'" y="0" width="'+unit+'" height="8" fill="#f0f2f4"/>';}
  const start=days(page.from,row.start),end=days(page.from,row.end)+1, l=Math.max(0,start),r=Math.min(span,end);
- const color=s.color?(row.type==='critical'?'#a34b42':row.type==='phase-summary'?'#c2dbe6':row.type==='milestone'?'#94703a':row.type==='gate'?'#795a9a':'#286c83'):'#667783';
+ const custom=page.colors||{};
+  const color=s.color?printColor(row.type==='phase-summary'?row.phaseColor:custom[row.type],row.type==='critical'?'#a34b42':row.type==='phase-summary'?'#c2dbe6':row.type==='milestone'?'#94703a':row.type==='gate'?'#795a9a':'#286c83'):'#667783';
  if(r>l){
   if(row.type==='milestone'||row.type==='gate'){const x=Math.min(width-2,Math.max(2,start*unit));shapes+='<path d="M '+x+' 1 L '+(x+2)+' 4 L '+x+' 7 L '+(x-2)+' 4 Z" fill="'+color+'"/>';}
   else{const x=l*unit,w=(r-l)*unit;shapes+='<rect x="'+x+'" y="2" width="'+w+'" height="4" rx=".5" fill="'+color+'"/>';if(s.progress&&Number(row.progress)>0)shapes+='<rect x="'+x+'" y="2" width="'+w*Math.min(100,Number(row.progress))/100+'" height="4" fill="#15384c" opacity=".45"/>';}
@@ -93,7 +95,7 @@ export function printHtml(projection,layout){
  const sheets=layout.pages.map(page=>{
   const markers=projection.markers.filter(m=>m.date>=page.from&&m.date<=page.to);
   const holidays=projection.holidays.filter(h=>h.date>=page.from&&h.date<=page.to);
-   const p={...page,markers,holidays};
+   const p={...page,markers,holidays,colors:projection.colors};
   const headers='<thead><tr><th style="width:'+layout.labelW+'mm">Aufgabe</th><th>Zeitraum '+escape(fmt(page.from))+' – '+escape(fmt(page.to))+timeHeader(page,layout)+'</th></tr></thead>';
   const body=page.rows.map((row,rowIndex)=>{
    let label=s.names?escape(row.name):escape(row.id);
