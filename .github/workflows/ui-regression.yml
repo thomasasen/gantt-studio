@@ -7,8 +7,9 @@ on:
       - refactor/engine-abstraction
       - fix/frappe-lifecycle-isolation
       - feature/frappe-transactional-editor
+      - spike/frappe-public-editor-api
   pull_request:
-    branches: [main, fix/frappe-lifecycle-isolation]
+    branches: [main, fix/frappe-lifecycle-isolation, feature/frappe-transactional-editor]
   workflow_dispatch:
 
 permissions:
@@ -39,6 +40,7 @@ jobs:
           node --check assets/js/core/transactional-editor.mjs
           node --check tests/transactional-editor.spec.mjs
           node --check tests/frappe-transactional-browser.spec.cjs
+          node --check tests/frappe-public-editor-pointer.spec.cjs
           node --check assets/js/core/project-activation.mjs
           node --check assets/js/engine/engine-contract.mjs
           node --check assets/js/engine/engine-controller.mjs
@@ -88,6 +90,13 @@ jobs:
         run: npx playwright test --reporter=line
       - name: Repeat the critical Gantt project-switch regression 20 times
         run: npx playwright test tests/project-switch-cancel.spec.cjs --grep "switching projects during Gantt drag" --repeat-each=20 --workers=1 --reporter=line
+      - name: Upload Frappe real-pointer evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frappe-public-editor-pointer-evidence
+          path: frappe-evidence/*.json
+          if-no-files-found: ignore
       - name: Upload design audit report
         if: always()
         uses: actions/upload-artifact@v4
