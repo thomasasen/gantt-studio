@@ -258,7 +258,6 @@ test('commit preserves scroll and transfers keyboard focus, including 200 percen
    focusTask(){return false;},destroy(){root?.replaceChildren();root=null;},
    getCapabilities(){return caps;}
   };});
-  const focusOriginal=HTMLElement.prototype.focus;
   try{
    c.mount({container:host,onError:()=>{}});
    await c.render({project:{id:'focus',tasks:[{
@@ -267,44 +266,22 @@ test('commit preserves scroll and transfers keyboard focus, including 200 percen
    viewport.scrollLeft=82;viewport.scrollTop=105;
    host.querySelector('button').focus({preventScroll:true});
    const wasFocused=document.activeElement.textContent==='Old focused task';
-   const focusTrace=[];
-   HTMLElement.prototype.focus=function(...args){
-    focusTrace.push({tag:this.tagName,id:this.id,tabindex:this.getAttribute('tabindex'),
-     hidden:this.getAttribute('aria-hidden'),inert:this.inert,connected:this.isConnected});
-    const value=focusOriginal.apply(this,args);
-    focusTrace[focusTrace.length-1].afterFocus=document.activeElement?.tagName;
-    focusTrace[focusTrace.length-1].afterIsTarget=document.activeElement===this;
-    focusTrace[focusTrace.length-1].computedVisibility=getComputedStyle(this).visibility;
-    focusTrace[focusTrace.length-1].computedDisplay=getComputedStyle(this).display;
-    focusTrace[focusTrace.length-1].computedPointerEvents=getComputedStyle(this).pointerEvents;
-    focusTrace[focusTrace.length-1].parentInert=this.parentElement?.inert;
-    return value;
-   };
    const originalSize={width:host.offsetWidth,height:host.offsetHeight};
    const switched=await c.switchEngine(createFrappeEngine);
    const newRoot=viewport.firstElementChild;
-   const focusBeforeManual=document.activeElement===newRoot;
-   newRoot.focus({preventScroll:true});
-   const manualFocusWorks=document.activeElement===newRoot;
    return {
-    switched,wasFocused,focusTransferred:focusBeforeManual,manualFocusWorks,
+    switched,wasFocused,focusTransferred:document.activeElement===newRoot,
     left:viewport.scrollLeft,top:viewport.scrollTop,
     active:newRoot.inert===false && !newRoot.hasAttribute('aria-hidden'),
     sizePreserved:newRoot.offsetWidth===originalSize.width && newRoot.offsetHeight===originalSize.height,
-    focusTrace,
-    activeElementTag:document.activeElement?.tagName,
-    activeElementId:document.activeElement?.id,
-    focusTargetTag:newRoot.tagName,
     frames:viewport.querySelectorAll('iframe').length,
     oldRemoved:!viewport.contains(host)
    };
   }finally{
-   HTMLElement.prototype.focus=focusOriginal;
    c.destroy();viewport.remove();document.documentElement.style.zoom='';
   }
  });
- console.log('ENGINE_FOCUS_DIAGNOSTICS '+JSON.stringify(result));
- expect(result).toMatchObject({
+ expect(result).toEqual({
   switched:true,wasFocused:true,focusTransferred:true,
   left:82,top:105,active:true,sizePreserved:true,frames:1,oldRemoved:true
  });

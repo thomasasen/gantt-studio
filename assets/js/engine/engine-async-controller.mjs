@@ -153,7 +153,9 @@ export function createAsyncEngineController(initialFactory) {
           // Honor an explicit size on the original mount root. Clearing this
           // width would clamp horizontal scroll during an atomic switch.
           node.style.width = liveWidth;
-          node.style.visibility = '';
+          // Explicitly show the committed tree; merely removing the hidden
+          // declaration can leave computed visibility inherited as hidden.
+          node.style.visibility = 'visible';
           node.style.pointerEvents = '';
           node.style.overflow = '';
           node.removeAttribute('aria-hidden');
